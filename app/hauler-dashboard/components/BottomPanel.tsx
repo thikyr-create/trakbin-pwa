@@ -37,14 +37,27 @@ export default function BottomPanel() {
 
   return (
     <motion.div 
-      initial={{ y: "100%" }} 
-      animate={{ y: 0 }} 
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
-      className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl rounded-t-[24px] shadow-2xl border-t border-slate-800 z-20 max-h-[75vh]"
+      drag="y"
+      dragConstraints={{ top: 0 }}
+      dragElastic={0.1}
+      onDragEnd={(e, info) => {
+        if (info.offset.y < -100) {
+          setIsExpanded(true);
+        } else if (info.offset.y > 100) {
+          setIsExpanded(false);
+        }
+      }}
+      animate={{ 
+        y: 0,
+        height: isExpanded ? 'auto' : 'auto',
+        borderRadius: 24
+      }}
+      className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl shadow-2xl border-t border-slate-800 z-20 cursor-grab active:cursor-grabbing"
+      style={{ touchAction: 'none' }}
     >
       {/* Drag Handle */}
       <div 
-        className="w-full flex justify-center pt-3 pb-2 cursor-pointer"
+        className="w-full flex justify-center pt-3 pb-2"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="w-12 h-1.5 bg-slate-700 rounded-full"></div>
@@ -53,7 +66,7 @@ export default function BottomPanel() {
       <div className="px-5 pb-5">
         <AnimatePresence mode="wait">
           {!showSearch ? (
-            // 📍 COLLAPSED/MINIMAL VIEW (Like Bolt)
+            // 📍 COLLAPSED/MINIMAL VIEW
             <motion.div
               key="minimal"
               initial={{ opacity: 0, y: 10 }}
@@ -61,7 +74,7 @@ export default function BottomPanel() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-4"
             >
-              {/* Search Bar - Always Visible */}
+              {/* Search Bar */}
               <div className="relative">
                 <button 
                   onClick={() => setShowSearch(true)}
@@ -75,7 +88,7 @@ export default function BottomPanel() {
                 </button>
               </div>
 
-              {/* Show Current Stop Info if Available */}
+              {/* Show Current Stop Info */}
               {currentStop && (
                 <motion.div 
                   initial={{ opacity: 0 }}
@@ -163,12 +176,11 @@ export default function BottomPanel() {
           )}
         </AnimatePresence>
 
-        {/* Expanded Details (Only when expanded and has current stop) */}
+        {/* Expanded Details */}
         {isExpanded && currentStop && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
             className="pt-4 border-t border-slate-800 mt-4"
           >
             <div className="grid grid-cols-2 gap-3 mb-4">
