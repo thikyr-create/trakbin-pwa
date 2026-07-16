@@ -2,16 +2,17 @@
 
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
+// @ts-ignore
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { RouteBuilding } from './components/types';
-
 interface MapboxMapProps {
   routeStops: RouteBuilding[];
+  focusStop?: RouteBuilding | null; // ✅ NEW
 }
 
 const DEFAULT_CENTER: [number, number] = [3.3792, 6.5244];
 
-export default function MapboxMap({ routeStops }: MapboxMapProps) {
+export default function MapboxMap({ routeStops, focusStop }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
@@ -34,12 +35,10 @@ export default function MapboxMap({ routeStops }: MapboxMapProps) {
 
     mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Add GPS Dot
     const el = document.createElement('div');
     el.innerHTML = `<div style="width: 20px; height: 20px; background-color: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>`;
     markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat(DEFAULT_CENTER).addTo(mapRef.current);
 
-    // Background GPS tracking
     if (navigator.geolocation) {
       navigator.geolocation.watchPosition(
         (pos) => {
@@ -58,57 +57,48 @@ export default function MapboxMap({ routeStops }: MapboxMapProps) {
     };
   }, []);
 
-  // 2. Draw Route Line and Nodes when stops update
+  // 2. Draw Route Line and Nodes
   useEffect(() => {
     if (!mapRef.current || routeStops.length === 0) return;
     const map = mapRef.current;
 
     const drawRoute = () => {
-      // Remove existing layers/sources if they exist
       if (map.getLayer('route-line-layer')) map.removeLayer('route-line-layer');
       if (map.getSource('route-line')) map.removeSource('route-line');
       if (map.getLayer('route-nodes-layer')) map.removeLayer('route-nodes-layer');
       if (map.getSource('route-nodes')) map.removeSource('route-nodes');
 
-      // Sort stops by sequence
       const sortedStops = [...routeStops].sort((a, b) => a.sequence - b.sequence);
+      const lineCoordinates: [number, number][] = sortedStops
+        .filter(s => s.latitude && s.longitude)
+        .map(stop => [stop.longitude!, stop.latitude!]);
       
-      // Create GeoJSON for the line
-      const lineCoordinates: [number, number][] = sortedStops.map(stop => [stop.longitude!, stop.latitude!]);
-      
-      // Add Line Source & Layer
-      map.addSource('route-line', {
-        type: 'geojson',
-        data: { 
-          type: 'Feature', 
-          properties: {}, 
-          geometry: { type: 'LineString', coordinates: lineCoordinates } 
-        }
-      });
+      if (lineCoordinates.length > 0) {
+        map.addSource('route-line', {
+          type: 'geojson',
+          data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: lineCoordinates } }
+        });
 
-      map.addLayer({
-        id: 'route-line-layer',
-        type: 'line',
-        source: 'route-line',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#16A34A', 'line-width': 6, 'line-opacity': 0.8 }
-      });
+        map.addLayer({
+          id: 'route-line-layer',
+          type: 'line',
+          source: 'route-line',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#16A34A', 'line-width': 6, 'line-opacity': 0.8 }
+        });
+      }
 
-      // Create GeoJSON for the nodes
       const nodesGeoJSON: any = {
         type: 'FeatureCollection',
-        features: sortedStops.map(stop => ({
-          type: 'Feature',
-          properties: { 
-            id: stop.building_id, 
-            status: stop.status,
-            payment: stop.payment_status 
-          },
-          geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] }
-        }))
+        features: sortedStops
+          .filter(s => s.latitude && s.longitude)
+          .map(stop => ({
+            type: 'Feature',
+            properties: { id: stop.building_id, status: stop.status, payment: stop.payment_status },
+            geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] }
+          }))
       };
 
-      // Add Nodes Source & Layer
       map.addSource('route-nodes', { type: 'geojson', data: nodesGeoJSON });
 
       map.addLayer({
@@ -117,38 +107,41 @@ export default function MapboxMap({ routeStops }: MapboxMapProps) {
         source: 'route-nodes',
         paint: {
           'circle-radius': 10,
-          // ✅ UPDATED: Added amber color for skipped stops
           'circle-color': [
-            'match',
-            ['get', 'status'],
-            'completed', '#9CA3AF', // Gray
-            'skipped', '#F59E0B',   // Amber/Yellow for skipped
-            'pending', [
-              'match', ['get', 'payment'],
-              'unpaid', '#EF4444', // Red
-              '#10B981' // Green
-            ],
-            '#3B82F6' // Blue (Current/Arrived)
+            'match', ['get', 'status'],
+            'completed', '#9CA3AF',
+            'skipped', '#F59E0B',
+            'pending', ['match', ['get', 'payment'], 'unpaid', '#EF4444', '#10B981'],
+            '#3B82F6'
           ],
           'circle-stroke-width': 3,
           'circle-stroke-color': '#FFFFFF'
         }
       });
 
-      // Fly to the first pending stop
+      // Auto-fly to first pending stop on initial load
       const firstPending = sortedStops.find(s => s.status === 'pending');
-      if (firstPending) {
-        map.flyTo({ center: [firstPending.longitude!, firstPending.latitude!], zoom: 16, duration: 2000 });
+      if (firstPending && firstPending.latitude && firstPending.longitude) {
+        map.flyTo({ center: [firstPending.longitude, firstPending.latitude], zoom: 16, duration: 2000 });
       }
     };
 
-    if (map.isStyleLoaded()) {
-      drawRoute();
-    } else {
-      map.on('load', drawRoute);
-    }
+    if (map.isStyleLoaded()) drawRoute();
+    else map.on('load', drawRoute);
 
   }, [routeStops]);
+
+  // ✅ NEW: Resume Route / Focus Stop Logic
+  useEffect(() => {
+    if (focusStop && focusStop.latitude && focusStop.longitude && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [focusStop.longitude, focusStop.latitude],
+        zoom: 17,
+        duration: 1500,
+        essential: true
+      });
+    }
+  }, [focusStop]);
 
   return <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />;
 }
