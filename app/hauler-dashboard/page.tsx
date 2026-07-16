@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 import { Search, LogOut, MapPin, Plus, Minus } from 'lucide-react';
 import ShiftCard from './components/ShiftCard';
 import BottomSheet from './components/BottomSheet';
@@ -10,42 +11,111 @@ import MapboxMap from './MapboxMap';
 import { DriverRoute, RouteBuilding } from './components/types';
 import { calculateDistanceInMeters } from './utils/geo';
 
+// Initialize Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default function HaulerDashboard() {
   const router = useRouter();
   const [currentTime, setCurrentTime] = useState('');
+  const [driver, setDriver] = useState<any>(null);
   const [route, setRoute] = useState<DriverRoute | null>(null);
   const [routeStops, setRouteStops] = useState<RouteBuilding[]>([]);
   const [currentStop, setCurrentStop] = useState<RouteBuilding | null>(null);
   const [isArrived, setIsArrived] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Clock
+  // 1. Clock & Auth Check
   useEffect(() => {
     setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })), 1000);
-    return () => clearInterval(timer);
-  }, []);
+    
+    const storedDriver = localStorage.getItem('trakbin_driver');
+    if (storedDriver) setDriver(JSON.parse(storedDriver));
+    else router.push('/auth'); // Redirect if not logged in
 
-  // 2. Simulate Route Assignment
+    return () => clearInterval(timer);
+  }, [router]);
+
+  // 2. Fetch Real Route Data
   useEffect(() => {
-    const mockRoute: DriverRoute = {
-      id: 'route-001', company_id: 'comp-1', driver_id: 'A30', truck_id: 'TRK-03',
-      zone_id: 'Zone A', route_name: 'Route A-03', status: 'active',
-      total_stops: 3, completed_stops: 0, scheduled_start_time: new Date().toISOString(),
+    if (!driver) return;
+
+    const fetchRoute = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch the latest active/assigned route for this driver
+        const { data: routeData, error: routeError } = await supabase
+          .from('routes')
+          .select('*')
+          .eq('driver_id', driver.employee_id || driver.id) // Adjust based on your user schema
+          .in('status', ['assigned', 'active'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (routeError || !routeData) {
+          console.log('No active route found for driver');
+          setRoute(null);
+          setRouteStops([]);
+          setIsLoading(false);
+          return;
+        }
+
+        setRoute(routeData);
+
+        // Fetch stops for this route
+        const { data: stopsData, error: stopsError } = await supabase
+          .from('route_stops')
+          .select('*')
+          .eq('route_id', routeData.id)
+          .order('sequence', { ascending: true });
+
+        if (stopsError || !stopsData) {
+          setRouteStops([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch building details for these stops
+        const buildingIds = stopsData.map((stop: any) => stop.building_id);
+        const { data: buildingsData } = await supabase
+          .from('Buildings')
+          .select('custom_id, address, latitude, longitude, payment_status, waste_type, estimated_waste, occupancy')
+          .in('custom_id', buildingIds);
+
+        // Merge stops with building details
+        const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
+          const building = buildingsData?.find((b: any) => b.custom_id === stop.building_id);
+          return {
+            ...stop,
+            address: building?.address || 'Unknown Address',
+            latitude: building?.latitude,
+            longitude: building?.longitude,
+            payment_status: building?.payment_status,
+            waste_type: building?.waste_type,
+            estimated_waste: building?.estimated_waste,
+            occupancy: building?.occupancy,
+          };
+        });
+
+        setRouteStops(mergedStops);
+
+        // Set current stop to the first pending one
+        const firstPending = mergedStops.find((s: any) => s.status === 'pending');
+        setCurrentStop(firstPending || null);
+
+      } catch (error) {
+        console.error('Error fetching route:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    const mockStops: RouteBuilding[] = [
-      { id: '1', route_id: 'route-001', building_id: 'TB-001', sequence: 1, status: 'pending', address: '12 Palm Crescent', latitude: 6.5250, longitude: 3.3790, payment_status: 'paid', waste_type: 'Mixed', estimated_waste: '240L', occupancy: '16 Units' },
-      { id: '2', route_id: 'route-001', building_id: 'TB-002', sequence: 2, status: 'pending', address: '45 Marina Road', latitude: 6.5265, longitude: 3.3810, payment_status: 'unpaid', waste_type: 'Organic', estimated_waste: '120L', occupancy: '8 Units' },
-      { id: '3', route_id: 'route-001', building_id: 'TB-003', sequence: 3, status: 'completed', address: '88 Broad Street', latitude: 6.5280, longitude: 3.3830, payment_status: 'paid', waste_type: 'Mixed', estimated_waste: '300L', occupancy: '24 Units' },
-    ];
-
-    setTimeout(() => {
-      setRoute(mockRoute);
-      setRouteStops(mockStops);
-      setCurrentStop(mockStops.find(s => s.status === 'pending') || null);
-    }, 1500);
-  }, []);
+    fetchRoute();
+  }, [driver]);
 
   // 3. Track GPS and Detect Arrival
   useEffect(() => {
@@ -59,12 +129,8 @@ export default function HaulerDashboard() {
             currentStop.latitude, currentStop.longitude
           );
           
-          // ARRIVAL DETECTION: 25 meters
-          if (distance <= 25 && !isArrived) {
-            setIsArrived(true);
-          } else if (distance > 50 && isArrived) {
-            setIsArrived(false); 
-          }
+          if (distance <= 25 && !isArrived) setIsArrived(true);
+          else if (distance > 50 && isArrived) setIsArrived(false); 
         }
       },
       (err) => console.warn('GPS Error:', err),
@@ -75,28 +141,42 @@ export default function HaulerDashboard() {
   }, [currentStop, isArrived]);
 
   // Handlers
-  const handleCompletePickup = () => {
-    if (!currentStop) return;
+  const handleCompletePickup = async () => {
+    if (!currentStop || !route) return;
+    
+    // Update local state immediately for UX
     setRouteStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, status: 'completed' } : s));
     setRoute(prev => prev ? { ...prev, completed_stops: prev.completed_stops + 1 } : null);
+    
+    // Update Supabase
+    await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id);
+    await supabase.from('routes').update({ completed_stops: route.completed_stops + 1 }).eq('id', route.id);
     
     const nextStop = routeStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
     setCurrentStop(nextStop || null);
     setIsArrived(false);
   };
 
-  const handleSkipSubmit = (reason: string) => {
+  const handleSkipSubmit = async (reason: string) => {
     if (!currentStop) return;
     
-    // Update local state to mark as skipped
     setRouteStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, status: 'skipped', skip_reason: reason } : s));
     
-    // Move to next stop
+    await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id);
+    
     const nextStop = routeStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
     setCurrentStop(nextStop || null);
     setIsArrived(false);
     setShowSkipModal(false);
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full bg-slate-900 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen w-full bg-slate-900 overflow-hidden">
@@ -139,7 +219,6 @@ export default function HaulerDashboard() {
         />
       </div>
 
-      {/* Skip Reason Modal */}
       <SkipReasonModal 
         isOpen={showSkipModal} 
         onClose={() => setShowSkipModal(false)} 
