@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { MapPin, Package, DollarSign, Users } from 'lucide-react';
 import { RouteBuilding } from './types';
+import SwipeButton from './SwipeButton'; // Import the new swipe button
 
 interface BottomSheetProps {
   stop: RouteBuilding | null;
@@ -78,19 +79,8 @@ export default function BottomSheet({ stop, isArrived, onComplete, onSkip }: Bot
         {/* Actions */}
         {isArrived ? (
           <div className="space-y-3">
-            {/* Swipe to Complete */}
-            <div className="relative w-full h-14 bg-emerald-600 rounded-xl overflow-hidden flex items-center justify-center shadow-lg shadow-emerald-900/20">
-              {/* ✅ FIXED: Wrapped arrows in quotes to prevent JSX error */}
-              <p className="absolute text-white font-black uppercase tracking-wider text-sm z-10">
-                Swipe to Complete Pickup {">>>"}
-              </p>
-              <button 
-                onClick={onComplete}
-                className="absolute right-1 w-12 h-12 bg-white rounded-lg flex items-center justify-center z-20 hover:bg-emerald-50 transition-colors"
-              >
-                <span className="text-emerald-600 font-black text-xl">→</span>
-              </button>
-            </div>
+            {/* ✅ REAL SWIPE BUTTON */}
+            <SwipeButton onSwipe={onComplete} />
             
             <button 
               onClick={onSkip}
