@@ -13,8 +13,8 @@ export default function MapboxMap() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   
-  // ✅ Read data directly from the Operational Engine
-  const { routeStops, currentStop } = useDriverSession();
+  // ✅ Read Map Slice State directly from the Operational Engine
+  const { routeStops, currentStop, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
 
   // 1. Initialize Map Once
   useEffect(() => {
@@ -58,21 +58,51 @@ export default function MapboxMap() {
 
       const nodesGeoJSON: any = { type: 'FeatureCollection', features: sortedStops.filter(s => s.latitude && s.longitude).map(stop => ({ type: 'Feature', properties: { id: stop.building_id, status: stop.status, payment: stop.payment_status }, geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] } })) };
       map.addSource('route-nodes', { type: 'geojson', data: nodesGeoJSON });
-      map.addLayer({ id: 'route-nodes-layer', type: 'circle', source: 'route-nodes', paint: { 'circle-radius': 10, 'circle-color': ['match', ['get', 'status'], 'completed', '#9CA3AF', 'skipped', '#F59E0B', 'pending', ['match', ['get', 'payment'], 'unpaid', '#EF4444', '#10B981'], '#3B82F6'], 'circle-stroke-width': 3, 'circle-stroke-color': '#FFFFFF' } });
+      
+      // ✅ UPDATED: Highlight logic in paint expression
+      map.addLayer({ 
+        id: 'route-nodes-layer', 
+        type: 'circle', 
+        source: 'route-nodes', 
+        paint: { 
+          'circle-radius': ['case', ['==', ['get', 'id'], highlightedNodeId || ''], 15, 10], // Make highlighted node bigger
+          'circle-color': ['match', ['get', 'status'], 'completed', '#9CA3AF', 'skipped', '#F59E0B', 'pending', ['match', ['get', 'payment'], 'unpaid', '#EF4444', '#10B981'], '#3B82F6'], 
+          'circle-stroke-width': 3, 
+          'circle-stroke-color': '#FFFFFF' 
+        } 
+      });
 
       const firstPending = sortedStops.find(s => s.status === 'pending');
-      if (firstPending && firstPending.latitude && firstPending.longitude) map.flyTo({ center: [firstPending.longitude, firstPending.latitude], zoom: 16, duration: 2000 });
+      if (firstPending && firstPending.latitude && firstPending.longitude && cameraMode === 'idle') {
+        map.flyTo({ center: [firstPending.longitude, firstPending.latitude], zoom: 16, duration: 2000 });
+      }
     };
 
     if (map.isStyleLoaded()) drawRoute(); else map.on('load', drawRoute);
-  }, [routeStops]);
+  }, [routeStops, highlightedNodeId, cameraMode]);
 
-  // 3. Fly to stop when currentStop changes in the store
+  // ✅ NEW: Execute FlyTo based on Target Location (Intent)
   useEffect(() => {
-    if (currentStop && currentStop.latitude && currentStop.longitude && mapRef.current) {
-      mapRef.current.flyTo({ center: [currentStop.longitude, currentStop.latitude], zoom: 17, duration: 1500, essential: true });
+    if (targetLocation && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [targetLocation.lng, targetLocation.lat],
+        zoom: targetLocation.zoom,
+        duration: 1500,
+        essential: true
+      });
     }
-  }, [currentStop]);
+  }, [targetLocation]);
+
+  // ✅ NEW: Execute Follow Driver based on Camera Mode (Intent)
+  useEffect(() => {
+    if (cameraMode === 'following' && gpsLocation && mapRef.current) {
+      mapRef.current.flyTo({
+        center: [gpsLocation.lng, gpsLocation.lat],
+        zoom: 17,
+        duration: 1000
+      });
+    }
+  }, [cameraMode, gpsLocation]);
 
   return <div ref={mapContainer} style={{ width: '100%', height: '100%' }} />;
 }

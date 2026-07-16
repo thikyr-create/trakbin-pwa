@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, LogOut, MapPin, Plus, Minus, Navigation } from 'lucide-react';
+import { Search, LogOut, Plus, Minus, Navigation } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import ShiftCard from './components/ShiftCard';
 import BottomSheet from './components/BottomSheet';
@@ -18,10 +18,11 @@ export default function HaulerDashboard() {
   
   // ✅ Read everything from the Operational Engine
   const {
-    route, routeStops, currentStop, isArrived, isLoading, progressStats,
+    route, routeStops, currentStop, isLoading, progressStats,
     searchQuery, searchResults, isSearchFocused, showSkipModal, showReportModal,
-    initializeSession, startGpsTracking, completePickup, skipStop, reportIssue,
-    setSearchQuery, setIsSearchFocused, selectSearchResult, setShowSkipModal, setShowReportModal
+    initializeSession, startGpsTracking, 
+    setSearchQuery, setIsSearchFocused, selectSearchResult, setShowSkipModal, setShowReportModal,
+    flyToLocation // ✅ NEW: Map Controller Action
   } = useDriverSession();
 
   // Initialize the Brain on mount
@@ -29,15 +30,6 @@ export default function HaulerDashboard() {
     initializeSession();
     startGpsTracking();
   }, []);
-    // Calculate Progress Stats (Distance & ETA)
-  useEffect(() => {
-    if (routeStops.length === 0) return;
-    const pendingStops = routeStops.filter((s: any) => s.status === 'pending' || s.status === 'arrived');
-    const distanceKm = calculateTotalDistanceKm(pendingStops);
-    
-    // Update the Zustand store directly
-    useDriverSession.setState({ progressStats: { distance: distanceKm, eta: (distanceKm / 25) * 60 } });
-  }, [routeStops]);
 
   // Close search when clicking outside
   useEffect(() => {
@@ -48,11 +40,15 @@ export default function HaulerDashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleNavigate = () => {
-    if (!currentStop || !currentStop.latitude || !currentStop.longitude) return;
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${currentStop.latitude},${currentStop.longitude}&travelmode=driving`;
-    window.open(url, '_blank');
-  };
+  // Calculate Progress Stats (Distance & ETA)
+  useEffect(() => {
+    if (routeStops.length === 0) return;
+    const pendingStops = routeStops.filter((s: any) => s.status === 'pending' || s.status === 'arrived');
+    const distanceKm = calculateTotalDistanceKm(pendingStops);
+    
+    // Update the Zustand store directly
+    useDriverSession.setState({ progressStats: { distance: distanceKm, eta: (distanceKm / 25) * 60 } });
+  }, [routeStops]);
 
   if (isLoading) {
     return <div className="h-screen w-full bg-slate-900 flex items-center justify-center"><div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -80,8 +76,17 @@ export default function HaulerDashboard() {
         </button>
       </div>
 
+      {/* ✅ UPDATED: Floating Action Buttons */}
       <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-3">
-        <button onClick={() => selectSearchResult(currentStop!)} className="w-12 h-12 bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-slate-800 hover:bg-emerald-600 transition-colors group" title="Resume Route">
+        <button 
+          onClick={() => { 
+            if (currentStop?.latitude && currentStop?.longitude) {
+              flyToLocation(currentStop.latitude, currentStop.longitude, 17);
+            }
+          }} 
+          className="w-12 h-12 bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-slate-800 hover:bg-emerald-600 transition-colors group" 
+          title="Resume Route"
+        >
           <Navigation size={20} className="text-emerald-400 group-hover:text-white" />
         </button>
         <button className="w-12 h-12 bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-slate-800 hover:bg-slate-800 transition-colors"><Plus size={20} className="text-white" /></button>
@@ -112,7 +117,8 @@ export default function HaulerDashboard() {
         <BottomSheet />
       </div>
 
-            <SkipReasonModal />
+      {/* ✅ Modals read directly from the store, no props needed */}
+      <SkipReasonModal />
       <ReportIssueModal />
     </div>
   );

@@ -8,6 +8,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface DriverSessionState {
+  // Data
   driver: any;
   route: DriverRoute | null;
   routeStops: RouteBuilding[];
@@ -16,12 +17,20 @@ export interface DriverSessionState {
   gpsLocation: { lat: number; lng: number } | null;
   isLoading: boolean;
   progressStats: { distance: number; eta: number };
+
+  // UI State
   searchQuery: string;
   searchResults: RouteBuilding[];
   isSearchFocused: boolean;
   showSkipModal: boolean;
   showReportModal: boolean;
 
+  // ✅ NEW: Map Slice (State of Intent)
+  cameraMode: 'following' | 'exploring' | 'navigating' | 'idle';
+  highlightedNodeId: string | null;
+  targetLocation: { lat: number; lng: number; zoom: number } | null;
+
+  // Actions
   initializeSession: () => void;
   startGpsTracking: () => void;
   updateGps: (lat: number, lng: number) => void;
@@ -33,9 +42,16 @@ export interface DriverSessionState {
   selectSearchResult: (stop: RouteBuilding) => void;
   setShowSkipModal: (show: boolean) => void;
   setShowReportModal: (show: boolean) => void;
+  
+  // ✅ NEW: Map Actions
+  setCameraMode: (mode: 'following' | 'exploring' | 'navigating' | 'idle') => void;
+  highlightNode: (id: string | null) => void;
+  flyToLocation: (lat: number, lng: number, zoom: number) => void;
+  centerOnDriver: () => void;
 }
 
 export const useDriverSession = create<DriverSessionState>((set, get) => ({
+  // Initial State
   driver: null,
   route: null,
   routeStops: [],
@@ -49,7 +65,13 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   isSearchFocused: false,
   showSkipModal: false,
   showReportModal: false,
+  
+  // ✅ NEW: Map Initial State
+  cameraMode: 'idle',
+  highlightedNodeId: null,
+  targetLocation: null,
 
+  // Actions
   initializeSession: async () => {
     const storedDriver = localStorage.getItem('trakbin_driver');
     if (!storedDriver) { window.location.href = '/auth'; return; }
@@ -71,20 +93,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
       const buildingIds = stopsData.map((stop: any) => stop.building_id);
       const { data: buildingsData } = await supabase.from('Buildings').select('custom_id, address, latitude, longitude, payment_status, waste_type, estimated_waste, occupancy').in('custom_id', buildingIds);
 
-      // ✅ FIX: Cast status to the correct type
       const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
         const building = buildingsData?.find((b: any) => b.custom_id === stop.building_id);
-        return { 
-          ...stop, 
-          status: stop.status as RouteBuilding['status'], // ✅ FIX HERE
-          address: building?.address, 
-          latitude: building?.latitude, 
-          longitude: building?.longitude, 
-          payment_status: building?.payment_status, 
-          waste_type: building?.waste_type, 
-          estimated_waste: building?.estimated_waste, 
-          occupancy: building?.occupancy 
-        };
+        return { ...stop, status: stop.status as RouteBuilding['status'], address: building?.address, latitude: building?.latitude, longitude: building?.longitude, payment_status: building?.payment_status, waste_type: building?.waste_type, estimated_waste: building?.estimated_waste, occupancy: building?.occupancy };
       });
 
       set({ routeStops: mergedStops, currentStop: mergedStops.find((s: any) => s.status === 'pending') || null, isLoading: false });
@@ -153,8 +164,18 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
   selectSearchResult: (stop) => {
     set({ searchQuery: stop.address || stop.building_id, isSearchFocused: false, currentStop: stop });
+    // ✅ NEW: Tell the map to fly to this stop
+    if (stop.latitude && stop.longitude) {
+      set({ targetLocation: { lat: stop.latitude, lng: stop.longitude, zoom: 17 }, cameraMode: 'navigating' });
+    }
   },
 
   setShowSkipModal: (show) => set({ showSkipModal: show }),
   setShowReportModal: (show) => set({ showReportModal: show }),
+
+  // ✅ NEW: Map Actions
+  setCameraMode: (mode) => set({ cameraMode: mode }),
+  highlightNode: (id) => set({ highlightedNodeId: id }),
+  flyToLocation: (lat, lng, zoom) => set({ targetLocation: { lat, lng, zoom }, cameraMode: 'navigating' }),
+  centerOnDriver: () => set({ cameraMode: 'following' }),
 }));
