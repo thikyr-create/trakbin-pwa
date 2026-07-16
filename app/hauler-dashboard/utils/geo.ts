@@ -16,3 +16,25 @@ export const calculateDistanceInMeters = (
 
   return R * c;
 };
+
+// ✅ UPDATED: Calculate total distance, safely handling undefined coordinates
+export const calculateTotalDistanceKm = (stops: { latitude?: number; longitude?: number }[]): number => {
+  let totalDistance = 0;
+  
+  for (let i = 0; i < stops.length - 1; i++) {
+    const p1 = stops[i];
+    const p2 = stops[i + 1];
+    
+    // Only calculate if both points have valid coordinates
+    if (p1.latitude !== undefined && p1.longitude !== undefined && 
+        p2.latitude !== undefined && p2.longitude !== undefined) {
+      
+      totalDistance += calculateDistanceInMeters(
+        p1.latitude, p1.longitude,
+        p2.latitude, p2.longitude
+      );
+    }
+  }
+  
+  return totalDistance / 1000; // Convert to km
+};

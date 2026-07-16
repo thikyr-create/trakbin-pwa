@@ -7,9 +7,11 @@ import { Search, LogOut, MapPin, Plus, Minus } from 'lucide-react';
 import ShiftCard from './components/ShiftCard';
 import BottomSheet from './components/BottomSheet';
 import SkipReasonModal from './components/SkipReasonModal';
+import RouteProgressCard from './components/RouteProgressCard'; // ✅ NEW
 import MapboxMap from './MapboxMap';
 import { DriverRoute, RouteBuilding } from './components/types';
-import { calculateDistanceInMeters } from './utils/geo';
+// ✅ UPDATED: Added calculateTotalDistanceKm
+import { calculateDistanceInMeters, calculateTotalDistanceKm } from './utils/geo';
 
 // Initialize Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -26,6 +28,9 @@ export default function HaulerDashboard() {
   const [isArrived, setIsArrived] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // ✅ NEW: State for Progress Stats
+  const [progressStats, setProgressStats] = useState({ distance: 0, eta: 0 });
 
   // 1. Clock & Auth Check
   useEffect(() => {
@@ -46,18 +51,16 @@ export default function HaulerDashboard() {
     const fetchRoute = async () => {
       setIsLoading(true);
       try {
-        // Fetch the latest active/assigned route for this driver
         const { data: routeData, error: routeError } = await supabase
           .from('routes')
           .select('*')
-          .eq('driver_id', driver.employee_id || driver.id) // Adjust based on your user schema
+          .eq('driver_id', driver.employee_id || driver.id)
           .in('status', ['assigned', 'active'])
           .order('created_at', { ascending: false })
           .limit(1)
           .single();
 
         if (routeError || !routeData) {
-          console.log('No active route found for driver');
           setRoute(null);
           setRouteStops([]);
           setIsLoading(false);
@@ -66,7 +69,6 @@ export default function HaulerDashboard() {
 
         setRoute(routeData);
 
-        // Fetch stops for this route
         const { data: stopsData, error: stopsError } = await supabase
           .from('route_stops')
           .select('*')
@@ -79,14 +81,12 @@ export default function HaulerDashboard() {
           return;
         }
 
-        // Fetch building details for these stops
         const buildingIds = stopsData.map((stop: any) => stop.building_id);
         const { data: buildingsData } = await supabase
           .from('Buildings')
           .select('custom_id, address, latitude, longitude, payment_status, waste_type, estimated_waste, occupancy')
           .in('custom_id', buildingIds);
 
-        // Merge stops with building details
         const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
           const building = buildingsData?.find((b: any) => b.custom_id === stop.building_id);
           return {
@@ -102,8 +102,6 @@ export default function HaulerDashboard() {
         });
 
         setRouteStops(mergedStops);
-
-        // Set current stop to the first pending one
         const firstPending = mergedStops.find((s: any) => s.status === 'pending');
         setCurrentStop(firstPending || null);
 
@@ -116,6 +114,22 @@ export default function HaulerDashboard() {
 
     fetchRoute();
   }, [driver]);
+
+  // ✅ NEW: Calculate Progress Stats (Distance & ETA)
+  useEffect(() => {
+    if (routeStops.length === 0) return;
+
+    // Filter only pending/arrived stops to calculate remaining distance
+    const pendingStops = routeStops.filter((s: any) => s.status === 'pending' || s.status === 'arrived');
+    
+    // Calculate distance between remaining stops
+    const distanceKm = calculateTotalDistanceKm(pendingStops);
+    
+    // Calculate ETA assuming average city truck speed of 25 km/h
+    const etaMinutes = (distanceKm / 25) * 60;
+
+    setProgressStats({ distance: distanceKm, eta: etaMinutes });
+  }, [routeStops]);
 
   // 3. Track GPS and Detect Arrival
   useEffect(() => {
@@ -144,15 +158,13 @@ export default function HaulerDashboard() {
   const handleCompletePickup = async () => {
     if (!currentStop || !route) return;
     
-    // Update local state immediately for UX
-    setRouteStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, status: 'completed' } : s));
-    setRoute(prev => prev ? { ...prev, completed_stops: prev.completed_stops + 1 } : null);
+    setRouteStops((prev: any) => prev.map((s: any) => s.id === currentStop.id ? { ...s, status: 'completed' } : s));
+    setRoute((prev: any) => prev ? { ...prev, completed_stops: prev.completed_stops + 1 } : null);
     
-    // Update Supabase
     await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id);
     await supabase.from('routes').update({ completed_stops: route.completed_stops + 1 }).eq('id', route.id);
     
-    const nextStop = routeStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
+    const nextStop = routeStops.find((s: any) => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
     setCurrentStop(nextStop || null);
     setIsArrived(false);
   };
@@ -160,11 +172,11 @@ export default function HaulerDashboard() {
   const handleSkipSubmit = async (reason: string) => {
     if (!currentStop) return;
     
-    setRouteStops(prev => prev.map(s => s.id === currentStop.id ? { ...s, status: 'skipped', skip_reason: reason } : s));
+    setRouteStops((prev: any) => prev.map((s: any) => s.id === currentStop.id ? { ...s, status: 'skipped', skip_reason: reason } : s));
     
     await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id);
     
-    const nextStop = routeStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
+    const nextStop = routeStops.find((s: any) => s.sequence === currentStop.sequence + 1 && s.status === 'pending');
     setCurrentStop(nextStop || null);
     setIsArrived(false);
     setShowSkipModal(false);
@@ -184,8 +196,18 @@ export default function HaulerDashboard() {
         <MapboxMap routeStops={routeStops} />
       </div>
 
-      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm">
+      {/* ✅ UPDATED: Stacked Shift Card and Progress Card */}
+      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm flex flex-col gap-3">
         <ShiftCard route={route} />
+        
+        {route && routeStops.length > 0 && (
+          <RouteProgressCard 
+            completed={route.completed_stops} 
+            remaining={route.total_stops - route.completed_stops} 
+            totalDistanceKm={progressStats.distance} 
+            etaMinutes={progressStats.eta} 
+          />
+        )}
       </div>
 
       <div className="absolute top-4 right-4 z-10 flex flex-col gap-2 items-end">
