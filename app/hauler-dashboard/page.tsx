@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { Search, LogOut, MapPin, Plus, Minus } from 'lucide-react';
 import ShiftCard from './components/ShiftCard';
 import BottomSheet from './components/BottomSheet';
 import SkipReasonModal from './components/SkipReasonModal';
-import RouteProgressCard from './components/RouteProgressCard'; // ✅ NEW
+import RouteProgressCard from './components/RouteProgressCard';
 import MapboxMap from './MapboxMap';
 import { DriverRoute, RouteBuilding } from './components/types';
-// ✅ UPDATED: Added calculateTotalDistanceKm
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from './utils/geo';
 
 // Initialize Supabase
@@ -28,9 +27,13 @@ export default function HaulerDashboard() {
   const [isArrived, setIsArrived] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // ✅ NEW: State for Progress Stats
   const [progressStats, setProgressStats] = useState({ distance: 0, eta: 0 });
+  
+  // ✅ NEW: Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<RouteBuilding[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   // 1. Clock & Auth Check
   useEffect(() => {
@@ -39,7 +42,7 @@ export default function HaulerDashboard() {
     
     const storedDriver = localStorage.getItem('trakbin_driver');
     if (storedDriver) setDriver(JSON.parse(storedDriver));
-    else router.push('/auth'); // Redirect if not logged in
+    else router.push('/auth');
 
     return () => clearInterval(timer);
   }, [router]);
@@ -115,23 +118,55 @@ export default function HaulerDashboard() {
     fetchRoute();
   }, [driver]);
 
-  // ✅ NEW: Calculate Progress Stats (Distance & ETA)
+  // 3. Calculate Progress Stats (Distance & ETA)
   useEffect(() => {
     if (routeStops.length === 0) return;
-
-    // Filter only pending/arrived stops to calculate remaining distance
     const pendingStops = routeStops.filter((s: any) => s.status === 'pending' || s.status === 'arrived');
-    
-    // Calculate distance between remaining stops
     const distanceKm = calculateTotalDistanceKm(pendingStops);
-    
-    // Calculate ETA assuming average city truck speed of 25 km/h
     const etaMinutes = (distanceKm / 25) * 60;
-
     setProgressStats({ distance: distanceKm, eta: etaMinutes });
   }, [routeStops]);
 
-  // 3. Track GPS and Detect Arrival
+   // ✅ NEW: Search Logic
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = routeStops.filter((stop) => 
+      stop.building_id.toLowerCase().includes(query) || 
+      (stop.address || '').toLowerCase().includes(query)
+    );
+    setSearchResults(filtered);
+  }, [searchQuery, routeStops]);
+
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle selecting a search result
+  const handleSelectResult = (stop: RouteBuilding) => {
+        setSearchQuery(stop.address || stop.building_id);
+    setIsSearchFocused(false);
+    
+    // Fly map to this stop (We'll pass this to MapboxMap via a state update if needed, 
+    // but for now, we can just set it as current stop to trigger the bottom sheet)
+    setCurrentStop(stop);
+    
+    // Note: To actually fly the map without changing the current stop logic, 
+    // we would add a 'flyToLocation' state. For now, this sets the context.
+  };
+
+  // 4. Track GPS and Detect Arrival
   useEffect(() => {
     if (!navigator.geolocation || !currentStop) return;
 
@@ -196,7 +231,6 @@ export default function HaulerDashboard() {
         <MapboxMap routeStops={routeStops} />
       </div>
 
-      {/* ✅ UPDATED: Stacked Shift Card and Progress Card */}
       <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm flex flex-col gap-3">
         <ShiftCard route={route} />
         
@@ -225,11 +259,44 @@ export default function HaulerDashboard() {
         <button className="w-12 h-12 bg-slate-900/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-slate-800 hover:bg-slate-800 transition-colors"><Minus size={20} className="text-white" /></button>
       </div>
 
-      <div className="absolute top-[180px] sm:top-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-md px-4 sm:px-0">
+      {/* ✅ UPDATED: Search Bar with Dropdown */}
+      <div ref={searchRef} className="absolute top-[180px] sm:top-4 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] max-w-md px-4 sm:px-0">
         <div className="bg-slate-900/90 backdrop-blur-md rounded-[18px] flex items-center gap-3 px-4 py-3 shadow-lg border border-slate-800">
           <Search size={20} className="text-gray-400" />
-          <input type="text" placeholder="Search assigned buildings..." className="flex-1 bg-transparent text-white text-sm font-medium outline-none placeholder:text-gray-500" />
+          <input 
+            type="text" 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            placeholder="Search assigned buildings..." 
+            className="flex-1 bg-transparent text-white text-sm font-medium outline-none placeholder:text-gray-500" 
+          />
         </div>
+
+        {/* Search Results Dropdown */}
+        {isSearchFocused && searchResults.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl rounded-xl border border-slate-800 shadow-2xl overflow-hidden max-h-60 overflow-y-auto">
+            {searchResults.map((stop) => (
+              <button
+                key={stop.id}
+                onClick={() => handleSelectResult(stop)}
+                className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 flex justify-between items-center"
+              >
+                <div>
+                  <p className="text-sm font-bold text-white">{stop.building_id}</p>
+                  <p className="text-xs text-gray-400 truncate max-w-[200px]">{stop.address}</p>
+                </div>
+                <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${
+                  stop.status === 'completed' ? 'bg-gray-500/20 text-gray-400' :
+                  stop.status === 'skipped' ? 'bg-amber-500/20 text-amber-400' :
+                  'bg-emerald-500/20 text-emerald-400'
+                }`}>
+                  {stop.status}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="absolute bottom-0 left-0 right-0 z-10 p-4">
