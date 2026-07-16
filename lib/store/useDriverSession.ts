@@ -7,17 +7,15 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Define Geocoding Result Type
 export interface GeocodeResult {
   id: string;
   place_name: string;
-  center: [number, number]; // [lng, lat]
+  center: [number, number];
   type: 'building' | 'place';
   buildingId?: string;
 }
 
 export interface DriverSessionState {
-  // Data
   driver: any;
   route: DriverRoute | null;
   routeStops: RouteBuilding[];
@@ -26,23 +24,21 @@ export interface DriverSessionState {
   gpsLocation: { lat: number; lng: number } | null;
   isLoading: boolean;
   progressStats: { distance: number; eta: number };
+  
+  // ✅ NEW: Pause State
+  isRoutePaused: boolean;
 
-  // UI State
   searchQuery: string;
   searchResults: RouteBuilding[];
   isSearchFocused: boolean;
   showSkipModal: boolean;
   showReportModal: boolean;
-
-  // ✅ NEW: Geocoding State
   geocodeResults: GeocodeResult[];
 
-  // Map Slice (State of Intent)
   cameraMode: 'following' | 'exploring' | 'navigating' | 'idle';
   highlightedNodeId: string | null;
   targetLocation: { lat: number; lng: number; zoom: number } | null;
 
-  // Actions
   initializeSession: () => void;
   startGpsTracking: () => void;
   updateGps: (lat: number, lng: number) => void;
@@ -54,12 +50,12 @@ export interface DriverSessionState {
   selectSearchResult: (stop: RouteBuilding) => void;
   setShowSkipModal: (show: boolean) => void;
   setShowReportModal: (show: boolean) => void;
-  
-  // ✅ NEW: Geocoding Actions
   searchGeocode: (query: string) => Promise<void>;
   selectGeocodeResult: (result: GeocodeResult) => void;
+  
+  // ✅ NEW: Pause Action
+  toggleRoutePause: () => Promise<void>;
 
-  // Map Actions
   setCameraMode: (mode: 'following' | 'exploring' | 'navigating' | 'idle') => void;
   highlightNode: (id: string | null) => void;
   flyToLocation: (lat: number, lng: number, zoom: number) => void;
@@ -67,7 +63,6 @@ export interface DriverSessionState {
 }
 
 export const useDriverSession = create<DriverSessionState>((set, get) => ({
-  // Initial State
   driver: null,
   route: null,
   routeStops: [],
@@ -76,19 +71,17 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   gpsLocation: null,
   isLoading: true,
   progressStats: { distance: 0, eta: 0 },
+  isRoutePaused: false, // ✅ NEW
   searchQuery: '',
   searchResults: [],
   isSearchFocused: false,
   showSkipModal: false,
   showReportModal: false,
   geocodeResults: [],
-  
-  // Map Initial State
   cameraMode: 'idle',
   highlightedNodeId: null,
   targetLocation: null,
 
-  // Actions
   initializeSession: async () => {
     const storedDriver = localStorage.getItem('trakbin_driver');
     if (!storedDriver) { window.location.href = '/auth'; return; }
@@ -99,10 +92,12 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     try {
       const { data: routeData, error: routeError } = await supabase
         .from('routes').select('*').eq('driver_id', driver.employee_id || driver.id)
-        .in('status', ['assigned', 'active']).order('created_at', { ascending: false }).limit(1).single();
+        .in('status', ['assigned', 'active', 'paused']).order('created_at', { ascending: false }).limit(1).single(); // ✅ Added 'paused'
 
       if (routeError || !routeData) { set({ route: null, routeStops: [], isLoading: false }); return; }
-      set({ route: routeData });
+      
+      // ✅ If route was paused, restore pause state
+      set({ route: routeData, isRoutePaused: routeData.status === 'paused' });
 
       const { data: stopsData } = await supabase.from('route_stops').select('*').eq('route_id', routeData.id).order('sequence', { ascending: true });
       if (!stopsData) { set({ routeStops: [], isLoading: false }); return; }
@@ -113,15 +108,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
       const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
         const building = buildingsData?.find((b: any) => b.custom_id === stop.building_id);
         return { 
-          ...stop, 
-          status: stop.status as RouteBuilding['status'], 
-          address: building?.address, 
-          latitude: building?.latitude, 
-          longitude: building?.longitude, 
-          payment_status: building?.payment_status, 
-          waste_type: building?.waste_type, 
-          estimated_waste: building?.estimated_waste, 
-          occupancy: building?.occupancy 
+          ...stop, status: stop.status as RouteBuilding['status'], address: building?.address, 
+          latitude: building?.latitude, longitude: building?.longitude, payment_status: building?.payment_status, 
+          waste_type: building?.waste_type, estimated_waste: building?.estimated_waste, occupancy: building?.occupancy 
         };
       });
 
@@ -140,12 +129,14 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
   updateGps: (lat, lng) => {
     set({ gpsLocation: { lat, lng } });
-    const { currentStop, isArrived } = get();
-    if (currentStop && currentStop.latitude && currentStop.longitude) {
-      const distance = calculateDistanceInMeters(lat, lng, currentStop.latitude, currentStop.longitude);
-      if (distance <= 25 && !isArrived) set({ isArrived: true });
-      else if (distance > 50 && isArrived) set({ isArrived: false });
-    }
+    const { currentStop, isArrived, isRoutePaused } = get();
+    
+    // ✅ Don't detect arrival if route is paused
+    if (isRoutePaused || !currentStop || !currentStop.latitude || !currentStop.longitude) return;
+
+    const distance = calculateDistanceInMeters(lat, lng, currentStop.latitude, currentStop.longitude);
+    if (distance <= 25 && !isArrived) set({ isArrived: true });
+    else if (distance > 50 && isArrived) set({ isArrived: false });
   },
 
   completePickup: async () => {
@@ -199,17 +190,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   setShowSkipModal: (show) => set({ showSkipModal: show }),
   setShowReportModal: (show) => set({ showReportModal: show }),
 
-  // ✅ NEW: Mapbox Geocoding Search
   searchGeocode: async (query) => {
-    if (!query.trim()) {
-      set({ geocodeResults: [] });
-      return;
-    }
-
+    if (!query.trim()) { set({ geocodeResults: [] }); return; }
     const { routeStops } = get();
     const results: GeocodeResult[] = [];
 
-    // 1. Search assigned buildings locally
     const buildingMatches = routeStops.filter(stop => 
       stop.building_id.toLowerCase().includes(query.toLowerCase()) || 
       (stop.address || '').toLowerCase().includes(query.toLowerCase())
@@ -217,60 +202,51 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
     buildingMatches.forEach(stop => {
       if (stop.latitude && stop.longitude) {
-        results.push({
-          id: `building-${stop.id}`,
-          place_name: `${stop.building_id} - ${stop.address}`,
-          center: [stop.longitude, stop.latitude],
-          type: 'building',
-          buildingId: stop.building_id
-        });
+        results.push({ id: `building-${stop.id}`, place_name: `${stop.building_id} - ${stop.address}`, center: [stop.longitude, stop.latitude], type: 'building', buildingId: stop.building_id });
       }
     });
 
-    // 2. Search Mapbox Geocoding API for real places
     try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&limit=5`
-      );
+      const response = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&limit=5`);
       const data = await response.json();
-      
       if (data.features) {
         data.features.forEach((feature: any) => {
-          results.push({
-            id: `place-${feature.id}`,
-            place_name: feature.place_name,
-            center: feature.center, // Mapbox returns [lng, lat]
-            type: 'place'
-          });
+          results.push({ id: `place-${feature.id}`, place_name: feature.place_name, center: feature.center, type: 'place' });
         });
       }
-    } catch (error) {
-      console.error('Geocoding error:', error);
-    }
+    } catch (error) { console.error('Geocoding error:', error); }
 
     set({ geocodeResults: results });
   },
 
   selectGeocodeResult: (result) => {
-    set({ 
-      geocodeResults: [],
-      searchQuery: result.place_name,
-      isSearchFocused: false
-    });
-    
-    // Fly to the location
+    set({ geocodeResults: [], searchQuery: result.place_name, isSearchFocused: false });
     if (result.type === 'building') {
       const building = get().routeStops.find(s => s.building_id === result.buildingId);
-      if (building) {
-        get().selectSearchResult(building);
-      }
+      if (building) get().selectSearchResult(building);
     } else {
-      // Mapbox center is [lng, lat], our flyToLocation expects (lat, lng)
       get().flyToLocation(result.center[1], result.center[0], 16);
     }
   },
 
-  // Map Actions
+  // ✅ NEW: Toggle Pause/Resume Route
+  toggleRoutePause: async () => {
+    const { isRoutePaused, route } = get();
+    const newPauseState = !isRoutePaused;
+    
+    // Update local state immediately (Optimistic UI)
+    set({ isRoutePaused: newPauseState });
+
+    // Update Supabase
+    if (route) {
+      try {
+        await supabase.from('routes').update({ status: newPauseState ? 'paused' : 'active' }).eq('id', route.id);
+      } catch (error) {
+        console.error('Error updating route status:', error);
+      }
+    }
+  },
+
   setCameraMode: (mode) => set({ cameraMode: mode }),
   highlightNode: (id) => set({ highlightedNodeId: id }),
   flyToLocation: (lat, lng, zoom) => set({ targetLocation: { lat, lng, zoom }, cameraMode: 'navigating' }),

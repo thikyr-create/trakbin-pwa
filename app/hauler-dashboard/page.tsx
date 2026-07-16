@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Navigation } from 'lucide-react';
+import { LogOut, Pause, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import ShiftCard from './components/ShiftCard';
@@ -15,11 +15,10 @@ import { calculateTotalDistanceKm } from './utils/geo';
 
 export default function HaulerDashboard() {
   const router = useRouter();
-  const [showFAB, setShowFAB] = useState(false);
   
   const {
-    route, routeStops, currentStop, isLoading, progressStats,
-    initializeSession, startGpsTracking, flyToLocation
+    route, routeStops, currentStop, isLoading, progressStats, isRoutePaused,
+    initializeSession, startGpsTracking, flyToLocation, toggleRoutePause
   } = useDriverSession();
 
   useEffect(() => {
@@ -34,13 +33,6 @@ export default function HaulerDashboard() {
     useDriverSession.setState({ progressStats: { distance: distanceKm, eta: (distanceKm / 25) * 60 } });
   }, [routeStops]);
 
-  // Show FAB when user pans away from current stop
-  useEffect(() => {
-    if (currentStop) {
-      setShowFAB(true);
-    }
-  }, [currentStop]);
-
   if (isLoading) {
     return <div className="h-screen w-full bg-slate-900 flex items-center justify-center"><div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
   }
@@ -51,8 +43,8 @@ export default function HaulerDashboard() {
         <MapboxMap />
       </div>
 
-      {/* Top Left: Collapsible Shift Card + Progress Card */}
-      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm flex flex-col gap-3">
+      {/* Top Left: Shift Card + Progress Card */}
+      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm flex flex-col gap-2">
         <ShiftCard route={route} />
         {route && routeStops.length > 0 && (
           <RouteProgressCard completed={route.completed_stops} remaining={route.total_stops - route.completed_stops} totalDistanceKm={progressStats.distance} etaMinutes={progressStats.eta} />
@@ -69,9 +61,9 @@ export default function HaulerDashboard() {
         </div>
       </div>
 
-      {/* ✅ Interactive Floating Action Button - Resume Route */}
+      {/* ✅ PAUSE / RESUME FLOATING ACTION BUTTON */}
       <AnimatePresence>
-        {showFAB && currentStop && (
+        {currentStop?.latitude && currentStop?.longitude && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -79,19 +71,34 @@ export default function HaulerDashboard() {
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => { 
-              if (currentStop?.latitude && currentStop?.longitude) {
-                flyToLocation(currentStop.latitude, currentStop.longitude, 17);
-                setShowFAB(false);
+              if (isRoutePaused) {
+                // RESUME: Unpause and fly to current stop
+                toggleRoutePause();
+                // ✅ FIX: Added type safety check for coordinates
+                if (currentStop.latitude && currentStop.longitude) {
+                  flyToLocation(currentStop.latitude, currentStop.longitude, 17);
+                }
+              } else {
+                // PAUSE: Pause the route (Truck is full)
+                toggleRoutePause();
               }
             }}
-            className="absolute right-6 bottom-[120px] z-30 w-14 h-14 bg-emerald-600 hover:bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-900/50 border-2 border-white"
+            className={`absolute right-6 bottom-[120px] z-30 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white transition-colors ${
+              isRoutePaused 
+                ? 'bg-amber-500 hover:bg-amber-400 shadow-amber-900/50' 
+                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50' 
+            }`}
           >
-            <Navigation size={24} className="text-white" />
+            {isRoutePaused ? (
+              <Play size={24} className="text-white fill-white" /> 
+            ) : (
+              <Pause size={24} className="text-white" /> 
+            )}
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Bottom Panel (Slideable) */}
+      {/* Bottom Panel */}
       <BottomPanel />
 
       <SkipReasonModal />
