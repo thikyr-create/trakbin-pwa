@@ -62,8 +62,9 @@ export default function HaulerDashboard() {
       </div>
 
       {/* ✅ PAUSE / RESUME FLOATING ACTION BUTTON */}
+      {/* Changed condition to 'route' so it ALWAYS shows when on shift */}
       <AnimatePresence>
-        {currentStop?.latitude && currentStop?.longitude && (
+        {route && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -72,14 +73,13 @@ export default function HaulerDashboard() {
             whileTap={{ scale: 0.95 }}
             onClick={() => { 
               if (isRoutePaused) {
-                // RESUME: Unpause and fly to current stop
                 toggleRoutePause();
-                // ✅ FIX: Added type safety check for coordinates
-                if (currentStop.latitude && currentStop.longitude) {
-                  flyToLocation(currentStop.latitude, currentStop.longitude, 17);
+                // Fly to current stop if it exists, otherwise fly to first pending stop
+                const target = currentStop || routeStops.find(s => s.status === 'pending');
+                if (target?.latitude && target?.longitude) {
+                  flyToLocation(target.latitude, target.longitude, 17);
                 }
               } else {
-                // PAUSE: Pause the route (Truck is full)
                 toggleRoutePause();
               }
             }}
