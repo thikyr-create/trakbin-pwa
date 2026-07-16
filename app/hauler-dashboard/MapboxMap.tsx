@@ -13,7 +13,6 @@ export default function MapboxMap() {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   
-  // ✅ Read Map Slice State directly from the Operational Engine
   const { routeStops, currentStop, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
 
   // 1. Initialize Map Once
@@ -25,10 +24,17 @@ export default function MapboxMap() {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: DEFAULT_CENTER,
-      zoom: 15, pitch: 0, bearing: 0, antialias: true,
+      zoom: 15, 
+      pitch: 0, 
+      bearing: 0, 
+      antialias: true,
+      // ✅ Disable default Mapbox controls
+      attributionControl: false,
+      logoPosition: 'bottom-right'
     });
 
-    mapRef.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // ✅ Add only scale control (no zoom buttons)
+    mapRef.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
     const el = document.createElement('div');
     el.innerHTML = `<div style="width: 20px; height: 20px; background-color: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>`;
@@ -37,7 +43,7 @@ export default function MapboxMap() {
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, []);
 
-  // 2. Draw Route Line and Nodes when store updates
+  // 2. Draw Route Line and Nodes
   useEffect(() => {
     if (!mapRef.current || routeStops.length === 0) return;
     const map = mapRef.current;
@@ -59,13 +65,12 @@ export default function MapboxMap() {
       const nodesGeoJSON: any = { type: 'FeatureCollection', features: sortedStops.filter(s => s.latitude && s.longitude).map(stop => ({ type: 'Feature', properties: { id: stop.building_id, status: stop.status, payment: stop.payment_status }, geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] } })) };
       map.addSource('route-nodes', { type: 'geojson', data: nodesGeoJSON });
       
-      // ✅ UPDATED: Highlight logic in paint expression
       map.addLayer({ 
         id: 'route-nodes-layer', 
         type: 'circle', 
         source: 'route-nodes', 
         paint: { 
-          'circle-radius': ['case', ['==', ['get', 'id'], highlightedNodeId || ''], 15, 10], // Make highlighted node bigger
+          'circle-radius': ['case', ['==', ['get', 'id'], highlightedNodeId || ''], 15, 10],
           'circle-color': ['match', ['get', 'status'], 'completed', '#9CA3AF', 'skipped', '#F59E0B', 'pending', ['match', ['get', 'payment'], 'unpaid', '#EF4444', '#10B981'], '#3B82F6'], 
           'circle-stroke-width': 3, 
           'circle-stroke-color': '#FFFFFF' 
@@ -81,7 +86,7 @@ export default function MapboxMap() {
     if (map.isStyleLoaded()) drawRoute(); else map.on('load', drawRoute);
   }, [routeStops, highlightedNodeId, cameraMode]);
 
-  // ✅ NEW: Execute FlyTo based on Target Location (Intent)
+  // 3. Execute FlyTo based on Target Location
   useEffect(() => {
     if (targetLocation && mapRef.current) {
       mapRef.current.flyTo({
@@ -93,7 +98,7 @@ export default function MapboxMap() {
     }
   }, [targetLocation]);
 
-  // ✅ NEW: Execute Follow Driver based on Camera Mode (Intent)
+  // 4. Execute Follow Driver
   useEffect(() => {
     if (cameraMode === 'following' && gpsLocation && mapRef.current) {
       mapRef.current.flyTo({
