@@ -83,11 +83,11 @@ export default function HaulerDashboard() {
                 toggleRoutePause();
               }
             }}
-            className={`absolute right-6 bottom-[120px] z-30 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-white transition-colors ${
-              isRoutePaused 
-                ? 'bg-amber-500 hover:bg-amber-400 shadow-amber-900/50' 
-                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50' 
-            }`}
+            className={`absolute right-6 bottom-[120px] z-30 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-slate-700 transition-colors ${
+  isRoutePaused 
+    ? 'bg-white hover:bg-gray-100 shadow-white/30' 
+    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50' 
+}`}
           >
             {isRoutePaused ? (
               <Play size={24} className="text-white fill-white" /> 

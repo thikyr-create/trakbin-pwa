@@ -105,11 +105,11 @@ export default function BottomPanel() {
                       </div>
                     </button>
                   ))
-                ) : (
+                                ) : (
                   <div className="text-center py-8">
                     <Search size={32} className="text-gray-600 mx-auto mb-2" />
                     <p className="text-gray-500 text-sm">
-                      {searchQuery.trim() ? 'No results found' : 'Start typing to search...'}
+                      {searchQuery.trim() ? 'No results found' : ''}
                     </p>
                   </div>
                 )}
