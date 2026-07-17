@@ -24,9 +24,8 @@ export interface DriverSessionState {
   gpsLocation: { lat: number; lng: number } | null;
   isLoading: boolean;
   progressStats: { distance: number; eta: number };
-  
-  // ✅ NEW: Pause State
   isRoutePaused: boolean;
+  showEndShiftModal: boolean;
 
   searchQuery: string;
   searchResults: RouteBuilding[];
@@ -41,6 +40,7 @@ export interface DriverSessionState {
 
   initializeSession: () => void;
   startGpsTracking: () => void;
+  stopGpsTracking: () => void;
   updateGps: (lat: number, lng: number) => void;
   completePickup: () => Promise<void>;
   skipStop: (reason: string) => Promise<void>;
@@ -50,17 +50,19 @@ export interface DriverSessionState {
   selectSearchResult: (stop: RouteBuilding) => void;
   setShowSkipModal: (show: boolean) => void;
   setShowReportModal: (show: boolean) => void;
+  setShowEndShiftModal: (show: boolean) => void;
   searchGeocode: (query: string) => Promise<void>;
   selectGeocodeResult: (result: GeocodeResult) => void;
-  
-  // ✅ NEW: Pause Action
   toggleRoutePause: () => Promise<void>;
+  endShift: () => Promise<void>;
 
   setCameraMode: (mode: 'following' | 'exploring' | 'navigating' | 'idle') => void;
   highlightNode: (id: string | null) => void;
   flyToLocation: (lat: number, lng: number, zoom: number) => void;
   centerOnDriver: () => void;
 }
+
+let gpsWatchId: number | null = null;
 
 export const useDriverSession = create<DriverSessionState>((set, get) => ({
   driver: null,
@@ -71,7 +73,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   gpsLocation: null,
   isLoading: true,
   progressStats: { distance: 0, eta: 0 },
-  isRoutePaused: false, // ✅ NEW
+  isRoutePaused: false,
+  showEndShiftModal: false,
   searchQuery: '',
   searchResults: [],
   isSearchFocused: false,
@@ -92,11 +95,10 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     try {
       const { data: routeData, error: routeError } = await supabase
         .from('routes').select('*').eq('driver_id', driver.employee_id || driver.id)
-        .in('status', ['assigned', 'active', 'paused']).order('created_at', { ascending: false }).limit(1).single(); // ✅ Added 'paused'
+        .in('status', ['assigned', 'active', 'paused']).order('created_at', { ascending: false }).limit(1).single();
 
       if (routeError || !routeData) { set({ route: null, routeStops: [], isLoading: false }); return; }
       
-      // ✅ If route was paused, restore pause state
       set({ route: routeData, isRoutePaused: routeData.status === 'paused' });
 
       const { data: stopsData } = await supabase.from('route_stops').select('*').eq('route_id', routeData.id).order('sequence', { ascending: true });
@@ -120,18 +122,24 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
   startGpsTracking: () => {
     if (!navigator.geolocation) return;
-    navigator.geolocation.watchPosition(
+    gpsWatchId = navigator.geolocation.watchPosition(
       (pos) => get().updateGps(pos.coords.latitude, pos.coords.longitude),
       (err) => console.warn(err),
       { enableHighAccuracy: true, maximumAge: 0 }
     );
   },
 
+  stopGpsTracking: () => {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+  },
+
   updateGps: (lat, lng) => {
     set({ gpsLocation: { lat, lng } });
     const { currentStop, isArrived, isRoutePaused } = get();
     
-    // ✅ Don't detect arrival if route is paused
     if (isRoutePaused || !currentStop || !currentStop.latitude || !currentStop.longitude) return;
 
     const distance = calculateDistanceInMeters(lat, lng, currentStop.latitude, currentStop.longitude);
@@ -151,6 +159,12 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
     await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id);
     await supabase.from('routes').update({ completed_stops: newRoute.completed_stops }).eq('id', route.id);
+
+    // ✅ Auto-end shift if all stops completed
+    const skippedCount = newStops.filter(s => s.status === 'skipped').length;
+    if (newRoute.completed_stops + skippedCount >= newRoute.total_stops) {
+      await get().endShift();
+    }
   },
 
   skipStop: async (reason: string) => {
@@ -189,6 +203,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
   setShowSkipModal: (show) => set({ showSkipModal: show }),
   setShowReportModal: (show) => set({ showReportModal: show }),
+  setShowEndShiftModal: (show) => set({ showEndShiftModal: show }),
 
   searchGeocode: async (query) => {
     if (!query.trim()) { set({ geocodeResults: [] }); return; }
@@ -229,21 +244,52 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     }
   },
 
-  // ✅ NEW: Toggle Pause/Resume Route
   toggleRoutePause: async () => {
     const { isRoutePaused, route } = get();
     const newPauseState = !isRoutePaused;
     
-    // Update local state immediately (Optimistic UI)
     set({ isRoutePaused: newPauseState });
 
-    // Update Supabase
     if (route) {
       try {
         await supabase.from('routes').update({ status: newPauseState ? 'paused' : 'active' }).eq('id', route.id);
       } catch (error) {
         console.error('Error updating route status:', error);
       }
+    }
+  },
+
+  // ✅ NEW: End Shift Action
+  endShift: async () => {
+    const { route, stopGpsTracking } = get();
+    
+    if (!route) return;
+
+    try {
+      // Update route status to completed
+      await supabase.from('routes').update({ 
+        status: 'completed',
+        ended_at: new Date().toISOString()
+      }).eq('id', route.id);
+
+      // Stop GPS tracking to save battery
+      stopGpsTracking();
+
+      // Clear the session
+      set({ 
+        route: null, 
+        routeStops: [], 
+        currentStop: null, 
+        isArrived: false,
+        isRoutePaused: false,
+        showEndShiftModal: false,
+        progressStats: { distance: 0, eta: 0 }
+      });
+
+      alert('Shift ended successfully! Great work today.');
+    } catch (error) {
+      console.error('Error ending shift:', error);
+      alert('Error ending shift. Please try again.');
     }
   },
 

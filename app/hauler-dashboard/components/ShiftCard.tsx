@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Truck, MapPin, User, ChevronUp, ChevronDown, Route } from 'lucide-react';
+import { Truck, MapPin, User, ChevronUp, ChevronDown, Route, LogOut } from 'lucide-react';
 import { DriverRoute } from './types';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 
@@ -12,11 +12,8 @@ interface ShiftCardProps {
 
 export default function ShiftCard({ route }: ShiftCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // ✅ Read pause state directly from the Operational Engine
-  const { isRoutePaused } = useDriverSession();
+  const { isRoutePaused, setShowEndShiftModal } = useDriverSession();
 
-  // Offline / No Route State
   if (!route) {
     return (
       <div className="bg-slate-900/90 backdrop-blur-md rounded-full px-4 py-3 shadow-lg border border-slate-800 flex items-center gap-2">
@@ -62,7 +59,7 @@ export default function ShiftCard({ route }: ShiftCardProps) {
         <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          className="px-3 pb-3 border-t border-slate-800 pt-3 space-y-2"
+          className="px-3 pb-3 border-t border-slate-800 pt-3 space-y-3"
         >
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-400 flex items-center gap-1"><User size={12} /> Driver:</span>
@@ -87,6 +84,15 @@ export default function ShiftCard({ route }: ShiftCardProps) {
               <p className="text-sm font-black text-orange-400">{route.total_stops - route.completed_stops}</p>
             </div>
           </div>
+
+          {/* ✅ End Shift Button */}
+          <button
+            onClick={() => setShowEndShiftModal(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 text-red-400 font-bold rounded-xl text-xs uppercase hover:bg-slate-700 transition-colors border border-slate-700 mt-2"
+          >
+            <LogOut size={16} />
+            End Shift
+          </button>
         </motion.div>
       )}
     </motion.div>

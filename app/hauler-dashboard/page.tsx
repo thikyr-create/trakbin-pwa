@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Pause, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDriverSession } from '@/lib/store/useDriverSession';
+import EndShiftModal from './components/EndShiftModal';
 import ShiftCard from './components/ShiftCard';
 import RouteProgressCard from './components/RouteProgressCard';
 import SkipReasonModal from './components/SkipReasonModal';
@@ -101,8 +102,9 @@ export default function HaulerDashboard() {
       {/* Bottom Panel */}
       <BottomPanel />
 
-      <SkipReasonModal />
+        <SkipReasonModal />
       <ReportIssueModal />
+      <EndShiftModal /> {/* ✅ Add this line */}
     </div>
   );
 }
