@@ -55,60 +55,66 @@ export default function AnalyticsPage() {
     fetchAnalytics();
   }, []);
 
-  if (loading) return <div className="p-6 text-center text-gray-500">Calculating analytics...</div>;
+  if (loading) return <div className="p-6 text-center text-gray-600">Calculating analytics...</div>;
 
-  const StatCard = ({ title, value, icon: Icon, color }: any) => (
+  const StatCard = ({ title, value, icon: Icon, color }: { title: string; value: string | number; icon: any; color: string }) => (
     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-500">{title}</p>
-        <Icon className={`h-4 w-4 ${color}`} />
+        <p className="text-sm font-medium text-gray-600">{title}</p>
+        <Icon className={`h-5 w-5 ${color}`} />
       </div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="text-3xl font-bold text-gray-900">{value}</p>
     </div>
   );
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Fleet Analytics</h1>
-        <p className="text-gray-500">Operational performance over the last 30 days.</p>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Fleet Analytics</h1>
+        <p className="text-sm text-gray-600 mt-1">Operational performance over the last 30 days.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-gray-500" />
-        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-500" />
-        <StatCard title="Peak Daily Volume" value={kpis.peakVolume} icon={BarChart3} color="text-blue-500" />
-        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-purple-500" />
+        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-green-600" />
+        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-600" />
+        <StatCard title="Peak Daily Volume" value={kpis.peakVolume} icon={BarChart3} color="text-green-600" />
+        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-green-600" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Daily Route Volume</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Daily Route Volume</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="total_routes" stroke="#3b82f6" strokeWidth={2} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  labelStyle={{ color: '#111827', fontWeight: 600 }}
+                />
+                <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={2} dot={{ r: 4, fill: '#16a34a' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-semibold mb-4">Completed vs Skipped</h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Completed vs Skipped</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="completed_routes" fill="#10b981" name="Completed" />
-                <Bar dataKey="skipped_routes" fill="#ef4444" name="Skipped" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  labelStyle={{ color: '#111827', fontWeight: 600 }}
+                />
+                <Legend wrapperStyle={{ color: '#111827' }} />
+                <Bar dataKey="completed_routes" fill="#16a34a" name="Completed" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="skipped_routes" fill="#ef4444" name="Skipped" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
