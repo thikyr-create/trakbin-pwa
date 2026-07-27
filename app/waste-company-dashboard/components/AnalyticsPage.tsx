@@ -55,35 +55,36 @@ export default function AnalyticsPage() {
     fetchAnalytics();
   }, []);
 
-  if (loading) return <div className="p-6 text-center text-gray-600">Calculating analytics...</div>;
+  if (loading) return <div className="p-6 text-center text-gray-600 font-semibold uppercase tracking-wider">Calculating analytics...</div>;
 
-  const StatCard = ({ title, value, icon: Icon, color }: { title: string; value: string | number; icon: any; color: string }) => (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+  const StatCard = ({ title, value, icon: Icon, color, borderColor }: { title: string; value: string | number; icon: any; color: string; borderColor: string }) => (
+    <div className={`bg-white p-6 rounded-xl border-l-4 ${borderColor} shadow-sm`}>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm font-medium text-gray-600">{title}</p>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
         <Icon className={`h-5 w-5 ${color}`} />
       </div>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
+      <p className="text-3xl font-black text-gray-900">{value}</p>
     </div>
   );
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header - Matching the image style */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Fleet Analytics</h1>
-        <p className="text-sm text-gray-600 mt-1">Operational performance over the last 30 days.</p>
+        <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Fleet Analytics</h1>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Operational performance over the last 30 days.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-green-600" />
-        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-600" />
-        <StatCard title="Peak Daily Volume" value={kpis.peakVolume} icon={BarChart3} color="text-green-600" />
-        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-green-600" />
+        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-green-600" borderColor="border-green-500" />
+        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-600" borderColor="border-green-500" />
+        <StatCard title="Peak Daily Volume" value={kpis.peakVolume} icon={BarChart3} color="text-blue-600" borderColor="border-blue-500" />
+        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-purple-600" borderColor="border-purple-500" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Daily Route Volume</h3>
+          <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Daily Route Volume</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats}>
@@ -92,16 +93,16 @@ export default function AnalyticsPage() {
                 <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                  labelStyle={{ color: '#111827', fontWeight: 600 }}
+                  labelStyle={{ color: '#111827', fontWeight: 700 }}
                 />
-                <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={2} dot={{ r: 4, fill: '#16a34a' }} />
+                <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={3} dot={{ r: 5, fill: '#16a34a' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Completed vs Skipped</h3>
+          <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Completed vs Skipped</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats}>
@@ -110,9 +111,9 @@ export default function AnalyticsPage() {
                 <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
-                  labelStyle={{ color: '#111827', fontWeight: 600 }}
+                  labelStyle={{ color: '#111827', fontWeight: 700 }}
                 />
-                <Legend wrapperStyle={{ color: '#111827' }} />
+                <Legend wrapperStyle={{ fontWeight: 600 }} />
                 <Bar dataKey="completed_routes" fill="#16a34a" name="Completed" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="skipped_routes" fill="#ef4444" name="Skipped" radius={[4, 4, 0, 0]} />
               </BarChart>
