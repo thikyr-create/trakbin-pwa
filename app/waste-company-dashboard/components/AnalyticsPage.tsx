@@ -57,63 +57,105 @@ export default function AnalyticsPage() {
 
   if (loading) return <div className="p-6 text-center text-gray-600 font-semibold uppercase tracking-wider">Calculating analytics...</div>;
 
-  const StatCard = ({ title, value, icon: Icon, color, borderColor }: { title: string; value: string | number; icon: any; color: string; borderColor: string }) => (
-    <div className={`bg-white p-6 rounded-xl border-l-4 ${borderColor} shadow-sm`}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
-        <Icon className={`h-5 w-5 ${color}`} />
-      </div>
-      <p className="text-3xl font-black text-gray-900">{value}</p>
-    </div>
-  );
+  const kpiCards = [
+    {
+      label: 'TOTAL ROUTES',
+      value: kpis.totalRoutes,
+      subtitle: 'Last 30 Days',
+      subtitleColor: 'text-green-600',
+      iconBg: 'bg-green-100',
+      iconColor: 'text-green-600',
+      icon: Route,
+    },
+    {
+      label: 'COMPLETION RATE',
+      value: `${kpis.completionRate.toFixed(1)}%`,
+      subtitle: 'Success Rate',
+      subtitleColor: 'text-blue-600',
+      iconBg: 'bg-blue-100',
+      iconColor: 'text-blue-600',
+      icon: CheckCircle,
+    },
+    {
+      label: 'PEAK VOLUME',
+      value: kpis.peakVolume,
+      subtitle: 'Best Day',
+      subtitleColor: 'text-purple-600',
+      iconBg: 'bg-purple-100',
+      iconColor: 'text-purple-600',
+      icon: BarChart3,
+    },
+    {
+      label: 'ACTIVE DAYS',
+      value: kpis.activeDays,
+      subtitle: 'Days Operated',
+      subtitleColor: 'text-orange-600',
+      iconBg: 'bg-orange-100',
+      iconColor: 'text-orange-600',
+      icon: TrendingUp,
+    },
+  ];
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header - Matching the image style */}
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Fleet Analytics</h1>
-        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Operational performance over the last 30 days.</p>
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Operational performance over the last 30 days</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-green-600" borderColor="border-green-500" />
-        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-600" borderColor="border-green-500" />
-        <StatCard title="Peak Daily Volume" value={kpis.peakVolume} icon={BarChart3} color="text-blue-600" borderColor="border-blue-500" />
-        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-purple-600" borderColor="border-purple-500" />
+      {/* KPI Cards */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {kpiCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
+                <Icon className={`w-5 h-5 ${card.iconColor}`} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{card.label}</p>
+                <p className="text-3xl font-black text-gray-900 mt-1">{card.value}</p>
+                <p className={`text-xs font-bold ${card.subtitleColor} mt-1`}>{card.subtitle}</p>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
+      {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Daily Route Volume</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Daily Route Volume</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={stats}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
-                <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
+                <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
                   labelStyle={{ color: '#111827', fontWeight: 700 }}
                 />
-                <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={3} dot={{ r: 5, fill: '#16a34a' }} />
+                <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: '#16a34a' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-          <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight mb-4">Completed vs Skipped</h3>
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Completed vs Skipped</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
-                <YAxis tick={{ fontSize: 12, fill: '#4b5563' }} stroke="#e5e7eb" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
+                <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
                   labelStyle={{ color: '#111827', fontWeight: 700 }}
                 />
-                <Legend wrapperStyle={{ fontWeight: 600 }} />
+                <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
                 <Bar dataKey="completed_routes" fill="#16a34a" name="Completed" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="skipped_routes" fill="#ef4444" name="Skipped" radius={[4, 4, 0, 0]} />
               </BarChart>
