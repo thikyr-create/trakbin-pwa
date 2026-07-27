@@ -1,6 +1,6 @@
 'use client';
 
-import { Truck, Users, Building2, AlertTriangle } from 'lucide-react';
+import { Truck, Users, Building2, AlertTriangle, ChevronRight } from 'lucide-react';
 
 export default function OverviewPage({ 
   trucks, 
@@ -17,6 +17,7 @@ export default function OverviewPage({
   issues?: any[]; 
   setActivePage?: (page: any) => void;
 }) {
+  // Data-driven navigation: each card knows exactly where it should route
   const cards = [
     {
       label: 'TRUCKS',
@@ -26,6 +27,7 @@ export default function OverviewPage({
       iconBg: 'bg-green-100',
       iconColor: 'text-green-600',
       icon: Truck,
+      targetPage: 'fleet',
     },
     {
       label: 'DRIVERS',
@@ -35,6 +37,7 @@ export default function OverviewPage({
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-600',
       icon: Users,
+      targetPage: 'drivers',
     },
     {
       label: 'BUILDINGS',
@@ -44,6 +47,7 @@ export default function OverviewPage({
       iconBg: 'bg-purple-100',
       iconColor: 'text-purple-600',
       icon: Building2,
+      targetPage: 'buildings',
     },
     {
       label: 'OPEN ISSUES',
@@ -53,6 +57,7 @@ export default function OverviewPage({
       iconBg: 'bg-red-100',
       iconColor: 'text-red-600',
       icon: AlertTriangle,
+      targetPage: 'issues',
     },
   ];
 
@@ -64,21 +69,29 @@ export default function OverviewPage({
         <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Executive summary of today's operations</p>
       </div>
 
-      {/* Cards Grid */}
+      {/* Clickable Cards Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
-                <Icon className={`w-5 h-5 ${card.iconColor}`} />
+            <button
+              key={card.label}
+              onClick={() => setActivePage?.(card.targetPage)}
+              className="w-full text-left bg-white rounded-xl border border-gray-200 p-5 space-y-3 cursor-pointer hover:shadow-lg hover:border-green-400 hover:-translate-y-1 transition-all duration-200 group"
+            >
+              <div className="flex items-start justify-between">
+                <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
+                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-green-600 group-hover:translate-x-1 transition-all duration-200" />
               </div>
+              
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{card.label}</p>
                 <p className="text-3xl font-black text-gray-900 mt-1">{card.value}</p>
                 <p className={`text-xs font-bold ${card.subtitleColor} mt-1`}>{card.subtitle}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -93,16 +106,6 @@ export default function OverviewPage({
         </div>
         <p className="text-4xl font-black">98.4%</p>
         <p className="text-sm font-semibold mt-1 text-green-100">All systems operational</p>
-      </div>
-
-      {/* Action Button */}
-      <div>
-        <button 
-          onClick={() => setActivePage?.('fleet')} 
-          className="bg-green-600 text-white px-6 py-3 rounded-lg font-bold uppercase tracking-wide hover:bg-green-700 transition-colors shadow-md"
-        >
-          View Fleet Details
-        </button>
       </div>
     </div>
   );

@@ -291,7 +291,7 @@ export default function WasteCompanyDashboard() {
           {activePage === 'mission' && <MissionMapPage buildings={buildings} />}
           {activePage === 'verification' && <VerificationPage collections={collections} />}
           {activePage === 'issues' && <IssuesPage issues={issues} />}
-          {activePage === 'analytics' && <AnalyticsPage />}
+          {activePage === 'analytics' && <AnalyticsPage setActivePage={setActivePage} />}
           {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
           {activePage === 'zones' && !selectedZone && <ZonesPage buildings={buildings} onSelectZone={setSelectedZone} />}
           {activePage === 'zones' && selectedZone && <ZoneDetailsPage zone={selectedZone} buildings={buildings} onBack={() => setSelectedZone(null)} />}

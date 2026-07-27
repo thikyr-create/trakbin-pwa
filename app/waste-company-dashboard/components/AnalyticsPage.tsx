@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { TrendingUp, Route, CheckCircle, BarChart3 } from 'lucide-react';
+import { TrendingUp, Route, CheckCircle, BarChart3, ChevronRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -16,7 +16,7 @@ interface DailyStats {
   skipped_routes: number;
 }
 
-export default function AnalyticsPage() {
+export default function AnalyticsPage({ setActivePage }: { setActivePage?: (page: any) => void }) {
   const [stats, setStats] = useState<DailyStats[]>([]);
   const [kpis, setKpis] = useState({ totalRoutes: 0, completionRate: 0, activeDays: 0, peakVolume: 0 });
   const [loading, setLoading] = useState(true);
@@ -66,6 +66,7 @@ export default function AnalyticsPage() {
       iconBg: 'bg-green-100',
       iconColor: 'text-green-600',
       icon: Route,
+      targetPage: 'fleet',
     },
     {
       label: 'COMPLETION RATE',
@@ -75,6 +76,7 @@ export default function AnalyticsPage() {
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-600',
       icon: CheckCircle,
+      targetPage: 'verification',
     },
     {
       label: 'PEAK VOLUME',
@@ -84,6 +86,7 @@ export default function AnalyticsPage() {
       iconBg: 'bg-purple-100',
       iconColor: 'text-purple-600',
       icon: BarChart3,
+      targetPage: 'analytics',
     },
     {
       label: 'ACTIVE DAYS',
@@ -93,6 +96,7 @@ export default function AnalyticsPage() {
       iconBg: 'bg-orange-100',
       iconColor: 'text-orange-600',
       icon: TrendingUp,
+      targetPage: 'mission',
     },
   ];
 
@@ -104,21 +108,29 @@ export default function AnalyticsPage() {
         <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Operational performance over the last 30 days</p>
       </div>
 
-      {/* KPI Cards */}
+      {/* Clickable KPI Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {kpiCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
-                <Icon className={`w-5 h-5 ${card.iconColor}`} />
+            <button
+              key={card.label}
+              onClick={() => setActivePage?.(card.targetPage)}
+              className="w-full text-left bg-white rounded-xl border border-gray-200 p-5 space-y-3 cursor-pointer hover:shadow-lg hover:border-green-400 hover:-translate-y-1 transition-all duration-200 group"
+            >
+              <div className="flex items-start justify-between">
+                <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
+                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-green-600 group-hover:translate-x-1 transition-all duration-200" />
               </div>
+              
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{card.label}</p>
                 <p className="text-3xl font-black text-gray-900 mt-1">{card.value}</p>
                 <p className={`text-xs font-bold ${card.subtitleColor} mt-1`}>{card.subtitle}</p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
