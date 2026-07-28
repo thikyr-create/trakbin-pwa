@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
+import AuthGate from './components/AuthGate'; // <-- NEW IMPORT
 import DispatchTimeline from './components/DispatchTimeline';
 import NotificationsPanel from './components/NotificationsPanel';
 import AddDriverModal from './components/AddDriverModal';
@@ -58,9 +59,9 @@ export default function WasteCompanyDashboard() {
   const [searchFleet, setSearchFleet] = useState('');
   const [searchDrivers, setSearchDrivers] = useState('');
 
-  const { addDispatchEvent, addNotification, subscribeToRealtime, unsubscribeFromRealtime } = useCompanySession();
+  // Get tenant context and actions from Zustand
+  const { tenant, addDispatchEvent, addNotification, subscribeToRealtime, unsubscribeFromRealtime } = useCompanySession();
 
-  // FIX: Safely handle the cleanup function return type
   useEffect(() => {
     const storedCompany = localStorage.getItem('trakbin_company');
     if (!storedCompany) { 
@@ -70,6 +71,9 @@ export default function WasteCompanyDashboard() {
     const userData = JSON.parse(storedCompany);
     setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
+    
+    // AuthGate handles loading the tenant context. 
+    // We call fetchData, which will wait for the tenant ID.
     fetchData();
 
     const cleanup = subscribeToRealtime();
@@ -82,14 +86,25 @@ export default function WasteCompanyDashboard() {
     };
   }, [router]);
 
+  // UPDATED: Uses tenant.companyId for secure, isolated queries
   const fetchData = async () => {
+    const { tenant } = useCompanySession.getState();
+    if (!tenant.companyId) {
+      // If tenant isn't loaded yet, wait a moment and retry
+      setTimeout(fetchData, 500);
+      return;
+    }
+
     setLoading(true);
     try {
-      const { data: trucksData } = await supabase.from('trucks').select('*').order('truck_id', { ascending: true });
+      const { data: trucksData } = await supabase.from('trucks').select('*').eq('company_id', tenant.companyId).order('truck_id', { ascending: true });
+      
+      // Note: 'users' table wasn't migrated to company_id in Phase 1, so we keep companyName here for now
       const { data: driversData } = await supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_name', companyName).order('employee_id', { ascending: true });
-      const { data: buildingsData } = await supabase.from('Buildings').select('*').order('custom_id', { ascending: true });
-      const { data: collectionsData } = await supabase.from('collections').select('*').order('collection_date', { ascending: false });
-      const { data: issuesData } = await supabase.from('issues').select('*').order('created_at', { ascending: false });
+      
+      const { data: buildingsData } = await supabase.from('Buildings').select('*').eq('company_id', tenant.companyId).order('custom_id', { ascending: true });
+      const { data: collectionsData } = await supabase.from('collections').select('*').eq('company_id', tenant.companyId).order('collection_date', { ascending: false });
+      const { data: issuesData } = await supabase.from('issues').select('*').eq('company_id', tenant.companyId).order('created_at', { ascending: false });
 
       if (trucksData) setTrucks(trucksData);
       if (driversData) setDrivers(driversData);
@@ -107,6 +122,7 @@ export default function WasteCompanyDashboard() {
   const generateTruckId = () => `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const handleSaveDriver = async (formData: any) => {
+    const { tenant } = useCompanySession.getState();
     const employeeId = generateEmployeeId();
     const generatedPassword = `Trakbin${Math.floor(1000 + Math.random() * 9000)}!`;
     
@@ -117,9 +133,11 @@ export default function WasteCompanyDashboard() {
       }]);
       if (userError) throw userError;
       
+      // Added company_id to the insert to maintain tenant isolation
       const { error: driverError } = await supabase.from('drivers').insert([{
         employee_id: employeeId, full_name: formData.full_name, email: formData.email,
-        phone: formData.phone, license_number: formData.license_number, company_name: companyName
+        phone: formData.phone, license_number: formData.license_number, 
+        company_name: companyName, company_id: tenant.companyId 
       }]);
       if (driverError) throw driverError;
       
@@ -127,7 +145,7 @@ export default function WasteCompanyDashboard() {
       addNotification(`Driver ${formData.full_name} created successfully!`, 'success');
       fetchData(); 
       
-      return { success: true, message: `✅ Driver Created Successfully!\n\n Employee ID: ${employeeId}\n📧 Email: ${formData.email}\n🔑 Password: ${generatedPassword}\n\nPlease save these credentials!`, employeeId, password: generatedPassword };
+      return { success: true, message: `✅ Driver Created Successfully!\n\n Employee ID: ${employeeId}\n Email: ${formData.email}\n🔑 Password: ${generatedPassword}\n\nPlease save these credentials!`, employeeId, password: generatedPassword };
     } catch (error: any) {
       addNotification(`Failed to create driver: ${error.message}`, 'error');
       return { success: false, message: error.message };
@@ -135,11 +153,14 @@ export default function WasteCompanyDashboard() {
   };
 
   const handleSaveTruck = async (formData: any) => {
+    const { tenant } = useCompanySession.getState();
     const truckId = generateTruckId();
     try {
+      // Added company_id to the insert to maintain tenant isolation
       const { error } = await supabase.from('trucks').insert([{
         truck_id: truckId, license_plate: formData.license_plate, driver_name: formData.driver_name,
-        truck_type: formData.truck_type, capacity: formData.capacity, status: formData.status, company_name: companyName
+        truck_type: formData.truck_type, capacity: formData.capacity, status: formData.status, 
+        company_name: companyName, company_id: tenant.companyId
       }]);
       if (error) throw error;
       
@@ -182,136 +203,139 @@ export default function WasteCompanyDashboard() {
     filterText(d.employee_id).includes(searchDrivers.toLowerCase())
   );
 
+  // UPDATED: Wrapped in AuthGate to prevent rendering until tenant is loaded
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      <NotificationsPanel />
+    <AuthGate>
+      <div className="min-h-screen bg-gray-50 relative">
+        <NotificationsPanel />
 
-      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setSidebarOpen(false)}></div>}
+        {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setSidebarOpen(false)}></div>}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
-              <span className="text-white font-black text-xl">T</span>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Operations</p>
-              <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">{companyName}</p>
-            </div>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-150px)]">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => { setActivePage(item.id as PageView); setSelectedDriver(null); setSelectedTruck(null); setSelectedZone(null); setSidebarOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                  isActive 
-                    ? 'bg-green-600 text-white shadow-lg shadow-green-200' 
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Icon size={18} />
-                <span className="uppercase tracking-wide text-xs">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 bg-white">
-          <button 
-            onClick={() => { localStorage.removeItem('trakbin_company'); router.push('/'); }} 
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all"
-          >
-            <LogOut size={18} />
-            <span className="uppercase tracking-wide text-xs">Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      <main className="min-w-0 flex flex-col">
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-4 py-3">
-          <div className="flex items-center justify-between">
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-700">
-                <Menu size={22} />
-              </button>
+              <div className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
+                <span className="text-white font-black text-xl">T</span>
+              </div>
               <div>
-                <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">
-                  {selectedDriver && activePage === 'drivers' ? 'Driver Profile' : 
-                   selectedTruck && activePage === 'fleet' ? 'Truck Profile' :
-                   selectedZone && activePage === 'zones' ? 'Zone Details' :
-                   navItems.find(n => n.id === activePage)?.label}
-                </h1>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-0.5">
-                  {activePage === 'overview' && 'Executive Dashboard'}
-                  {activePage === 'fleet' && !selectedTruck && 'Fleet Management'}
-                  {activePage === 'drivers' && !selectedDriver && 'Driver Management'}
-                  {activePage === 'buildings' && 'Building Registry'}
-                  {activePage === 'assignments' && 'Dispatch Center'}
-                  {activePage === 'mission' && 'Live Operations Map'}
-                  {activePage === 'verification' && 'Collection Verification'}
-                  {activePage === 'issues' && 'Issue Management'}
-                  {activePage === 'analytics' && 'Performance Analytics'}
-                  {activePage === 'maintenance' && 'Fleet Maintenance'}
-                  {activePage === 'zones' && !selectedZone && 'Zone Management'}
-                  {activePage === 'settings' && 'Company Settings'}
-                </p>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Operations</p>
+                <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">{companyName}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
-                <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
-                  <span className="text-green-700 font-black text-sm">{companyName.charAt(0).toUpperCase()}</span>
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-bold text-gray-900">{companyName}</p>
-                  <p className="text-xs font-bold text-gray-500 uppercase">Admin</p>
-                </div>
-              </div>
-            </div>
+            <button onClick={() => setSidebarOpen(false)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg">
+              <X size={20} />
+            </button>
           </div>
-        </header>
 
-        <div className="p-4 lg:p-6 flex-1">
-          {activePage === 'overview' && <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />}
-          {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
-          {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
-          {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
-          {activePage === 'drivers' && selectedDriver && <DriverProfile driver={selectedDriver} trucks={trucks} onBack={() => setSelectedDriver(null)} />}
-          {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
-          {activePage === 'assignments' && <AssignmentsPage trucks={trucks} drivers={drivers} />}
-          {activePage === 'mission' && <MissionMapPage buildings={buildings} />}
-          {activePage === 'verification' && <VerificationPage collections={collections} />}
-          {activePage === 'issues' && <IssuesPage issues={issues} />}
-          {activePage === 'analytics' && <AnalyticsPage setActivePage={setActivePage} />}
-          {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
-          {activePage === 'zones' && !selectedZone && <ZonesPage buildings={buildings} onSelectZone={setSelectedZone} />}
-          {activePage === 'zones' && selectedZone && <ZoneDetailsPage zone={selectedZone} buildings={buildings} onBack={() => setSelectedZone(null)} />}
-          {activePage === 'settings' && <SettingsPage companyName={companyName} companyId={companyId} />}
-        </div>
-      </main>
+          <nav className="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-150px)]">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activePage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => { setActivePage(item.id as PageView); setSelectedDriver(null); setSelectedTruck(null); setSelectedZone(null); setSidebarOpen(false); }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    isActive 
+                      ? 'bg-green-600 text-white shadow-lg shadow-green-200' 
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span className="uppercase tracking-wide text-xs">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
-      <AddDriverModal 
-        isOpen={showDriverModal} 
-        onClose={() => setShowDriverModal(false)} 
-        companyName={companyName} 
-        onSubmit={handleSaveDriver} 
-      />
-      <AddTruckModal 
-        isOpen={showTruckModal} 
-        onClose={() => setShowTruckModal(false)} 
-        companyName={companyName} 
-        onSubmit={handleSaveTruck} 
-      />
-    </div>
+          <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-gray-100 bg-white">
+            <button 
+              onClick={() => { localStorage.removeItem('trakbin_company'); router.push('/'); }} 
+              className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all"
+            >
+              <LogOut size={18} />
+              <span className="uppercase tracking-wide text-xs">Logout</span>
+            </button>
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex flex-col">
+          <header className="bg-white border-b border-gray-200 sticky top-0 z-30 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-gray-100 text-gray-700">
+                  <Menu size={22} />
+                </button>
+                <div>
+                  <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                    {selectedDriver && activePage === 'drivers' ? 'Driver Profile' : 
+                     selectedTruck && activePage === 'fleet' ? 'Truck Profile' :
+                     selectedZone && activePage === 'zones' ? 'Zone Details' :
+                     navItems.find(n => n.id === activePage)?.label}
+                  </h1>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-0.5">
+                    {activePage === 'overview' && 'Executive Dashboard'}
+                    {activePage === 'fleet' && !selectedTruck && 'Fleet Management'}
+                    {activePage === 'drivers' && !selectedDriver && 'Driver Management'}
+                    {activePage === 'buildings' && 'Building Registry'}
+                    {activePage === 'assignments' && 'Dispatch Center'}
+                    {activePage === 'mission' && 'Live Operations Map'}
+                    {activePage === 'verification' && 'Collection Verification'}
+                    {activePage === 'issues' && 'Issue Management'}
+                    {activePage === 'analytics' && 'Performance Analytics'}
+                    {activePage === 'maintenance' && 'Fleet Maintenance'}
+                    {activePage === 'zones' && !selectedZone && 'Zone Management'}
+                    {activePage === 'settings' && 'Company Settings'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 pl-3 border-l border-gray-200">
+                  <div className="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center">
+                    <span className="text-green-700 font-black text-sm">{companyName.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-sm font-bold text-gray-900">{companyName}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">Admin</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-4 lg:p-6 flex-1">
+            {activePage === 'overview' && <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />}
+            {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
+            {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
+            {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
+            {activePage === 'drivers' && selectedDriver && <DriverProfile driver={selectedDriver} trucks={trucks} onBack={() => setSelectedDriver(null)} />}
+            {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
+            {activePage === 'assignments' && <AssignmentsPage trucks={trucks} drivers={drivers} />}
+            {activePage === 'mission' && <MissionMapPage buildings={buildings} />}
+            {activePage === 'verification' && <VerificationPage />}
+            {activePage === 'issues' && <IssuesPage issues={issues} />}
+            {activePage === 'analytics' && <AnalyticsPage />}
+            {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
+            {activePage === 'zones' && !selectedZone && <ZonesPage buildings={buildings} onSelectZone={setSelectedZone} />}
+            {activePage === 'zones' && selectedZone && <ZoneDetailsPage zone={selectedZone} buildings={buildings} onBack={() => setSelectedZone(null)} />}
+            {activePage === 'settings' && <SettingsPage companyName={companyName} companyId={companyId} />}
+          </div>
+        </main>
+
+        <AddDriverModal 
+          isOpen={showDriverModal} 
+          onClose={() => setShowDriverModal(false)} 
+          companyName={companyName} 
+          onSubmit={handleSaveDriver} 
+        />
+        <AddTruckModal 
+          isOpen={showTruckModal} 
+          onClose={() => setShowTruckModal(false)} 
+          companyName={companyName} 
+          onSubmit={handleSaveTruck} 
+        />
+      </div>
+    </AuthGate>
   );
 }
 

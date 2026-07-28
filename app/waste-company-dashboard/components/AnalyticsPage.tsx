@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { TrendingUp, Route, CheckCircle, BarChart3, ChevronRight } from 'lucide-react';
+import { TrendingUp, Route, CheckCircle, BarChart3 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { useCompanySession } from '@/lib/store/useCompanySession'; // <-- NEW IMPORT
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -16,17 +17,26 @@ interface DailyStats {
   skipped_routes: number;
 }
 
-export default function AnalyticsPage({ setActivePage }: { setActivePage?: (page: any) => void }) {
+export default function AnalyticsPage() {
   const [stats, setStats] = useState<DailyStats[]>([]);
   const [kpis, setKpis] = useState({ totalRoutes: 0, completionRate: 0, activeDays: 0, peakVolume: 0 });
   const [loading, setLoading] = useState(true);
 
+  // Get tenant context
+  const { tenant } = useCompanySession();
+
   useEffect(() => {
     async function fetchAnalytics() {
+      // Guard clause: Do not query if tenant isn't loaded
+      if (!tenant.companyId) return;
+
       const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      // FIX: Scoped to tenant.companyId
       const { data } = await supabase
         .from('analytics_daily_summary')
         .select('*')
+        .eq('company_id', tenant.companyId) 
         .gte('date', thirtyDaysAgo)
         .order('date', { ascending: true });
 
@@ -49,93 +59,42 @@ export default function AnalyticsPage({ setActivePage }: { setActivePage?: (page
           activeDays: normalizedData.length,
           peakVolume,
         });
+      } else {
+        setStats([]);
+        setKpis({ totalRoutes: 0, completionRate: 0, activeDays: 0, peakVolume: 0 });
       }
       setLoading(false);
     }
+    
     fetchAnalytics();
-  }, []);
+  }, [tenant.companyId]); // Re-fetch if tenant changes
 
   if (loading) return <div className="p-6 text-center text-gray-600 font-semibold uppercase tracking-wider">Calculating analytics...</div>;
 
-  const kpiCards = [
-    {
-      label: 'TOTAL ROUTES',
-      value: kpis.totalRoutes,
-      subtitle: 'Last 30 Days',
-      subtitleColor: 'text-green-600',
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
-      icon: Route,
-      targetPage: 'fleet',
-    },
-    {
-      label: 'COMPLETION RATE',
-      value: `${kpis.completionRate.toFixed(1)}%`,
-      subtitle: 'Success Rate',
-      subtitleColor: 'text-blue-600',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      icon: CheckCircle,
-      targetPage: 'verification',
-    },
-    {
-      label: 'PEAK VOLUME',
-      value: kpis.peakVolume,
-      subtitle: 'Best Day',
-      subtitleColor: 'text-purple-600',
-      iconBg: 'bg-purple-100',
-      iconColor: 'text-purple-600',
-      icon: BarChart3,
-      targetPage: 'analytics',
-    },
-    {
-      label: 'ACTIVE DAYS',
-      value: kpis.activeDays,
-      subtitle: 'Days Operated',
-      subtitleColor: 'text-orange-600',
-      iconBg: 'bg-orange-100',
-      iconColor: 'text-orange-600',
-      icon: TrendingUp,
-      targetPage: 'mission',
-    },
-  ];
+  const StatCard = ({ title, value, icon: Icon, color, borderColor }: { title: string; value: string | number; icon: any; color: string; borderColor: string }) => (
+    <div className={`bg-white p-6 rounded-xl border-l-4 ${borderColor} shadow-sm`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</p>
+        <Icon className={`h-5 w-5 ${color}`} />
+      </div>
+      <p className="text-3xl font-black text-gray-900">{value}</p>
+    </div>
+  );
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Fleet Analytics</h1>
         <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-1">Operational performance over the last 30 days</p>
       </div>
 
-      {/* Clickable KPI Cards */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <button
-              key={card.label}
-              onClick={() => setActivePage?.(card.targetPage)}
-              className="w-full text-left bg-white rounded-xl border border-gray-200 p-5 space-y-3 cursor-pointer hover:shadow-lg hover:border-green-400 hover:-translate-y-1 transition-all duration-200 group"
-            >
-              <div className="flex items-start justify-between">
-                <div className={`w-10 h-10 ${card.iconBg} rounded-lg flex items-center justify-center`}>
-                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-green-600 group-hover:translate-x-1 transition-all duration-200" />
-              </div>
-              
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">{card.label}</p>
-                <p className="text-3xl font-black text-gray-900 mt-1">{card.value}</p>
-                <p className={`text-xs font-bold ${card.subtitleColor} mt-1`}>{card.subtitle}</p>
-              </div>
-            </button>
-          );
-        })}
+        <StatCard title="Total Routes" value={kpis.totalRoutes} icon={Route} color="text-green-600" borderColor="border-green-500" />
+        <StatCard title="Completion Rate" value={`${kpis.completionRate.toFixed(1)}%`} icon={CheckCircle} color="text-green-600" borderColor="border-green-500" />
+        <StatCard title="Peak Volume" value={kpis.peakVolume} icon={BarChart3} color="text-purple-600" borderColor="border-purple-500" />
+        <StatCard title="Active Days" value={kpis.activeDays} icon={TrendingUp} color="text-orange-600" borderColor="border-orange-500" />
       </div>
 
-      {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Daily Route Volume</h3>
@@ -145,10 +104,7 @@ export default function AnalyticsPage({ setActivePage }: { setActivePage?: (page
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
                 <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
-                  labelStyle={{ color: '#111827', fontWeight: 700 }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }} labelStyle={{ color: '#111827', fontWeight: 700 }} />
                 <Line type="monotone" dataKey="total_routes" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: '#16a34a' }} />
               </LineChart>
             </ResponsiveContainer>
@@ -163,10 +119,7 @@ export default function AnalyticsPage({ setActivePage }: { setActivePage?: (page
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
                 <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} stroke="#e5e7eb" />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }}
-                  labelStyle={{ color: '#111827', fontWeight: 700 }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '12px' }} labelStyle={{ color: '#111827', fontWeight: 700 }} />
                 <Legend wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
                 <Bar dataKey="completed_routes" fill="#16a34a" name="Completed" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="skipped_routes" fill="#ef4444" name="Skipped" radius={[4, 4, 0, 0]} />

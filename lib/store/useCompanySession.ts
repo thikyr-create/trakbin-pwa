@@ -5,6 +5,16 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// --- TENANT CONTEXT ---
+export type UserRole = 'company' | 'driver' | 'caretaker' | 'admin' | 'government' | null;
+
+export interface TenantContext {
+  companyId: number | null; // BIGINT from DB
+  userId: string | null;
+  role: UserRole;
+  loaded: boolean;
+}
+
 export type DispatchEventType = 
   | 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' 
   | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full' 
@@ -36,12 +46,18 @@ export interface Truck {
 }
 
 export interface CompanySessionState {
+  // Tenant State
+  tenant: TenantContext;
+  loadTenantContext: () => Promise<void>;
+  
+  // Existing State
   trucks: Truck[];
   dispatchTimeline: DispatchEvent[];
   activeNotifications: Array<{ id: string; message: string; timestamp: string; type: 'success' | 'warning' | 'error' | 'info' }>;
   selectedTruck: Truck | null;
   cameraMode: 'overview' | 'following' | 'navigating';
   
+  // Existing Actions
   fetchFleet: () => Promise<void>;
   updateTruckStatus: (truckId: string, status: Truck['status']) => void;
   addDispatchEvent: (event: Omit<DispatchEvent, 'id' | 'timestamp'>) => void;
@@ -49,13 +65,51 @@ export interface CompanySessionState {
   clearNotification: (id: string) => void;
   setSelectedTruck: (truck: Truck | null) => void;
   setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
-  
-  // FIX: Always returns a cleanup function (never void)
   subscribeToRealtime: () => () => void;
   unsubscribeFromRealtime: () => void;
 }
 
 export const useCompanySession = create<CompanySessionState>((set, get) => ({
+  // Initial Tenant State
+  tenant: {
+    companyId: null,
+    userId: null,
+    role: null,
+    loaded: false,
+  },
+
+  // Load Tenant Context from Supabase Auth & Profiles
+  loadTenantContext: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // If no user, mark as loaded so the AuthGate can redirect them
+      set((state) => ({ tenant: { ...state.tenant, loaded: true, userId: null } }));
+      return;
+    }
+
+    // Fetch their profile to get company_id and role
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('company_id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.error('Failed to load tenant profile:', error);
+    }
+
+    set({
+      tenant: {
+        companyId: profile?.company_id || null,
+        userId: user.id,
+        role: (profile?.role as UserRole) || 'company',
+        loaded: true,
+      }
+    });
+  },
+
+  // --- EXISTING STATE & ACTIONS (Unchanged) ---
   trucks: [],
   dispatchTimeline: [],
   activeNotifications: [],
@@ -63,10 +117,14 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   cameraMode: 'overview',
 
   fetchFleet: async () => {
+    const { tenant } = get();
+    if (!tenant.companyId) return;
+
     try {
       const { data: routes, error } = await supabase
         .from('routes')
         .select('*, drivers(name), trucks(truck_id)')
+        .eq('company_id', tenant.companyId) 
         .in('status', ['active', 'paused'])
         .order('created_at', { ascending: false });
 
@@ -136,9 +194,17 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   setCameraMode: (mode) => set({ cameraMode: mode }),
 
   subscribeToRealtime: () => {
+    const { tenant } = get();
+    if (!tenant.companyId) return () => {};
+
     const routeSubscription = supabase
       .channel('routes-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'routes' }, (payload) => {
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'routes',
+        filter: `company_id=eq.${tenant.companyId}` 
+      }, (payload) => {
         const newPayload = payload.new as any;
         const { route_id, status, completed_stops, total_stops } = newPayload;
         
@@ -151,17 +217,13 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
             driver_name: newPayload.driver_name || 'Unknown',
             message: `Route completed: ${completed_stops}/${total_stops} stops`,
           });
-
-          get().addNotification(
-            `${newPayload.truck_id || 'Unknown'} completed route with ${completed_stops}/${total_stops} stops`,
-            'success'
-          );
+          get().addNotification(`${newPayload.truck_id || 'Unknown'} completed route`, 'success');
         } else if (status === 'paused') {
           get().addDispatchEvent({
             type: 'route_paused',
             truck_id: newPayload.truck_id || 'Unknown',
             driver_name: newPayload.driver_name || 'Unknown',
-            message: 'Route paused - truck likely at disposal facility',
+            message: 'Route paused',
           });
         }
       })
@@ -169,7 +231,12 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
 
     const stopsSubscription = supabase
       .channel('route-stops-channel')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'route_stops' }, (payload) => {
+      .on('postgres_changes', { 
+        event: 'UPDATE', 
+        schema: 'public', 
+        table: 'route_stops',
+        filter: `company_id=eq.${tenant.companyId}` 
+      }, (payload) => {
         const newPayload = payload.new as any;
         const { status, building_id, skip_reason } = newPayload;
         
@@ -189,13 +256,11 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
             building_id,
             message: `Pickup skipped at ${building_id}: ${skip_reason}`,
           });
-
-          get().addNotification(`Pickup skipped at ${building_id}: ${skip_reason}`, 'warning');
+          get().addNotification(`Pickup skipped at ${building_id}`, 'warning');
         }
       })
       .subscribe();
 
-    // FIX: Always return a cleanup function
     return () => {
       supabase.removeChannel(routeSubscription);
       supabase.removeChannel(stopsSubscription);

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Camera, MapPin, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useCompanySession } from '@/lib/store/useCompanySession'; // <-- NEW IMPORT
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -20,19 +21,34 @@ interface Verification {
   created_at: string;
 }
 
-export default function VerificationPage({ collections }: { collections?: any[] }) {
+export default function VerificationPage() {
   const [verifications, setVerifications] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
+  // Get tenant context
+  const { tenant } = useCompanySession();
+
   useEffect(() => {
     fetchVerifications();
-  }, [filter]);
+  }, [filter, tenant.companyId]); // Re-fetch if filter or tenant changes
 
   async function fetchVerifications() {
+    // Guard clause
+    if (!tenant.companyId) return;
+
     setLoading(true);
-    let query = supabase.from('verifications').select('*').order('created_at', { ascending: false });
-    if (filter !== 'all') query = query.eq('status', filter);
+    
+    // FIX: Scoped to tenant.companyId using 'hauler_id' to match DB schema
+    let query = supabase
+      .from('verifications')
+      .select('*')
+      .eq('hauler_id', tenant.companyId) 
+      .order('created_at', { ascending: false });
+
+    if (filter !== 'all') {
+      query = query.eq('status', filter);
+    }
 
     const { data } = await query;
     if (data) setVerifications(data as Verification[]);
@@ -62,17 +78,17 @@ export default function VerificationPage({ collections }: { collections?: any[] 
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Service Verifications</h1>
+        <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Service Verifications</h1>
         <div className="flex gap-2 flex-wrap">
           {['all', 'pending', 'verified', 'rejected'].map((f) => (
             <button 
               key={f} 
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-md text-sm font-bold uppercase tracking-wide transition-colors ${
                 filter === f ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {f}
             </button>
           ))}
         </div>
@@ -86,7 +102,7 @@ export default function VerificationPage({ collections }: { collections?: any[] 
               <div className="flex flex-row items-center justify-between p-4 bg-gray-50 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   {getIcon(v.verification_type)}
-                  <h3 className="text-sm font-semibold capitalize">{v.verification_type}</h3>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{v.verification_type}</h3>
                 </div>
                 {getStatusBadge(v.status)}
               </div>
@@ -101,16 +117,16 @@ export default function VerificationPage({ collections }: { collections?: any[] 
                 )}
 
                 <div className="text-sm space-y-1.5">
-                  <p><span className="font-semibold text-gray-500">Driver:</span> {v.driver_name || 'Unknown'}</p>
-                  <p><span className="font-semibold text-gray-500">Truck:</span> {v.truck_id ? String(v.truck_id).substring(0, 8) + '...' : 'N/A'}</p>
+                  <p><span className="font-semibold text-gray-500 uppercase text-xs">Driver:</span> <span className="font-bold text-gray-900">{v.driver_name || 'Unknown'}</span></p>
+                  <p><span className="font-semibold text-gray-500 uppercase text-xs">Truck:</span> <span className="font-bold text-gray-900">{v.truck_id ? String(v.truck_id).substring(0, 8) + '...' : 'N/A'}</span></p>
                   <div className="flex items-center gap-1.5 text-gray-500">
                     <Clock className="h-3.5 w-3.5" />
-                    <span>{new Date(v.created_at).toLocaleString()}</span>
+                    <span className="text-xs font-medium">{new Date(v.created_at).toLocaleString()}</span>
                   </div>
                   {gps?.lat && gps?.lng && (
                     <div className="flex items-center gap-1.5 text-gray-500">
                       <MapPin className="h-3.5 w-3.5" />
-                      <span>{Number(gps.lat).toFixed(4)}, {Number(gps.lng).toFixed(4)}</span>
+                      <span className="text-xs font-medium">{Number(gps.lat).toFixed(4)}, {Number(gps.lng).toFixed(4)}</span>
                     </div>
                   )}
                 </div>
