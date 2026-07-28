@@ -106,7 +106,7 @@ export default function AuthPage() {
         .select('*')
         .eq('custom_id', buildingId)
         .eq('passcode', passcode)
-        .maybeSingle(); // ✅ Prevents 406 error
+        .maybeSingle();
 
       if (error || !building) { 
         setMessage('❌ Invalid Building ID or Passcode'); 
@@ -118,7 +118,7 @@ export default function AuthPage() {
     } else {
       // Unified login for Operations (both Driver and Waste Company)
       let user = null;
-      let loginAccountType = ''; // Renamed to avoid shadowing the state variable
+      let loginAccountType = '';
 
       // 1. Try to find by Employee ID first (for Drivers)
       const { data: driverUser, error: driverError } = await supabase
@@ -126,7 +126,7 @@ export default function AuthPage() {
         .select('*')
         .eq('employee_id', email)
         .eq('password', password)
-        .maybeSingle(); // ✅ Prevents 406 error
+        .maybeSingle();
 
       if (driverUser && !driverError) {
         user = driverUser;
@@ -140,7 +140,7 @@ export default function AuthPage() {
           .select('*')
           .eq('email', email)
           .eq('password', password)
-          .maybeSingle(); // ✅ Prevents 406 error
+          .maybeSingle();
 
         if (companyUser && !companyError) {
           user = companyUser;
@@ -163,10 +163,11 @@ export default function AuthPage() {
           router.push('/hauler-dashboard');
         }
       }
-    } // ✅ THIS CLOSING BRACKET WAS MISSING, CAUSING THE ERROR!
+    }
+    setLoading(false);
   };
 
-  // --- REGISTRATION LOGIC ---
+  // --- REFACTORED REGISTRATION LOGIC ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
@@ -188,6 +189,9 @@ export default function AuthPage() {
         nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 2, 1);
       }
       
+      // Get the first company (or you could let them select one)
+      const { data: defaultCompany } = await supabase.from('haulers').select('id').limit(1).single();
+      
       const buildingMetadata: any = { 
         custom_id: buildingId, 
         passcode: passcode, 
@@ -199,7 +203,8 @@ export default function AuthPage() {
         status: 'pending', 
         payment_status: 'unpaid',
         next_billing_date: nextBillingDate.toISOString().split('T')[0],
-        billing_day: 1
+        billing_day: 1,
+        company_id: defaultCompany?.id || null // <-- ADDED: Assign to a company
       };
       
       if (buildingType === 'Residential Multi-Unit') { buildingMetadata.number_of_units = parseInt(numberOfFlats); buildingMetadata.unit_type = 'flats'; } 
@@ -215,12 +220,36 @@ export default function AuthPage() {
       const { data: existingUser } = await supabase.from('users').select('email').eq('email', email).maybeSingle();
       if (existingUser) { setMessage('❌ Email already registered.'); setLoading(false); return; }
       
-      const { error } = await supabase.from('users').insert([{ 
-        email, password, account_type: 'WasteCompany', company_name: companyName, license_number: licenseNumber 
+      // Step 1: Create the Hauler (Company) record
+      const { data: haulerData, error: haulerError } = await supabase.from('haulers').insert([{
+        company_name: companyName,
+        license_number: licenseNumber,
+        operating_address: operatingAddress,
+        contact_number: contactNumber
+      }]).select().single();
+      
+      if (haulerError) { 
+        setMessage('❌ Failed to create company: ' + haulerError.message); 
+        setLoading(false); 
+        return; 
+      }
+      
+      // Step 2: Create the User record linked to the company
+      const { error: userError } = await supabase.from('users').insert([{ 
+        email, 
+        password, 
+        account_type: 'WasteCompany', 
+        company_name: companyName, 
+        license_number: licenseNumber,
+        company_id: haulerData.id // <-- ADDED: Link user to company
       }]);
       
-      if (error) { setMessage('❌ Registration failed: ' + error.message); } 
-      else { setMessage('✅ Waste Company account created!'); setTimeout(() => { setIsLogin(true); setMessage(''); }, 2000); }
+      if (userError) { 
+        setMessage(' Registration failed: ' + userError.message); 
+      } else { 
+        setMessage('✅ Waste Company account created!'); 
+        setTimeout(() => { setIsLogin(true); setMessage(''); }, 2000); 
+      }
     }
     setLoading(false);
   };
@@ -431,7 +460,7 @@ export default function AuthPage() {
           )}
           {message && (
             <div className={`mt-6 flex items-start gap-3 p-4 rounded-xl text-sm font-medium ${message.includes('❌') ? 'text-red-700 bg-red-50 border border-red-100' : message.includes('✅') ? 'text-green-700 bg-green-50 border border-green-200' : 'text-gray-700 bg-gray-50 border border-gray-100'}`}>
-              {message.includes('❌') ? <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" /> : <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-green-600" />}
+              {message.includes('') ? <AlertCircle size={18} className="shrink-0 mt-0.5 text-red-600" /> : <CheckCircle2 size={18} className="shrink-0 mt-0.5 text-green-600" />}
               <p>{message}</p>
             </div>
           )}
