@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
-import { useCompanySession } from '@/lib/store/useCompanySession';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -58,32 +57,26 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     }
     const caretakerData = JSON.parse(storedCaretaker);
     
-    // Get tenant context for RLS scoping
-    const { tenant } = useCompanySession.getState();
-    if (!tenant || !tenant.companyId) {
-      console.error('Tenant context not loaded.');
-      return;
-    }
-
     set({ building: caretakerData, loading: true });
 
     try {
-      // 1. Fetch Collection History (Scoped to Company)
+      // Caretakers are isolated by their custom_id (Building ID). 
+      // We do not strictly require a company_id for them to view their own data.
+      
+      // 1. Fetch Collection History
       const { data: history } = await supabase
         .from('collections')
         .select('*')
         .eq('building_id', caretakerData.custom_id)
-        .eq('company_id', tenant.companyId) // <-- RLS SCOPE
         .order('collection_date', { ascending: false })
         .limit(10);
       if (history) set({ collectionHistory: history });
 
-      // 2. Fetch Building Data (Scoped to Company)
+      // 2. Fetch Building Data
       const { data: buildingData } = await supabase
         .from('Buildings')
         .select('wallet_balance, autopay_enabled, autopay_source, next_billing_date, payment_status')
         .eq('custom_id', caretakerData.custom_id)
-        .eq('company_id', tenant.companyId) // <-- RLS SCOPE
         .single();
         
       if (buildingData) {
@@ -104,28 +97,25 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
         }
       }
 
-      // 3. Fetch Payment Methods (Scoped to Company)
+      // 3. Fetch Payment Methods
       const { data: methods } = await supabase
         .from('payment_methods')
         .select('*')
-        .eq('building_id', caretakerData.custom_id)
-        .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+        .eq('building_id', caretakerData.custom_id);
       if (methods) set({ paymentMethods: methods });
 
-      // 4. Fetch Schedule (Scoped to Company)
+      // 4. Fetch Schedule
       const { data: scheduleData } = await supabase
         .from('collection_schedules')
         .select('*')
-        .eq('building_id', caretakerData.custom_id)
-        .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+        .eq('building_id', caretakerData.custom_id);
       if (scheduleData && scheduleData.length > 0) set({ schedule: scheduleData[0] });
 
-      // 5. Fetch Invoices (Scoped to Company)
+      // 5. Fetch Invoices
       const { data: allInvoices } = await supabase
         .from('invoices')
         .select('status')
-        .eq('building_id', caretakerData.custom_id)
-        .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+        .eq('building_id', caretakerData.custom_id);
         
       if (allInvoices) {
         set({
@@ -138,6 +128,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     } catch (error) {
       console.error('Error initializing caretaker session:', error);
     } finally {
+      // CRITICAL FIX: Always set loading to false, even if data is missing
       set({ loading: false });
     }
   },
@@ -146,29 +137,26 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     const today = new Date().toISOString().split('T')[0];
     if (today >= nextBillingDate) {
       set({ billingProcessing: true });
-      const { tenant } = useCompanySession.getState();
-      if (!tenant?.companyId) return;
 
       const invoiceAmount = 7500;
       const billingDate = new Date(nextBillingDate);
       const followingMonth = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, 1);
       const monthLabel = billingDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       
-      // Insert Invoice (Scoped)
+      // Insert Invoice
       await supabase.from('invoices').insert([{ 
         building_id: bId, 
-        company_id: tenant.companyId, // <-- RLS SCOPE
         amount: invoiceAmount, 
         due_date: nextBillingDate, 
         status: 'pending', 
         description: `Monthly Waste Collection - ${monthLabel}` 
       }]);
       
-      // Update Building Billing Date (Scoped)
+      // Update Building Billing Date
       await supabase.from('Buildings').update({ 
         next_billing_date: followingMonth.toISOString().split('T')[0], 
         payment_status: 'unpaid' 
-      }).eq('custom_id', bId).eq('company_id', tenant.companyId);
+      }).eq('custom_id', bId);
 
       // Process Autopay if enabled
       if (autopayEnabled && currentWalletBalance >= invoiceAmount) {
@@ -177,11 +165,10 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
         await supabase.from('Buildings').update({ 
           wallet_balance: newBalance, 
           payment_status: 'paid' 
-        }).eq('custom_id', bId).eq('company_id', tenant.companyId);
+        }).eq('custom_id', bId);
         
         await supabase.from('wallet_transactions').insert([{ 
           building_id: bId, 
-          company_id: tenant.companyId, // <-- RLS SCOPE
           type: 'payment', 
           amount: invoiceAmount, 
           description: `Autopay: ${monthLabel}`, 
@@ -190,8 +177,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
         
         await supabase.from('invoices').update({ status: 'paid' })
           .eq('building_id', bId)
-          .eq('due_date', nextBillingDate)
-          .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+          .eq('due_date', nextBillingDate);
           
         set({ walletBalance: newBalance });
         alert(`✅ Autopay successful! ₦${invoiceAmount.toLocaleString()} deducted for ${monthLabel}.`);
@@ -212,12 +198,10 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
 
   addFunds: async (amount, methodId) => {
     const { building, walletBalance } = get();
-    const { tenant } = useCompanySession.getState();
-    if (!building || !tenant?.companyId) return;
+    if (!building) return;
 
     await supabase.from('wallet_transactions').insert([{ 
       building_id: building.custom_id, 
-      company_id: tenant.companyId, // <-- RLS SCOPE
       type: 'deposit', 
       amount, 
       description: 'Wallet top-up', 
@@ -226,8 +210,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     
     const newBalance = walletBalance + amount;
     await supabase.from('Buildings').update({ wallet_balance: newBalance })
-      .eq('custom_id', building.custom_id)
-      .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+      .eq('custom_id', building.custom_id);
       
     set({ walletBalance: newBalance, showAddFunds: false, selectedMethod: '' });
     alert('Funds added successfully!');
@@ -235,13 +218,11 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
 
   saveAutopay: async () => {
     const { building, autopaySource } = get();
-    const { tenant } = useCompanySession.getState();
-    if (!building || !tenant?.companyId) return;
+    if (!building) return;
 
     set({ autopayLoading: true });
     await supabase.from('Buildings').update({ autopay_enabled: true, autopay_source: autopaySource })
-      .eq('custom_id', building.custom_id)
-      .eq('company_id', tenant.companyId); // <-- RLS SCOPE
+      .eq('custom_id', building.custom_id);
       
     set({ autopayLoading: false, showAutopay: false });
     alert(`✅ Autopay enabled! We will automatically deduct from your ${autopaySource} on the 1st of every month.`);
