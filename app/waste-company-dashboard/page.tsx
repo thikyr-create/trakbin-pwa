@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
-import AuthGate from './components/AuthGate'; // <-- NEW IMPORT
+import AuthGate from './components/AuthGate';
 import DispatchTimeline from './components/DispatchTimeline';
 import NotificationsPanel from './components/NotificationsPanel';
 import AddDriverModal from './components/AddDriverModal';
@@ -59,7 +59,6 @@ export default function WasteCompanyDashboard() {
   const [searchFleet, setSearchFleet] = useState('');
   const [searchDrivers, setSearchDrivers] = useState('');
 
-  // Get tenant context and actions from Zustand
   const { tenant, addDispatchEvent, addNotification, subscribeToRealtime, unsubscribeFromRealtime } = useCompanySession();
 
   useEffect(() => {
@@ -68,12 +67,17 @@ export default function WasteCompanyDashboard() {
       router.push('/auth'); 
       return; 
     }
+    
     const userData = JSON.parse(storedCompany);
     setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
     
-    // AuthGate handles loading the tenant context. 
-    // We call fetchData, which will wait for the tenant ID.
+    // Redirect drivers to their own dashboard
+    if (tenant.role === 'driver') {
+      router.push('/driver-dashboard');
+      return;
+    }
+    
     fetchData();
 
     const cleanup = subscribeToRealtime();
@@ -84,13 +88,11 @@ export default function WasteCompanyDashboard() {
         unsubscribeFromRealtime();
       }
     };
-  }, [router]);
+  }, [router, tenant.role]);
 
-  // UPDATED: Uses tenant.companyId for secure, isolated queries
   const fetchData = async () => {
     const { tenant } = useCompanySession.getState();
     if (!tenant.companyId) {
-      // If tenant isn't loaded yet, wait a moment and retry
       setTimeout(fetchData, 500);
       return;
     }
@@ -98,10 +100,7 @@ export default function WasteCompanyDashboard() {
     setLoading(true);
     try {
       const { data: trucksData } = await supabase.from('trucks').select('*').eq('company_id', tenant.companyId).order('truck_id', { ascending: true });
-      
-      // Note: 'users' table wasn't migrated to company_id in Phase 1, so we keep companyName here for now
       const { data: driversData } = await supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_name', companyName).order('employee_id', { ascending: true });
-      
       const { data: buildingsData } = await supabase.from('Buildings').select('*').eq('company_id', tenant.companyId).order('custom_id', { ascending: true });
       const { data: collectionsData } = await supabase.from('collections').select('*').eq('company_id', tenant.companyId).order('collection_date', { ascending: false });
       const { data: issuesData } = await supabase.from('issues').select('*').eq('company_id', tenant.companyId).order('created_at', { ascending: false });
@@ -133,7 +132,6 @@ export default function WasteCompanyDashboard() {
       }]);
       if (userError) throw userError;
       
-      // Added company_id to the insert to maintain tenant isolation
       const { error: driverError } = await supabase.from('drivers').insert([{
         employee_id: employeeId, full_name: formData.full_name, email: formData.email,
         phone: formData.phone, license_number: formData.license_number, 
@@ -145,7 +143,7 @@ export default function WasteCompanyDashboard() {
       addNotification(`Driver ${formData.full_name} created successfully!`, 'success');
       fetchData(); 
       
-      return { success: true, message: `✅ Driver Created Successfully!\n\n Employee ID: ${employeeId}\n Email: ${formData.email}\n🔑 Password: ${generatedPassword}\n\nPlease save these credentials!`, employeeId, password: generatedPassword };
+      return { success: true, message: `✅ Driver Created Successfully!\n\n Employee ID: ${employeeId}\n Email: ${formData.email}\n Password: ${generatedPassword}\n\nPlease save these credentials!`, employeeId, password: generatedPassword };
     } catch (error: any) {
       addNotification(`Failed to create driver: ${error.message}`, 'error');
       return { success: false, message: error.message };
@@ -156,7 +154,6 @@ export default function WasteCompanyDashboard() {
     const { tenant } = useCompanySession.getState();
     const truckId = generateTruckId();
     try {
-      // Added company_id to the insert to maintain tenant isolation
       const { error } = await supabase.from('trucks').insert([{
         truck_id: truckId, license_plate: formData.license_plate, driver_name: formData.driver_name,
         truck_type: formData.truck_type, capacity: formData.capacity, status: formData.status, 
@@ -177,20 +174,26 @@ export default function WasteCompanyDashboard() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'fleet', label: 'Fleet', icon: Truck },
-    { id: 'drivers', label: 'Drivers', icon: Users },
-    { id: 'buildings', label: 'Buildings', icon: Building2 },
-    { id: 'assignments', label: 'Assignments', icon: ClipboardList },
-    { id: 'mission', label: 'Mission Map', icon: Map },
-    { id: 'verification', label: 'Verification', icon: CheckCircle2 },
-    { id: 'issues', label: 'Issues', icon: AlertTriangle },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'maintenance', label: 'Maintenance', icon: Wrench },
-    { id: 'zones', label: 'Zones', icon: Globe },
-    { id: 'settings', label: 'Settings', icon: Settings },
+  // Role-based navigation configuration
+  const allNavItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
+    { id: 'fleet', label: 'Fleet', icon: Truck, roles: ['company', 'admin'] },
+    { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
+    { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
+    { id: 'assignments', label: 'Assignments', icon: ClipboardList, roles: ['company', 'admin'] },
+    { id: 'mission', label: 'Mission Map', icon: Map, roles: ['company', 'admin'] },
+    { id: 'verification', label: 'Verification', icon: CheckCircle2, roles: ['company', 'admin', 'government'] },
+    { id: 'issues', label: 'Issues', icon: AlertTriangle, roles: ['company', 'admin', 'government', 'caretaker'] },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['company', 'admin', 'government'] },
+    { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['company', 'admin'] },
+    { id: 'zones', label: 'Zones', icon: Globe, roles: ['company', 'admin'] },
+    { id: 'settings', label: 'Settings', icon: Settings, roles: ['company', 'admin', 'government', 'caretaker'] },
   ];
+
+  // Filter navigation based on user role
+  const navItems = allNavItems.filter(item => 
+    tenant.role === 'admin' || item.roles.includes(tenant.role || 'company')
+  );
 
   const filterText = (text: string) => text?.toLowerCase() || '';
   const filteredTrucks = trucks.filter(t => 
@@ -203,7 +206,6 @@ export default function WasteCompanyDashboard() {
     filterText(d.employee_id).includes(searchDrivers.toLowerCase())
   );
 
-  // UPDATED: Wrapped in AuthGate to prevent rendering until tenant is loaded
   return (
     <AuthGate>
       <div className="min-h-screen bg-gray-50 relative">
@@ -296,7 +298,7 @@ export default function WasteCompanyDashboard() {
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-sm font-bold text-gray-900">{companyName}</p>
-                    <p className="text-xs font-bold text-gray-500 uppercase">Admin</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">{tenant.role || 'User'}</p>
                   </div>
                 </div>
               </div>
