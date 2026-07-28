@@ -1,119 +1,40 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, CheckCircle2, MapPin, Calendar, Truck, LogOut, Phone, CreditCard, ArrowRight, Wallet, Plus, X, Landmark, Loader2, Home } from 'lucide-react';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 export default function CaretakerDashboard() {
-  const [building, setBuilding] = useState<any>(null);
-  const [collectionHistory, setCollectionHistory] = useState<any[]>([]);
-  const [walletBalance, setWalletBalance] = useState(0);
-  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
-  const [schedule, setSchedule] = useState<any>(null);
-  const [invoiceCount, setInvoiceCount] = useState({ paid: 0, due: 0 });
-
-  const [showAddFunds, setShowAddFunds] = useState(false);
-  const [showAutopay, setShowAutopay] = useState(false);
-  const [autopaySource, setAutopaySource] = useState<'wallet' | 'card'>('wallet');
-  const [autopayLoading, setAutopayLoading] = useState(false);
-
-  const [selectedMethod, setSelectedMethod] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [billingProcessing, setBillingProcessing] = useState(false);
   const router = useRouter();
+  const {
+    building, collectionHistory, walletBalance, paymentMethods, schedule, invoiceCount,
+    showAddFunds, showAutopay, autopaySource, autopayLoading, selectedMethod, loading, billingProcessing,
+    initializeSession, addFunds, saveAutopay, setShowAddFunds, setShowAutopay, setAutopaySource, setSelectedMethod, logout
+  } = useCaretakerSession();
 
   useEffect(() => {
-    const storedCaretaker = localStorage.getItem('trakbin_caretaker');
-    if (!storedCaretaker) { router.push('/auth'); return; }
-    const caretakerData = JSON.parse(storedCaretaker);
-    setBuilding(caretakerData);
+    initializeSession();
+  }, []);
 
-    const fetchData = async () => {
-      const { data: history } = await supabase.from('collections').select('*').eq('building_id', caretakerData.custom_id).order('collection_date', { ascending: false }).limit(10);
-      if (history) setCollectionHistory(history);
-
-      const { data: buildingData } = await supabase.from('Buildings').select('wallet_balance, autopay_enabled, autopay_source, next_billing_date, payment_status').eq('custom_id', caretakerData.custom_id).single();
-      if (buildingData) {
-        setWalletBalance(buildingData.wallet_balance || 0);
-        if (buildingData.autopay_source) setAutopaySource(buildingData.autopay_source);
-        setBuilding((prev: any) => ({ ...prev, ...buildingData }));
-      }
-
-      const { data: methods } = await supabase.from('payment_methods').select('*').eq('building_id', caretakerData.custom_id);
-      if (methods) setPaymentMethods(methods);
-
-      const { data: scheduleData } = await supabase.from('collection_schedules').select('*').eq('building_id', caretakerData.custom_id).single();
-      if (scheduleData) setSchedule(scheduleData);
-
-      const { data: allInvoices } = await supabase.from('invoices').select('status').eq('building_id', caretakerData.custom_id);
-      if (allInvoices) {
-        setInvoiceCount({
-          paid: allInvoices.filter(i => i.status === 'paid').length,
-          due: allInvoices.filter(i => i.status !== 'paid').length
-        });
-      }
-
-      if (buildingData?.next_billing_date) {
-        await checkAndGenerateInvoice(caretakerData.custom_id, buildingData.next_billing_date, buildingData.autopay_enabled, buildingData.wallet_balance || 0);
-      }
-
-      setLoading(false);
-    };
-    fetchData();
-  }, [router]);
-
-  const checkAndGenerateInvoice = async (bId: string, nextBillingDate: string, autopayEnabled: boolean, currentWalletBalance: number) => {
-    const today = new Date().toISOString().split('T')[0];
-    if (today >= nextBillingDate) {
-      setBillingProcessing(true);
-      const invoiceAmount = 7500;
-      const billingDate = new Date(nextBillingDate);
-      const followingMonth = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, 1);
-      const monthLabel = billingDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      
-      await supabase.from('invoices').insert([{ building_id: bId, amount: invoiceAmount, due_date: nextBillingDate, status: 'pending', description: `Monthly Waste Collection - ${monthLabel}` }]);
-      await supabase.from('Buildings').update({ next_billing_date: followingMonth.toISOString().split('T')[0], payment_status: 'unpaid' }).eq('custom_id', bId);
-
-      if (autopayEnabled && currentWalletBalance >= invoiceAmount) {
-        const newBalance = currentWalletBalance - invoiceAmount;
-        await supabase.from('Buildings').update({ wallet_balance: newBalance, payment_status: 'paid' }).eq('custom_id', bId);
-        await supabase.from('wallet_transactions').insert([{ building_id: bId, type: 'payment', amount: invoiceAmount, description: `Autopay: ${monthLabel}`, status: 'completed' }]);
-        await supabase.from('invoices').update({ status: 'paid' }).eq('building_id', bId).eq('due_date', nextBillingDate);
-        setWalletBalance(newBalance);
-        alert(`✅ Autopay successful! ₦${invoiceAmount.toLocaleString()} deducted for ${monthLabel}.`);
-      } else if (autopayEnabled && currentWalletBalance < invoiceAmount) {
-        alert(`⚠️ Autopay failed: Insufficient wallet balance.`);
-      }
-
-      setBuilding((prev: any) => ({ ...prev, next_billing_date: followingMonth.toISOString().split('T')[0], payment_status: autopayEnabled && currentWalletBalance >= invoiceAmount ? 'paid' : 'unpaid' }));
-      setBillingProcessing(false);
-    }
+  const handleAddFundsClick = () => { 
+    if (paymentMethods.length === 0) { 
+      alert('Please add a payment method first.'); 
+      router.push('/caretaker/payment'); 
+    } else { 
+      setShowAddFunds(true); 
+    } 
   };
-
-  const handleLogout = () => { localStorage.removeItem('trakbin_caretaker'); router.push('/'); };
-  const handleAddFundsClick = () => { if (paymentMethods.length === 0) { alert('Please add a payment method first.'); router.push('/caretaker/payment'); } else { setShowAddFunds(true); } };
   
   const handleConfirmAddFunds = async () => {
     if (!selectedMethod) { alert('Please select a payment method'); return; }
     const amount = prompt('Enter amount to add (₦):');
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { alert('Please enter a valid amount'); return; }
-    const numAmount = Number(amount);
-    await supabase.from('wallet_transactions').insert([{ building_id: building.custom_id, type: 'deposit', amount: numAmount, description: 'Wallet top-up', status: 'completed' }]);
-    const newBalance = walletBalance + numAmount;
-    await supabase.from('Buildings').update({ wallet_balance: newBalance }).eq('custom_id', building.custom_id);
-    setWalletBalance(newBalance); setShowAddFunds(false); setSelectedMethod(''); alert('Funds added successfully!');
+    await addFunds(Number(amount), selectedMethod);
   };
 
   const handleSaveAutopay = async () => {
-    setAutopayLoading(true);
-    await supabase.from('Buildings').update({ autopay_enabled: true, autopay_source: autopaySource }).eq('custom_id', building.custom_id);
-    setAutopayLoading(false); setShowAutopay(false);
-    alert(`✅ Autopay enabled! We will automatically deduct from your ${autopaySource} on the 1st of every month.`);
+    await saveAutopay();
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-white"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
@@ -123,7 +44,7 @@ export default function CaretakerDashboard() {
   const getStatusInfo = () => {
     if (!schedule) return { status: 'Scheduled', badgeColor: 'bg-gray-100 text-gray-700', icon: '⚪' };
     if (schedule.status === 'delayed') return { status: 'Delayed', badgeColor: 'bg-orange-100 text-orange-700', icon: '🟠' };
-    if (schedule.status === 'missed') return { status: 'Missed', badgeColor: 'bg-red-100 text-red-700', icon: '🔴' };
+    if (schedule.status === 'missed') return { status: 'Missed', badgeColor: 'bg-red-100 text-red-700', icon: '' };
     return { status: 'Scheduled', badgeColor: 'bg-green-100 text-green-700', icon: '🟢' };
   };
   const statusInfo = getStatusInfo();
@@ -143,7 +64,7 @@ export default function CaretakerDashboard() {
               <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center"><span className="text-white font-bold text-xl">T</span></div>
               <span className="text-xl font-bold text-gray-900 tracking-tight">Trakbin</span>
             </div>
-            <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><LogOut size={16} /> Logout</button>
+            <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><LogOut size={16} /> Logout</button>
           </div>
         </div>
       </header>
