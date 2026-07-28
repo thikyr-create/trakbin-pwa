@@ -116,7 +116,6 @@ export default function AuthPage() {
       localStorage.setItem('trakbin_caretaker', JSON.stringify(building));
       router.push('/caretaker-dashboard');
     } else {
-      // Unified login for Operations (both Driver and Waste Company)
       let user = null;
       let loginAccountType = '';
 
@@ -189,9 +188,7 @@ export default function AuthPage() {
         nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 2, 1);
       }
       
-      // Get the first company (or you could let them select one)
-      const { data: defaultCompany } = await supabase.from('haulers').select('id').limit(1).single();
-      
+      // Caretakers are independent initially. company_id is left NULL until assigned by an admin.
       const buildingMetadata: any = { 
         custom_id: buildingId, 
         passcode: passcode, 
@@ -204,7 +201,7 @@ export default function AuthPage() {
         payment_status: 'unpaid',
         next_billing_date: nextBillingDate.toISOString().split('T')[0],
         billing_day: 1,
-        company_id: defaultCompany?.id || null // <-- ADDED: Assign to a company
+        company_id: null 
       };
       
       if (buildingType === 'Residential Multi-Unit') { buildingMetadata.number_of_units = parseInt(numberOfFlats); buildingMetadata.unit_type = 'flats'; } 
@@ -241,7 +238,7 @@ export default function AuthPage() {
         account_type: 'WasteCompany', 
         company_name: companyName, 
         license_number: licenseNumber,
-        company_id: haulerData.id // <-- ADDED: Link user to company
+        company_id: haulerData.id 
       }]);
       
       if (userError) { 
