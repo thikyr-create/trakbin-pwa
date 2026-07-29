@@ -5,11 +5,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- TENANT CONTEXT ---
 export type UserRole = 'company' | 'driver' | 'caretaker' | 'admin' | 'government' | null;
 
 export interface TenantContext {
-  companyId: number | null; 
+  companyId: number | null;
   userId: string | null;
   role: UserRole;
   loaded: boolean;
@@ -81,7 +80,6 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     let role: UserRole = 'company';
 
     if (userId) {
-      // If official auth user exists, query profiles
       const { data: profile } = await supabase
         .from('profiles')
         .select('company_id, role')
@@ -91,13 +89,12 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       role = profile?.role as UserRole;
     } else {
       // 2. FALLBACK: Custom Auth (Check LocalStorage)
-      // This is what your Waste Company and Driver logins use!
       const storedCompany = localStorage.getItem('trakbin_company');
       const storedDriver = localStorage.getItem('trakbin_driver');
 
       if (storedCompany) {
         const parsed = JSON.parse(storedCompany);
-        userId = parsed.id; // The ID from your custom users table
+        userId = parsed.id;
         companyId = parsed.company_id;
         role = 'company'; 
       } else if (storedDriver) {
@@ -108,7 +105,6 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       }
     }
 
-    // CRITICAL: Ensure companyId is a Number (your users table has it as text, but DB needs number)
     const numericCompanyId = companyId ? Number(companyId) : null;
 
     set({
@@ -124,25 +120,101 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   fetchFleet: async () => {
     const { tenant } = get();
     if (!tenant.companyId) return;
-    // ... (rest of your existing fleet logic)
+
+    try {
+      const { data: routes, error } = await supabase
+        .from('routes')
+        .select('*, drivers(name), trucks(truck_id)')
+        .eq('company_id', tenant.companyId) 
+        .in('status', ['active', 'paused'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const trucks: Truck[] = (routes || []).map((route: any) => ({
+        id: route.id,
+        truck_id: route.trucks?.truck_id || 'Unknown',
+        driver_name: route.drivers?.name || 'Unknown',
+        status: route.status === 'paused' ? 'paused' : 'on_route',
+        current_route_id: route.id,
+        capacity_percent: 0,
+        completed_stops: route.completed_stops || 0,
+        total_stops: route.total_stops || 0,
+        license_plate: '',
+        truck_type: '',
+      }));
+
+      set({ trucks });
+    } catch (error) {
+      console.error('Error fetching fleet:', error);
+    }
   },
 
-  // ... (keep all your other existing functions: updateTruckStatus, addDispatchEvent, etc.)
   updateTruckStatus: (truckId, status) => {
-    set((state) => ({ trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)) }));
+    set((state) => ({
+      trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)),
+    }));
   },
+
   addDispatchEvent: (event) => {
-    const newEvent = { ...event, id: `event-${Date.now()}`, timestamp: new Date().toISOString() };
-    set((state) => ({ dispatchTimeline: [newEvent, ...state.dispatchTimeline].slice(0, 100) }));
+    const newEvent: DispatchEvent = {
+      ...event,
+      id: `event-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
+    set((state) => ({
+      dispatchTimeline: [newEvent, ...state.dispatchTimeline].slice(0, 100),
+    }));
   },
+
   addNotification: (message, type) => {
-    const notification = { id: `notif-${Date.now()}`, message, timestamp: new Date().toISOString(), type };
-    set((state) => ({ activeNotifications: [notification, ...state.activeNotifications].slice(0, 10) }));
-    setTimeout(() => get().clearNotification(notification.id), 5000);
+    const notification = {
+      id: `notif-${Date.now()}`,
+      message,
+      timestamp: new Date().toISOString(),
+      type,
+    };
+    set((state) => ({
+      activeNotifications: [notification, ...state.activeNotifications].slice(0, 10),
+    }));
+    setTimeout(() => {
+      get().clearNotification(notification.id);
+    }, 5000);
   },
-  clearNotification: (id) => set((state) => ({ activeNotifications: state.activeNotifications.filter((n) => n.id !== id) })),
+
+  clearNotification: (id) => {
+    set((state) => ({
+      activeNotifications: state.activeNotifications.filter((n) => n.id !== id),
+    }));
+  },
+
   setSelectedTruck: (truck) => set({ selectedTruck: truck }),
   setCameraMode: (mode) => set({ cameraMode: mode }),
-  subscribeToRealtime: () => { return () => {}; }, // Placeholder
-  unsubscribeFromRealtime: () => {}, // Placeholder
+
+  subscribeToRealtime: () => {
+    const { tenant } = get();
+    if (!tenant.companyId) return () => {};
+
+    const routeSubscription = supabase
+      .channel('routes-channel')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'routes',
+        filter: `company_id=eq.${tenant.companyId}` 
+      }, (payload) => {
+        const newPayload = payload.new as any;
+        const { route_id, status } = newPayload;
+        get().updateTruckStatus(route_id, status === 'paused' ? 'paused' : status === 'completed' ? 'completed' : 'on_route');
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(routeSubscription);
+    };
+  },
+
+  unsubscribeFromRealtime: () => {
+    supabase.removeAllChannels();
+  },
 }));

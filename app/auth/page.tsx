@@ -94,13 +94,28 @@ export default function AuthPage() {
       }).catch(() => { setMessage('❌ Search failed.'); setSearching(false); });
   };
 
+  // Clear GPS data helper
+  const clearGPSData = () => {
+    setGpsAddress('');
+    setCoords({ lat: 6.5244, lon: 3.3792 });
+    setGpsStatus('idle');
+    setAccuracy(null);
+  };
+
+  // Clear GPS when switching to login
+  useEffect(() => {
+    if (isLogin) {
+      clearGPSData();
+    }
+  }, [isLogin]);
+
   // --- ROBUST LOGIN LOGIC ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
     setMessage('');
 
-    // Trim whitespace to prevent "password " vs "password" errors
+    // Trim whitespace
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
     const cleanBuildingId = buildingId.trim();
@@ -150,12 +165,11 @@ export default function AuthPage() {
 
         if (emailUsers && emailUsers.length > 0) {
           user = emailUsers[0];
-          // Dynamically check the account type from the database
           loginAccountType = user.account_type === 'Driver' ? 'Driver' : 'WasteCompany';
         }
       }
 
-      // 3. Route based on the actual account type found
+      // 3. Route based on account type
       if (!user) {
         setMessage('❌ Invalid ID/Email or password');
       } else {
@@ -173,7 +187,7 @@ export default function AuthPage() {
     setLoading(false);
   };
 
-  // --- REGISTRATION LOGIC ---
+  // --- REGISTRATION LOGIC WITH STATE RESET ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
@@ -195,7 +209,6 @@ export default function AuthPage() {
         nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 2, 1);
       }
       
-      // Caretakers are independent initially. company_id is left NULL until assigned by an admin.
       const buildingMetadata: any = { 
         custom_id: buildingId, 
         passcode: passcode, 
@@ -217,8 +230,32 @@ export default function AuthPage() {
       
       const { error: buildingError } = await supabase.from('Buildings').insert([buildingMetadata]);
       if (buildingError) { setMessage('❌ Error: ' + buildingError.message); setLoading(false); return; }
+      
       setMessage('✅ Building registered successfully! You can now login.');
-      setTimeout(() => { setIsLogin(true); setMessage(''); }, 2000);
+      
+      // CRITICAL FIX: Clear old caretaker session and reset ALL form fields
+      localStorage.removeItem('trakbin_caretaker');
+      
+      setTimeout(() => { 
+        setIsLogin(true); 
+        setMessage('');
+        
+        // Reset ALL caretaker form fields
+        setBuildingId('');
+        setPasscode('');
+        setBuildingType('Residential Single Unit');
+        setNumberOfFlats('');
+        setNumberOfShops('');
+        setOfficialAddress('');
+        setGpsAddress('');
+        setCoords({ lat: 6.5244, lon: 3.3792 });
+        setGpsStatus('idle');
+        setAccuracy(null);
+        setSearchQuery('');
+      }, 2000);
+      
+      setLoading(false);
+      return;
     } 
     else if (accountType === 'Operations') {
       const { data: existingUser } = await supabase.from('users').select('email').eq('email', email).maybeSingle();
@@ -226,10 +263,10 @@ export default function AuthPage() {
       
       // Step 1: Create the Hauler (Company) record
       const { data: haulerData, error: haulerError } = await supabase.from('haulers').insert([{
-        business_name: companyName,  // FIXED: Using correct column name
+        business_name: companyName,
         license_number: licenseNumber,
         operating_address: operatingAddress,
-        contact_number: contactNumber  // FIXED: Added contact_number
+        contact_number: contactNumber
       }]).select().single();
       
       if (haulerError) { 
@@ -245,7 +282,7 @@ export default function AuthPage() {
         account_type: 'WasteCompany', 
         company_name: companyName, 
         license_number: licenseNumber,
-        company_id: haulerData.id  // Link user to their company
+        company_id: haulerData.id
       }]);
       
       if (userError) { 
