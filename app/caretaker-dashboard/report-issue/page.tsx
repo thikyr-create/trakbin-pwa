@@ -1,14 +1,20 @@
 "use client";
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Camera, MapPin, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Camera, MapPin, CheckCircle2, Upload, X } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ReportIssuePage() {
   const router = useRouter();
   const { building, createIssue } = useCaretakerSession();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form State
   const [issueType, setIssueType] = useState('');
@@ -16,12 +22,14 @@ export default function ReportIssuePage() {
   const [wasteTypes, setWasteTypes] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   const issueOptions = [
     { id: 'dumping', title: 'Illegal Dumping', icon: '🗑', desc: 'Waste dumped in unauthorized locations.' },
     { id: 'missed', title: 'Missed Collection', icon: '🚛', desc: 'Scheduled pickup was missed.' },
     { id: 'damaged', title: 'Damaged Bin', icon: '🗑️', desc: 'Bin is broken or missing.' },
-    { id: 'blocked', title: 'Blocked Access', icon: '🚧', desc: 'Truck cannot access the bin.' },
+    { id: 'blocked', title: 'Blocked Access', icon: '', desc: 'Truck cannot access the bin.' },
     { id: 'burning', title: 'Burning Waste', icon: '🔥', desc: 'Open burning of trash observed.' },
   ];
 
@@ -31,21 +39,132 @@ export default function ReportIssuePage() {
     );
   };
 
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    const totalPhotos = photos.length + newFiles.length;
+
+    if (totalPhotos > 10) {
+      alert('You can only upload a maximum of 10 photos');
+      return;
+    }
+
+    setPhotos(prev => [...prev, ...newFiles]);
+
+    // Create previews
+    newFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Remove photo
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Upload photos to Supabase Storage
+  const uploadPhotos = async (issueId: string) => {
+    const uploadedUrls: string[] = [];
+
+    for (const photo of photos) {
+      const fileExt = photo.name.split('.').pop();
+      const fileName = `${issueId}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `evidence/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('environmental-issues')
+        .upload(filePath, photo, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Error uploading photo:', uploadError);
+        continue;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('environmental-issues')
+        .getPublicUrl(filePath);
+
+      uploadedUrls.push(publicUrl);
+
+      // Save to database
+      await supabase.from('environmental_issue_photos').insert([{
+        issue_id: issueId,
+        photo_url: publicUrl,
+        photo_type: 'evidence',
+        uploaded_by: building?.custom_id
+      }]);
+    }
+
+    return uploadedUrls;
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
-    // In a real app, you would upload photos to Supabase Storage here first
-    // For now, we submit the text data
-    await createIssue({
-      issue_type: issueType,
-      severity: severity,
-      waste_type: wasteTypes,
-      description: description,
-      latitude: building?.latitude,
-      longitude: building?.longitude,
-      address: building?.address
-    });
-    setLoading(false);
-    router.push('/caretaker-dashboard');
+    setUploading(true);
+
+    try {
+      // First create the issue
+      const issueNumber = `ENV-${Date.now().toString().slice(-6)}`;
+      
+      const { data: newIssue, error: issueError } = await supabase
+        .from('environmental_issues')
+        .insert([{
+          issue_type: issueType,
+          severity: severity,
+          waste_type: wasteTypes,
+          description: description,
+          latitude: building?.latitude,
+          longitude: building?.longitude,
+          address: building?.address,
+          issue_number: issueNumber,
+          building_id: building?.custom_id,
+          reported_by: building?.custom_id,
+          company_id: building?.company_id || null,
+          status: 'pending'
+        }])
+        .select()
+        .single();
+
+      if (issueError) throw issueError;
+
+      // Upload photos if any
+      if (photos.length > 0) {
+        await uploadPhotos(newIssue.id);
+      }
+
+      // Create audit trail
+      await supabase.from('environmental_issue_history').insert([{
+        issue_id: newIssue.id,
+        action: 'REPORT_CREATED',
+        performed_by: 'caretaker',
+        metadata: { type: issueType, photo_count: photos.length }
+      }]);
+
+      alert(`Report Submitted Successfully!\nIssue ID: ${issueNumber}\n\n${photos.length} photo(s) attached.`);
+      router.push('/caretaker-dashboard');
+    } catch (error) {
+      console.error('Error submitting report:', error);
+      alert('Failed to submit report. Please try again.');
+    } finally {
+      setLoading(false);
+      setUploading(false);
+    }
   };
 
   return (
@@ -119,14 +238,52 @@ export default function ReportIssuePage() {
               </div>
             )}
 
-            {/* Photo Upload (Mockup) */}
+            {/* Photo Upload - FUNCTIONAL */}
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Evidence Photos</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50">
+              
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Upload Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={photos.length >= 10}
+                className="w-full border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 hover:border-green-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 <Camera className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-sm font-bold text-gray-700">Click to upload photos</p>
-                <p className="text-xs text-gray-500">Max 10 photos</p>
-              </div>
+                <p className="text-sm font-bold text-gray-700">
+                  {photos.length === 0 ? 'Take Photo or Upload' : 'Add More Photos'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {photos.length}/10 photos (Max)
+                </p>
+              </button>
+
+              {/* Photo Previews */}
+              {photoPreviews.length > 0 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-4">
+                  {photoPreviews.map((preview, index) => (
+                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-gray-200">
+                      <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => removePhoto(index)}
+                        className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -159,14 +316,24 @@ export default function ReportIssuePage() {
               <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-bold text-sm">Issue Type</span><span className="font-bold">{issueType}</span></div>
               <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-bold text-sm">Severity</span><span className="font-bold text-amber-600">{severity}</span></div>
               <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-bold text-sm">Location</span><span className="font-bold text-right text-sm">{building?.address}</span></div>
+              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-bold text-sm">Photos</span><span className="font-bold">{photos.length}</span></div>
               <div className="border-b pb-2">
                 <span className="text-gray-500 font-bold text-sm block mb-1">Description</span>
                 <p className="text-sm text-gray-900">{description || 'No description provided.'}</p>
               </div>
             </div>
 
-            <button onClick={handleSubmit} disabled={loading} className="w-full py-4 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 disabled:bg-gray-400">
-              {loading ? 'Submitting...' : 'Submit Report'}
+            <button onClick={handleSubmit} disabled={loading || uploading} className="w-full py-4 bg-green-600 text-white font-black text-lg rounded-xl hover:bg-green-700 disabled:bg-gray-400 flex items-center justify-center gap-2">
+              {uploading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Uploading Photos...
+                </>
+              ) : loading ? (
+                'Submitting...'
+              ) : (
+                'Submit Report'
+              )}
             </button>
           </div>
         )}

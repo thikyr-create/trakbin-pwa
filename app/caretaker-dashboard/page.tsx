@@ -2,16 +2,16 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut, Home, Building2, Calendar, Truck, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { LogOut, Home, Building2, Calendar, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 // Import the smart components
 import BillingCard from './components/BillingCard';
 import WalletCard from './components/WalletCard';
 import CollectionStatusCard from './components/CollectionStatusCard';
+import ReportIssueCard from './components/ReportIssueCard';
 import AddFundsModal from './components/AddFundsModal';
 import AutopayModal from './components/AutopayModal';
-import ReportIssueCard from './components/ReportIssueCard'; 
 
 export default function CaretakerDashboard() {
   const router = useRouter();
@@ -60,12 +60,12 @@ export default function CaretakerDashboard() {
           </div>
         </div>
 
-        {/* Top 3 Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        {/* Top Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <BillingCard />
           <WalletCard />
           <CollectionStatusCard />
-          <ReportIssueCard /> {/* <-- Add it here */}
+          <ReportIssueCard />
         </div>
 
         {/* Building Details */}
