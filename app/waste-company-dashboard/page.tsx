@@ -59,7 +59,14 @@ export default function WasteCompanyDashboard() {
   const [searchFleet, setSearchFleet] = useState('');
   const [searchDrivers, setSearchDrivers] = useState('');
 
-  const { tenant, addDispatchEvent, addNotification, subscribeToRealtime, unsubscribeFromRealtime } = useCompanySession();
+  const { 
+    tenant, 
+    loadTenantContext, // <-- CRITICAL: Added this
+    addDispatchEvent, 
+    addNotification, 
+    subscribeToRealtime, 
+    unsubscribeFromRealtime 
+  } = useCompanySession();
 
   useEffect(() => {
     const storedCompany = localStorage.getItem('trakbin_company');
@@ -72,13 +79,19 @@ export default function WasteCompanyDashboard() {
     setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
     
+    // CRITICAL FIX: Force the store to load the tenant context
+    loadTenantContext();
+    
     // Redirect drivers to their own dashboard
     if (tenant.role === 'driver') {
       router.push('/driver-dashboard');
       return;
     }
     
-    fetchData();
+    // Small delay to ensure loadTenantContext finishes before fetching
+    setTimeout(() => {
+      fetchData();
+    }, 500);
 
     const cleanup = subscribeToRealtime();
     return () => {
@@ -88,22 +101,35 @@ export default function WasteCompanyDashboard() {
         unsubscribeFromRealtime();
       }
     };
-  }, [router, tenant.role]);
+  }, [router]);
 
   const fetchData = async () => {
-    const { tenant } = useCompanySession.getState();
-    if (!tenant.companyId) {
-      setTimeout(fetchData, 500);
+    // FAILSAFE: If Zustand store is empty, read directly from localStorage
+    let currentCompanyId = tenant.companyId;
+    
+    if (!currentCompanyId) {
+      const stored = localStorage.getItem('trakbin_company');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
+      }
+    }
+
+    // BREAK THE INFINITE LOOP: If still no ID, stop loading and log error
+    if (!currentCompanyId) {
+      console.error("CRITICAL: No company_id found in store or localStorage.");
+      setLoading(false); 
       return;
     }
 
     setLoading(true);
     try {
-      const { data: trucksData } = await supabase.from('trucks').select('*').eq('company_id', tenant.companyId).order('truck_id', { ascending: true });
-      const { data: driversData } = await supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_name', companyName).order('employee_id', { ascending: true });
-      const { data: buildingsData } = await supabase.from('Buildings').select('*').eq('company_id', tenant.companyId).order('custom_id', { ascending: true });
-      const { data: collectionsData } = await supabase.from('collections').select('*').eq('company_id', tenant.companyId).order('collection_date', { ascending: false });
-      const { data: issuesData } = await supabase.from('issues').select('*').eq('company_id', tenant.companyId).order('created_at', { ascending: false });
+      // Use currentCompanyId instead of tenant.companyId for the queries
+      const { data: trucksData } = await supabase.from('trucks').select('*').eq('company_id', currentCompanyId).order('truck_id', { ascending: true });
+      const { data: driversData } = await supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_id', currentCompanyId).order('employee_id', { ascending: true });
+      const { data: buildingsData } = await supabase.from('Buildings').select('*').eq('company_id', currentCompanyId).order('custom_id', { ascending: true });
+      const { data: collectionsData } = await supabase.from('collections').select('*').eq('company_id', currentCompanyId).order('collection_date', { ascending: false });
+      const { data: issuesData } = await supabase.from('issues').select('*').eq('company_id', currentCompanyId).order('created_at', { ascending: false });
 
       if (trucksData) setTrucks(trucksData);
       if (driversData) setDrivers(driversData);
@@ -121,21 +147,30 @@ export default function WasteCompanyDashboard() {
   const generateTruckId = () => `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
 
   const handleSaveDriver = async (formData: any) => {
-    const { tenant } = useCompanySession.getState();
+    let currentCompanyId = tenant.companyId;
+    if (!currentCompanyId) {
+      const stored = localStorage.getItem('trakbin_company');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
+      }
+    }
+
     const employeeId = generateEmployeeId();
     const generatedPassword = `Trakbin${Math.floor(1000 + Math.random() * 9000)}!`;
     
     try {
       const { error: userError } = await supabase.from('users').insert([{ 
         email: formData.email, employee_id: employeeId, password: generatedPassword, 
-        account_type: 'Driver', company_name: companyName, full_name: formData.full_name, phone: formData.phone
+        account_type: 'Driver', company_name: companyName, full_name: formData.full_name, phone: formData.phone,
+        company_id: currentCompanyId
       }]);
       if (userError) throw userError;
       
       const { error: driverError } = await supabase.from('drivers').insert([{
         employee_id: employeeId, full_name: formData.full_name, email: formData.email,
         phone: formData.phone, license_number: formData.license_number, 
-        company_name: companyName, company_id: tenant.companyId 
+        company_name: companyName, company_id: currentCompanyId 
       }]);
       if (driverError) throw driverError;
       
@@ -151,13 +186,21 @@ export default function WasteCompanyDashboard() {
   };
 
   const handleSaveTruck = async (formData: any) => {
-    const { tenant } = useCompanySession.getState();
+    let currentCompanyId = tenant.companyId;
+    if (!currentCompanyId) {
+      const stored = localStorage.getItem('trakbin_company');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
+      }
+    }
+
     const truckId = generateTruckId();
     try {
       const { error } = await supabase.from('trucks').insert([{
         truck_id: truckId, license_plate: formData.license_plate, driver_name: formData.driver_name,
         truck_type: formData.truck_type, capacity: formData.capacity, status: formData.status, 
-        company_name: companyName, company_id: tenant.companyId
+        company_name: companyName, company_id: currentCompanyId
       }]);
       if (error) throw error;
       
