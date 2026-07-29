@@ -94,19 +94,26 @@ export default function AuthPage() {
       }).catch(() => { setMessage('❌ Search failed.'); setSearching(false); });
   };
 
-  // --- SMART LOGIN LOGIC ---
+  // --- ROBUST LOGIN LOGIC ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
     setMessage('');
 
+    // Trim whitespace to prevent "password " vs "password" errors
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+    const cleanBuildingId = buildingId.trim();
+    const cleanPasscode = passcode.trim();
+
     if (accountType === 'Caretaker') {
       const { data: building, error } = await supabase
         .from('Buildings')
         .select('*')
-        .eq('custom_id', buildingId)
-        .eq('passcode', passcode)
-        .maybeSingle();
+        .eq('custom_id', cleanBuildingId)
+        .eq('passcode', cleanPasscode)
+        .limit(1)
+        .single();
 
       if (error || !building) { 
         setMessage('❌ Invalid Building ID or Passcode'); 
@@ -120,37 +127,37 @@ export default function AuthPage() {
       let loginAccountType = '';
 
       // 1. Try to find by Employee ID first (for Drivers)
-      const { data: driverUser, error: driverError } = await supabase
+      const { data: driverUsers } = await supabase
         .from('users')
         .select('*')
-        .eq('employee_id', email)
-        .eq('password', password)
-        .maybeSingle();
+        .eq('employee_id', cleanEmail)
+        .eq('password', cleanPassword)
+        .limit(1);
 
-      if (driverUser && !driverError) {
-        user = driverUser;
+      if (driverUsers && driverUsers.length > 0) {
+        user = driverUsers[0];
         loginAccountType = 'Driver';
       }
 
-      // 2. If not found, try to find by Email (for Waste Companies)
+      // 2. If not found, try to find by Email
       if (!user) {
-        const { data: companyUser, error: companyError } = await supabase
+        const { data: emailUsers } = await supabase
           .from('users')
           .select('*')
-          .eq('email', email)
-          .eq('password', password)
-          .maybeSingle();
+          .eq('email', cleanEmail)
+          .eq('password', cleanPassword)
+          .limit(1);
 
-        if (companyUser && !companyError) {
-          user = companyUser;
-          loginAccountType = 'WasteCompany';
+        if (emailUsers && emailUsers.length > 0) {
+          user = emailUsers[0];
+          // Dynamically check the account type from the database
+          loginAccountType = user.account_type === 'Driver' ? 'Driver' : 'WasteCompany';
         }
       }
 
-      // 3. Route based on account type
+      // 3. Route based on the actual account type found
       if (!user) {
         setMessage('❌ Invalid ID/Email or password');
-        setLoading(false);
       } else {
         setMessage('✅ Login successful! Redirecting...');
         
@@ -166,7 +173,7 @@ export default function AuthPage() {
     setLoading(false);
   };
 
-  // --- REFACTORED REGISTRATION LOGIC ---
+  // --- REGISTRATION LOGIC ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
@@ -175,7 +182,7 @@ export default function AuthPage() {
     if (accountType === 'Caretaker') {
       if (gpsStatus !== 'captured') { setMessage(' Please search for your location or allow GPS.'); setLoading(false); return; }
       if (!officialAddress) { setMessage('❌ Please enter the official building address.'); setLoading(false); return; }
-      if (buildingType === 'Residential Multi-Unit' && !numberOfFlats) { setMessage('❌ Please select number of flats.'); setLoading(false); return; }
+      if (buildingType === 'Residential Multi-Unit' && !numberOfFlats) { setMessage(' Please select number of flats.'); setLoading(false); return; }
       if (buildingType === 'Commercial' && !numberOfShops) { setMessage('❌ Please select number of shops.'); setLoading(false); return; }
       
       const { data: existingBuilding } = await supabase.from('Buildings').select('custom_id').eq('custom_id', buildingId).maybeSingle();
