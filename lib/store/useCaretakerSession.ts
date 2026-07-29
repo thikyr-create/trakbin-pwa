@@ -13,6 +13,7 @@ export interface CaretakerSessionState {
   paymentMethods: any[];
   schedule: any | null;
   invoiceCount: { paid: number; due: number };
+  issues: any[]; // NEW: Environmental issues
   
   showAddFunds: boolean;
   showAutopay: boolean;
@@ -24,6 +25,8 @@ export interface CaretakerSessionState {
 
   // Actions
   initializeSession: () => Promise<void>;
+  fetchIssues: () => Promise<void>; // NEW
+  createIssue: (issueData: any) => Promise<void>; // NEW
   checkAndGenerateInvoice: (bId: string, nextBillingDate: string, autopayEnabled: boolean, currentWalletBalance: number) => Promise<void>;
   addFunds: (amount: number, methodId: string) => Promise<void>;
   saveAutopay: () => Promise<void>;
@@ -41,6 +44,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
   paymentMethods: [],
   schedule: null,
   invoiceCount: { paid: 0, due: 0 },
+  issues: [], // NEW
   showAddFunds: false,
   showAutopay: false,
   autopaySource: 'wallet',
@@ -60,9 +64,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     set({ building: caretakerData, loading: true });
 
     try {
-      // Caretakers are isolated by their custom_id (Building ID). 
-      // We do not strictly require a company_id for them to view their own data.
-      
       // 1. Fetch Collection History
       const { data: history } = await supabase
         .from('collections')
@@ -75,7 +76,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       // 2. Fetch Building Data
       const { data: buildingData } = await supabase
         .from('Buildings')
-        .select('wallet_balance, autopay_enabled, autopay_source, next_billing_date, payment_status')
+        .select('wallet_balance, autopay_enabled, autopay_source, next_billing_date, payment_status, company_id')
         .eq('custom_id', caretakerData.custom_id)
         .single();
         
@@ -86,7 +87,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
           building: { ...caretakerData, ...buildingData }
         });
 
-        // Trigger billing check if date is due
         if (buildingData.next_billing_date) {
           await get().checkAndGenerateInvoice(
             caretakerData.custom_id, 
@@ -125,11 +125,65 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
           }
         });
       }
+
+      // 6. Fetch Environmental Issues (NEW)
+      await get().fetchIssues();
+
     } catch (error) {
       console.error('Error initializing caretaker session:', error);
     } finally {
-      // CRITICAL FIX: Always set loading to false, even if data is missing
       set({ loading: false });
+    }
+  },
+
+  // NEW: Fetch Issues
+  fetchIssues: async () => {
+    const { building } = get();
+    if (!building) return;
+
+    const { data } = await supabase
+      .from('environmental_issues')
+      .select('*')
+      .eq('building_id', building.custom_id)
+      .order('created_at', { ascending: false });
+      
+    if (data) set({ issues: data });
+  },
+
+  // NEW: Create Issue
+  createIssue: async (issueData) => {
+    const { building } = get();
+    if (!building) return;
+
+    // Generate unique issue number
+    const issueNumber = `ENV-${Date.now().toString().slice(-6)}`;
+
+    const { data: newIssue, error } = await supabase
+      .from('environmental_issues')
+      .insert([{
+        ...issueData,
+        issue_number: issueNumber,
+        building_id: building.custom_id,
+        reported_by: building.custom_id,
+        company_id: building.company_id || null
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating issue:", error);
+      alert("Failed to submit report.");
+    } else {
+      // Create audit trail entry
+      await supabase.from('environmental_issue_history').insert([{
+        issue_id: newIssue.id,
+        action: 'REPORT_CREATED',
+        performed_by: 'caretaker',
+        metadata: { type: issueData.issue_type }
+      }]);
+      
+      alert(`Report Submitted! ID: ${issueNumber}`);
+      await get().fetchIssues(); // Refresh the list
     }
   },
 
@@ -143,7 +197,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       const followingMonth = new Date(billingDate.getFullYear(), billingDate.getMonth() + 1, 1);
       const monthLabel = billingDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
       
-      // Insert Invoice
       await supabase.from('invoices').insert([{ 
         building_id: bId, 
         amount: invoiceAmount, 
@@ -152,13 +205,11 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
         description: `Monthly Waste Collection - ${monthLabel}` 
       }]);
       
-      // Update Building Billing Date
       await supabase.from('Buildings').update({ 
         next_billing_date: followingMonth.toISOString().split('T')[0], 
         payment_status: 'unpaid' 
       }).eq('custom_id', bId);
 
-      // Process Autopay if enabled
       if (autopayEnabled && currentWalletBalance >= invoiceAmount) {
         const newBalance = currentWalletBalance - invoiceAmount;
         

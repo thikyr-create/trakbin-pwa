@@ -11,6 +11,7 @@ import WalletCard from './components/WalletCard';
 import CollectionStatusCard from './components/CollectionStatusCard';
 import AddFundsModal from './components/AddFundsModal';
 import AutopayModal from './components/AutopayModal';
+import ReportIssueCard from './components/ReportIssueCard'; 
 
 export default function CaretakerDashboard() {
   const router = useRouter();
@@ -64,6 +65,7 @@ export default function CaretakerDashboard() {
           <BillingCard />
           <WalletCard />
           <CollectionStatusCard />
+          <ReportIssueCard /> {/* <-- Add it here */}
         </div>
 
         {/* Building Details */}
