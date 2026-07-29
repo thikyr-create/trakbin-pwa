@@ -226,10 +226,10 @@ export default function AuthPage() {
       
       // Step 1: Create the Hauler (Company) record
       const { data: haulerData, error: haulerError } = await supabase.from('haulers').insert([{
-        company_name: companyName,
+        business_name: companyName,  // FIXED: Using correct column name
         license_number: licenseNumber,
         operating_address: operatingAddress,
-        contact_number: contactNumber
+        contact_number: contactNumber  // FIXED: Added contact_number
       }]).select().single();
       
       if (haulerError) { 
@@ -245,7 +245,7 @@ export default function AuthPage() {
         account_type: 'WasteCompany', 
         company_name: companyName, 
         license_number: licenseNumber,
-        company_id: haulerData.id 
+        company_id: haulerData.id  // Link user to their company
       }]);
       
       if (userError) { 
