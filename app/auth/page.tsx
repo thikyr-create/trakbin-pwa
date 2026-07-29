@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { Building2, Truck, LogIn, UserPlus, ChevronDown, CheckCircle2, AlertCircle, MapPin, Phone, Loader2, Search, ArrowLeft, Smartphone, Monitor } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import BuildingIdCard from './components/BuildingIdCard';
 
 const DraggableMap = dynamic(() => import('../dashboard/DraggableMap'), { ssr: false });
 
@@ -20,6 +21,8 @@ export default function AuthPage() {
   const router = useRouter();
 
   const [isMobile, setIsMobile] = useState(false);
+  const [showIdCard, setShowIdCard] = useState(false);
+  const [generatedBuildingId, setGeneratedBuildingId] = useState('');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -68,7 +71,7 @@ export default function AuthPage() {
         (error) => {
           setGpsStatus('error');
           if (error.code === 1) {
-             setMessage(isMobile ? ' Location access denied. Please enable GPS in your phone settings.' : '❌ GPS access denied. Please use the search bar below.');
+             setMessage(isMobile ? ' Location access denied. Please enable GPS in your phone settings.' : ' GPS access denied. Please use the search bar below.');
           } else {
              setMessage(isMobile ? '️ Phone GPS unavailable. Use the search bar below.' : '️ Desktop GPS is inaccurate. Use the search bar below.');
           }
@@ -91,23 +94,18 @@ export default function AuthPage() {
           setMessage('✅ Location found! Drag the red pin to your exact house.');
         } else { setMessage('❌ Location not found.'); }
         setSearching(false);
-      }).catch(() => { setMessage('❌ Search failed.'); setSearching(false); });
+      }).catch(() => { setMessage(' Search failed.'); setSearching(false); });
   };
 
-  // Clear GPS data helper
-  const clearGPSData = () => {
-    setGpsAddress('');
-    setCoords({ lat: 6.5244, lon: 3.3792 });
-    setGpsStatus('idle');
-    setAccuracy(null);
-  };
-
-  // Clear GPS when switching to login
-  useEffect(() => {
-    if (isLogin) {
-      clearGPSData();
+  // Generate unique Building ID
+  const generateBuildingId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
+    let result = 'TRK-';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-  }, [isLogin]);
+    return result;
+  };
 
   // --- ROBUST LOGIN LOGIC ---
   const handleLogin = async (e: React.FormEvent) => {
@@ -115,7 +113,6 @@ export default function AuthPage() {
     setLoading(true); 
     setMessage('');
 
-    // Trim whitespace
     const cleanEmail = email.trim();
     const cleanPassword = password.trim();
     const cleanBuildingId = buildingId.trim();
@@ -141,7 +138,6 @@ export default function AuthPage() {
       let user = null;
       let loginAccountType = '';
 
-      // 1. Try to find by Employee ID first (for Drivers)
       const { data: driverUsers } = await supabase
         .from('users')
         .select('*')
@@ -154,7 +150,6 @@ export default function AuthPage() {
         loginAccountType = 'Driver';
       }
 
-      // 2. If not found, try to find by Email
       if (!user) {
         const { data: emailUsers } = await supabase
           .from('users')
@@ -169,7 +164,6 @@ export default function AuthPage() {
         }
       }
 
-      // 3. Route based on account type
       if (!user) {
         setMessage('❌ Invalid ID/Email or password');
       } else {
@@ -187,7 +181,7 @@ export default function AuthPage() {
     setLoading(false);
   };
 
-  // --- REGISTRATION LOGIC WITH STATE RESET ---
+  // --- REGISTRATION LOGIC WITH AUTO-GENERATED BUILDING ID ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
@@ -199,8 +193,32 @@ export default function AuthPage() {
       if (buildingType === 'Residential Multi-Unit' && !numberOfFlats) { setMessage(' Please select number of flats.'); setLoading(false); return; }
       if (buildingType === 'Commercial' && !numberOfShops) { setMessage('❌ Please select number of shops.'); setLoading(false); return; }
       
-      const { data: existingBuilding } = await supabase.from('Buildings').select('custom_id').eq('custom_id', buildingId).maybeSingle();
-      if (existingBuilding) { setMessage(' Building ID already registered!'); setLoading(false); return; }
+      // Generate unique Building ID
+      let generatedId = generateBuildingId();
+      let isUnique = false;
+      let attempts = 0;
+      
+      // Ensure uniqueness (max 10 attempts)
+      while (!isUnique && attempts < 10) {
+        const { data: existingBuilding } = await supabase
+          .from('Buildings')
+          .select('custom_id')
+          .eq('custom_id', generatedId)
+          .maybeSingle();
+          
+        if (!existingBuilding) {
+          isUnique = true;
+        } else {
+          generatedId = generateBuildingId();
+          attempts++;
+        }
+      }
+      
+      if (!isUnique) {
+        setMessage('❌ Unable to generate unique Building ID. Please try again.');
+        setLoading(false);
+        return;
+      }
 
       const today = new Date();
       const currentDay = today.getDate();
@@ -210,7 +228,7 @@ export default function AuthPage() {
       }
       
       const buildingMetadata: any = { 
-        custom_id: buildingId, 
+        custom_id: generatedId, 
         passcode: passcode, 
         building_type: buildingType, 
         address: officialAddress, 
@@ -231,29 +249,10 @@ export default function AuthPage() {
       const { error: buildingError } = await supabase.from('Buildings').insert([buildingMetadata]);
       if (buildingError) { setMessage('❌ Error: ' + buildingError.message); setLoading(false); return; }
       
-      setMessage('✅ Building registered successfully! You can now login.');
-      
-      // CRITICAL FIX: Clear old caretaker session and reset ALL form fields
-      localStorage.removeItem('trakbin_caretaker');
-      
-      setTimeout(() => { 
-        setIsLogin(true); 
-        setMessage('');
-        
-        // Reset ALL caretaker form fields
-        setBuildingId('');
-        setPasscode('');
-        setBuildingType('Residential Single Unit');
-        setNumberOfFlats('');
-        setNumberOfShops('');
-        setOfficialAddress('');
-        setGpsAddress('');
-        setCoords({ lat: 6.5244, lon: 3.3792 });
-        setGpsStatus('idle');
-        setAccuracy(null);
-        setSearchQuery('');
-      }, 2000);
-      
+      // Show Building ID Card
+      setGeneratedBuildingId(generatedId);
+      setMessage('✅ Building registered successfully!');
+      setShowIdCard(true);
       setLoading(false);
       return;
     } 
@@ -261,7 +260,6 @@ export default function AuthPage() {
       const { data: existingUser } = await supabase.from('users').select('email').eq('email', email).maybeSingle();
       if (existingUser) { setMessage('❌ Email already registered.'); setLoading(false); return; }
       
-      // Step 1: Create the Hauler (Company) record
       const { data: haulerData, error: haulerError } = await supabase.from('haulers').insert([{
         business_name: companyName,
         license_number: licenseNumber,
@@ -275,7 +273,6 @@ export default function AuthPage() {
         return; 
       }
       
-      // Step 2: Create the User record linked to the company
       const { error: userError } = await supabase.from('users').insert([{ 
         email, 
         password, 
@@ -293,6 +290,38 @@ export default function AuthPage() {
       }
     }
     setLoading(false);
+  };
+
+  // Clear GPS data helper
+  const clearGPSData = () => {
+    setGpsAddress('');
+    setCoords({ lat: 6.5244, lon: 3.3792 });
+    setGpsStatus('idle');
+    setAccuracy(null);
+  };
+
+  useEffect(() => {
+    if (isLogin) {
+      clearGPSData();
+    }
+  }, [isLogin]);
+
+  const handleIdCardClose = () => {
+    setShowIdCard(false);
+    setIsLogin(true);
+    // Reset ALL form fields
+    setBuildingId('');
+    setPasscode('');
+    setBuildingType('Residential Single Unit');
+    setNumberOfFlats('');
+    setNumberOfShops('');
+    setOfficialAddress('');
+    setGpsAddress('');
+    setCoords({ lat: 6.5244, lon: 3.3792 });
+    setGpsStatus('idle');
+    setAccuracy(null);
+    setSearchQuery('');
+    setMessage('');
   };
 
   return (
@@ -335,7 +364,7 @@ export default function AuthPage() {
                 <>
                   <div className="relative">
                     <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="text" placeholder="Building ID" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} required className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
+                    <input type="text" placeholder="Building ID (e.g., TRK-ABC123)" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} required className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
                   </div>
                   <input type="password" placeholder="Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
                 </>
@@ -364,10 +393,11 @@ export default function AuthPage() {
               
               {accountType === 'Caretaker' ? (
                 <>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input type="text" placeholder="Building ID (e.g., 12b)" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} required className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                    <p className="text-xs font-bold text-blue-800 mb-1">ℹ️ Building ID will be auto-generated</p>
+                    <p className="text-xs text-blue-700">A unique Building ID will be created for you after registration. You'll receive a digital ID card to save.</p>
                   </div>
+                  
                   <input type="password" placeholder="Set Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:ring-2 focus:ring-green-500 outline-none" />
                   
                   <div className="relative">
@@ -507,6 +537,16 @@ export default function AuthPage() {
           )}
         </div>
       </div>
+
+      {/* Building ID Card Modal */}
+      {showIdCard && (
+        <BuildingIdCard 
+          buildingId={generatedBuildingId}
+          passcode={passcode}
+          address={officialAddress}
+          onClose={handleIdCardClose}
+        />
+      )}
     </div>
   );
 }
