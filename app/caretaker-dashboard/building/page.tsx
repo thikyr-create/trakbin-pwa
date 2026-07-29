@@ -96,7 +96,7 @@ export default function BuildingPage() {
             <div className="space-y-4">
               <div><p className="text-xs font-bold text-gray-500 uppercase mb-1">Status</p><p className={`text-base font-bold ${building.payment_status === 'paid' ? 'text-green-600' : 'text-red-600'}`}>{building.payment_status === 'paid' ? 'Up to Date' : 'Outstanding Balance'}</p></div>
               <div><p className="text-xs font-bold text-gray-500 uppercase mb-1">Wallet Balance</p><p className="text-base font-bold text-gray-900">₦{building.wallet_balance?.toLocaleString() || 0}</p></div>
-              <button onClick={() => router.push('/caretaker/payment')} className="w-full mt-2 py-2 bg-green-50 text-green-600 font-bold rounded-lg hover:bg-green-100 transition-all text-sm">View Invoices & Pay</button>
+              <button onClick={() => router.push('/caretaker-dashboard/payment')} className="w-full mt-2 py-2 bg-green-50 text-green-600 font-bold rounded-lg hover:bg-green-100 transition-all text-sm">View Invoices & Pay</button>
             </div>
           </div>
         </div>
