@@ -154,7 +154,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     else set({ serviceRequests: data || [] });
   },
 
-  // Domain event: one activation provisions the entire relationship.
+  // Domain event: a single activation provisions the whole relationship.
   activateService: async (requestId, zoneId, scheduleData) => {
     const { tenant } = get();
     if (!tenant.companyId) return;
@@ -186,16 +186,8 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       await supabase.from('Buildings').update({ company_id: tenant.companyId, status: 'active' }).eq('custom_id', request.building_id);
 
       // D+. Materialize the rich profile row ONCE, seeded with the signup number.
-      //     ignoreDuplicates = seed-once: a later activation never clobbers the
-      //     company's own edits to contact_numbers. The row exists from the
-      //     moment the relationship exists, so a future Settings screen that
-      //     edits multiple numbers never crashes on a missing row.
-      const { data: hauler } = await supabase
-        .from('haulers')
-        .select('contact_number')
-        .eq('id', tenant.companyId)
-        .maybeSingle();
-
+      //     ignoreDuplicates = seed-once semantics: never clobber later edits.
+      const { data: hauler } = await supabase.from('haulers').select('contact_number').eq('id', tenant.companyId).maybeSingle();
       await supabase.from('company_profiles').upsert(
         {
           id: tenant.companyId,
