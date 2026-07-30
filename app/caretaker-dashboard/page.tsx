@@ -13,7 +13,8 @@ import ReportIssueCard from './components/ReportIssueCard';
 import AddFundsModal from './components/AddFundsModal';
 import AutopayModal from './components/AutopayModal';
 import MyWasteProviderCard from './components/MyWasteProviderCard'; // NEW
-import StatusTimeline from './components/StatusTimeline';       // NEW
+import StatusTimeline from './components/StatusTimeline';
+import SupportBanner from './components/SupportBanner';       // NEW
 
 export default function CaretakerDashboard() {
   const router = useRouter();
