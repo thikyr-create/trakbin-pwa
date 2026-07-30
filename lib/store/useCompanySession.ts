@@ -14,9 +14,9 @@ export interface TenantContext {
   loaded: boolean;
 }
 
-export type DispatchEventType = 
-  | 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' 
-  | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full' 
+export type DispatchEventType =
+  | 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported'
+  | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full'
   | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added' | 'service_activated';
 
 export interface DispatchEvent {
@@ -61,16 +61,14 @@ export interface CompanySessionState {
   setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
   subscribeToRealtime: () => () => void;
   unsubscribeFromRealtime: () => void;
-  
-  // Service Request State
+
   serviceRequests: any[];
   selectedRequest: any | null;
   isDrawerOpen: boolean;
   fetchServiceRequests: () => Promise<void>;
   setSelectedRequest: (request: any | null) => void;
   setIsDrawerOpen: (isOpen: boolean) => void;
-  
-  // NEW: Domain Event Activation
+
   activateService: (requestId: string, zoneId: string, scheduleData: any) => Promise<void>;
 }
 
@@ -103,7 +101,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         const parsed = JSON.parse(storedCompany);
         userId = parsed.id;
         companyId = parsed.company_id;
-        role = 'company'; 
+        role = 'company';
       } else if (storedDriver) {
         const parsed = JSON.parse(storedDriver);
         userId = parsed.id;
@@ -113,9 +111,8 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     }
 
     const numericCompanyId = companyId ? Number(companyId) : null;
-
     set({ tenant: { companyId: numericCompanyId, userId: userId, role: role, loaded: true } });
-    
+
     if (numericCompanyId) {
       await get().fetchFleet();
       await get().fetchServiceRequests();
@@ -157,7 +154,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     else set({ serviceRequests: data || [] });
   },
 
-  // NEW: Domain Event Activation Handler
+  // Domain event: one activation provisions the entire relationship.
   activateService: async (requestId, zoneId, scheduleData) => {
     const { tenant } = get();
     if (!tenant.companyId) return;
@@ -168,33 +165,54 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
 
       const now = new Date().toISOString();
 
-      // A. Update Service Request Status
+      // A. Flip the request to activated
       await supabase.from('service_requests').update({ status: 'activated', company_id: tenant.companyId, activated_at: now }).eq('id', requestId);
 
-      // B. Create the Active Service Assignment (The Contract)
+      // B. The active contract
       await supabase.from('service_assignments').insert([{
         building_id: request.building_id, company_id: tenant.companyId, zone_id: zoneId,
         schedule_template: scheduleData.frequency, pickup_days: scheduleData.days,
         time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now
       }]);
 
-      // C. Create the Operational Schedule (For Drivers/Routes)
+      // C. Operational schedule for the routing engine
       await supabase.from('collection_schedules').insert([{
         company_id: tenant.companyId, building_id: request.building_id,
         frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '),
         time_window: scheduleData.timeWindow, is_active: true
       }]);
 
-      // D. Update the Building Record
+      // D. Link the building
       await supabase.from('Buildings').update({ company_id: tenant.companyId, status: 'active' }).eq('custom_id', request.building_id);
 
-      // E. Create Audit Log
+      // D+. Materialize the rich profile row ONCE, seeded with the signup number.
+      //     ignoreDuplicates = seed-once: a later activation never clobbers the
+      //     company's own edits to contact_numbers. The row exists from the
+      //     moment the relationship exists, so a future Settings screen that
+      //     edits multiple numbers never crashes on a missing row.
+      const { data: hauler } = await supabase
+        .from('haulers')
+        .select('contact_number')
+        .eq('id', tenant.companyId)
+        .maybeSingle();
+
+      await supabase.from('company_profiles').upsert(
+        {
+          id: tenant.companyId,
+          contact_numbers: hauler?.contact_number
+            ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }]
+            : [],
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+
+      // E. Audit trail
       await supabase.from('environmental_issue_history').insert([{
         issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${tenant.companyId}`,
         metadata: { request_id: requestId, building_id: request.building_id }
       }]);
 
-      // F. Dispatch Event & Refresh
+      // F. Broadcast + refresh UI
       get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
       await get().fetchServiceRequests();
       get().setIsDrawerOpen(false);
