@@ -246,9 +246,28 @@ export default function AuthPage() {
       else if (buildingType === 'Commercial') { buildingMetadata.number_of_units = parseInt(numberOfShops); buildingMetadata.unit_type = 'shops'; } 
       else { buildingMetadata.number_of_units = 1; buildingMetadata.unit_type = 'unit'; }
       
+            // ... (Your existing building metadata and insert logic) ...
+      
       const { error: buildingError } = await supabase.from('Buildings').insert([buildingMetadata]);
       if (buildingError) { setMessage('❌ Error: ' + buildingError.message); setLoading(false); return; }
       
+      // === NEW: CREATE SERVICE REQUEST ===
+      const requestNumber = `REQ-${Date.now().toString().slice(-6)}`;
+      await supabase.from('service_requests').insert([{
+        request_number: requestNumber,
+        building_id: generatedId,
+        caretaker_name: 'Caretaker', // You can add a name field to the form later
+        status: 'pending',
+        submitted_at: new Date().toISOString()
+      }]);
+      
+      // Also create an initial notification for all companies (or a specific admin)
+      await supabase.from('notifications').insert([{
+        title: 'New Service Request',
+        message: `New building registered: ${generatedId} at ${officialAddress}`,
+        type: 'info'
+      }]);
+
       // Show Building ID Card
       setGeneratedBuildingId(generatedId);
       setMessage('✅ Building registered successfully!');
