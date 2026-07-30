@@ -61,6 +61,14 @@ export interface CompanySessionState {
   setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
   subscribeToRealtime: () => () => void;
   unsubscribeFromRealtime: () => void;
+  
+  // NEW: Service Request State
+  serviceRequests: any[];
+  selectedRequest: any | null;
+  isDrawerOpen: boolean;
+  fetchServiceRequests: () => Promise<void>;
+  setSelectedRequest: (request: any | null) => void;
+  setIsDrawerOpen: (isOpen: boolean) => void;
 }
 
 export const useCompanySession = create<CompanySessionState>((set, get) => ({
@@ -70,9 +78,14 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   activeNotifications: [],
   selectedTruck: null,
   cameraMode: 'overview',
+  
+  // NEW: Initial Service Request State
+  serviceRequests: [],
+  selectedRequest: null,
+  isDrawerOpen: false,
 
   loadTenantContext: async () => {
-    // 1. Try Official Supabase Auth
+    console.log(' Loading tenant context...');
     const { data: { user } } = await supabase.auth.getUser();
     
     let userId = user?.id || null;
@@ -80,6 +93,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     let role: UserRole = 'company';
 
     if (userId) {
+      console.log('✅ Found Supabase Auth user:', userId);
       const { data: profile } = await supabase
         .from('profiles')
         .select('company_id, role')
@@ -88,24 +102,39 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       companyId = profile?.company_id;
       role = profile?.role as UserRole;
     } else {
-      // 2. FALLBACK: Custom Auth (Check LocalStorage)
+      console.log('❌ No Supabase Auth user, checking localStorage...');
       const storedCompany = localStorage.getItem('trakbin_company');
       const storedDriver = localStorage.getItem('trakbin_driver');
 
       if (storedCompany) {
-        const parsed = JSON.parse(storedCompany);
-        userId = parsed.id;
-        companyId = parsed.company_id;
-        role = 'company'; 
+        try {
+          const parsed = JSON.parse(storedCompany);
+          console.log('✅ Found stored company:', parsed);
+          userId = parsed.id;
+          companyId = parsed.company_id;
+          role = 'company'; 
+        } catch (e) {
+          console.error('❌ Failed to parse stored company data:', e);
+          localStorage.removeItem('trakbin_company');
+        }
       } else if (storedDriver) {
-        const parsed = JSON.parse(storedDriver);
-        userId = parsed.id;
-        companyId = parsed.company_id;
-        role = 'driver';
+        try {
+          const parsed = JSON.parse(storedDriver);
+          console.log('✅ Found stored driver:', parsed);
+          userId = parsed.id;
+          companyId = parsed.company_id;
+          role = 'driver';
+        } catch (e) {
+          console.error('❌ Failed to parse stored driver data:', e);
+          localStorage.removeItem('trakbin_driver');
+        }
+      } else {
+        console.log('❌ No stored session found');
       }
     }
 
     const numericCompanyId = companyId ? Number(companyId) : null;
+    console.log(' Final Tenant Context:', { userId, companyId: numericCompanyId, role });
 
     set({
       tenant: {
@@ -115,17 +144,34 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         loaded: true,
       }
     });
+    
+    if (numericCompanyId) {
+      console.log(' Fetching fleet for company:', numericCompanyId);
+      await get().fetchFleet();
+      await get().fetchServiceRequests(); // Fetch requests on load
+    } else {
+      console.warn('️ No company_id found, skipping fleet fetch');
+    }
   },
 
   fetchFleet: async () => {
     const { tenant } = get();
-    if (!tenant.companyId) return;
+    let currentCompanyId = tenant.companyId;
+    
+    if (!currentCompanyId) {
+      const stored = localStorage.getItem('trakbin_company');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
+      }
+    }
+    if (!currentCompanyId) return;
 
     try {
       const { data: routes, error } = await supabase
         .from('routes')
         .select('*, drivers(name), trucks(truck_id)')
-        .eq('company_id', tenant.companyId) 
+        .eq('company_id', currentCompanyId) 
         .in('status', ['active', 'paused'])
         .order('created_at', { ascending: false });
 
@@ -150,10 +196,35 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     }
   },
 
+  // NEW: Fetch Service Requests
+  fetchServiceRequests: async () => {
+    const { tenant } = get();
+    let currentCompanyId = tenant.companyId;
+    
+    if (!currentCompanyId) {
+      const stored = localStorage.getItem('trakbin_company');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
+      }
+    }
+    if (!currentCompanyId) return;
+
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(`
+        *,
+        buildings:building_id (address, latitude, longitude, building_type)
+      `)
+      .eq('status', 'pending')
+      .order('submitted_at', { ascending: false });
+
+    if (error) console.error('Error fetching requests:', error);
+    else set({ serviceRequests: data || [] });
+  },
+
   updateTruckStatus: (truckId, status) => {
-    set((state) => ({
-      trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)),
-    }));
+    set((state) => ({ trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)) }));
   },
 
   addDispatchEvent: (event) => {
@@ -162,9 +233,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       id: `event-${Date.now()}`,
       timestamp: new Date().toISOString(),
     };
-    set((state) => ({
-      dispatchTimeline: [newEvent, ...state.dispatchTimeline].slice(0, 100),
-    }));
+    set((state) => ({ dispatchTimeline: [newEvent, ...state.dispatchTimeline].slice(0, 100) }));
   },
 
   addNotification: (message, type) => {
@@ -174,22 +243,20 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       timestamp: new Date().toISOString(),
       type,
     };
-    set((state) => ({
-      activeNotifications: [notification, ...state.activeNotifications].slice(0, 10),
-    }));
-    setTimeout(() => {
-      get().clearNotification(notification.id);
-    }, 5000);
+    set((state) => ({ activeNotifications: [notification, ...state.activeNotifications].slice(0, 10) }));
+    setTimeout(() => get().clearNotification(notification.id), 5000);
   },
 
   clearNotification: (id) => {
-    set((state) => ({
-      activeNotifications: state.activeNotifications.filter((n) => n.id !== id),
-    }));
+    set((state) => ({ activeNotifications: state.activeNotifications.filter((n) => n.id !== id) }));
   },
 
   setSelectedTruck: (truck) => set({ selectedTruck: truck }),
   setCameraMode: (mode) => set({ cameraMode: mode }),
+  
+  // NEW: Service Request Actions
+  setSelectedRequest: (request) => set({ selectedRequest: request }),
+  setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
   subscribeToRealtime: () => {
     const { tenant } = get();

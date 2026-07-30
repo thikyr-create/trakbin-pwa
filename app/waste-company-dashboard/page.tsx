@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Truck, Users, MapPin, ClipboardList, CheckCircle2, 
   AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut, Plus, 
   TrendingUp, Clock, Navigation, Phone, Activity, Menu, X, Map, Building2,
-  ArrowLeft, Mail, Hash, Save, Search
+  ArrowLeft, Mail, Hash, Save, Search, Inbox
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
@@ -29,12 +29,14 @@ import MaintenancePage from './components/MaintenancePage';
 import ZonesPage from './components/ZonesPage';
 import ZoneDetailsPage from './components/ZoneDetailsPage';
 import SettingsPage from './components/SettingsPage';
+import ServiceRequestsPage from './components/ServiceRequestsPage';
+import ReviewDrawer from './components/ReviewDrawer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-type PageView = 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments' | 'mission' | 'verification' | 'issues' | 'analytics' | 'maintenance' | 'zones' | 'settings';
+type PageView = 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments' | 'mission' | 'verification' | 'issues' | 'analytics' | 'maintenance' | 'zones' | 'settings' | 'service-requests';
 
 export default function WasteCompanyDashboard() {
   const router = useRouter();
@@ -61,11 +63,14 @@ export default function WasteCompanyDashboard() {
 
   const { 
     tenant, 
-    loadTenantContext, // <-- CRITICAL: Added this
+    loadTenantContext,
     addDispatchEvent, 
     addNotification, 
     subscribeToRealtime, 
-    unsubscribeFromRealtime 
+    unsubscribeFromRealtime,
+    // NEW: Service Request Store Hooks
+    setSelectedRequest,
+    setIsDrawerOpen
   } = useCompanySession();
 
   useEffect(() => {
@@ -79,34 +84,26 @@ export default function WasteCompanyDashboard() {
     setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
     
-    // CRITICAL FIX: Force the store to load the tenant context
     loadTenantContext();
     
-    // Redirect drivers to their own dashboard
     if (tenant.role === 'driver') {
       router.push('/driver-dashboard');
       return;
     }
     
-    // Small delay to ensure loadTenantContext finishes before fetching
     setTimeout(() => {
       fetchData();
     }, 500);
 
     const cleanup = subscribeToRealtime();
     return () => {
-      if (typeof cleanup === 'function') {
-        cleanup();
-      } else {
-        unsubscribeFromRealtime();
-      }
+      if (typeof cleanup === 'function') cleanup();
+      else unsubscribeFromRealtime();
     };
   }, [router]);
 
   const fetchData = async () => {
-    // FAILSAFE: If Zustand store is empty, read directly from localStorage
     let currentCompanyId = tenant.companyId;
-    
     if (!currentCompanyId) {
       const stored = localStorage.getItem('trakbin_company');
       if (stored) {
@@ -115,7 +112,6 @@ export default function WasteCompanyDashboard() {
       }
     }
 
-    // BREAK THE INFINITE LOOP: If still no ID, stop loading and log error
     if (!currentCompanyId) {
       console.error("CRITICAL: No company_id found in store or localStorage.");
       setLoading(false); 
@@ -124,7 +120,6 @@ export default function WasteCompanyDashboard() {
 
     setLoading(true);
     try {
-      // Use currentCompanyId instead of tenant.companyId for the queries
       const { data: trucksData } = await supabase.from('trucks').select('*').eq('company_id', currentCompanyId).order('truck_id', { ascending: true });
       const { data: driversData } = await supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_id', currentCompanyId).order('employee_id', { ascending: true });
       const { data: buildingsData } = await supabase.from('Buildings').select('*').eq('company_id', currentCompanyId).order('custom_id', { ascending: true });
@@ -217,9 +212,9 @@ export default function WasteCompanyDashboard() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div></div>;
 
-  // Role-based navigation configuration
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
+    { id: 'service-requests', label: 'Service Requests', icon: Inbox, roles: ['company', 'admin'] }, // NEW
     { id: 'fleet', label: 'Fleet', icon: Truck, roles: ['company', 'admin'] },
     { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
     { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
@@ -233,7 +228,6 @@ export default function WasteCompanyDashboard() {
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['company', 'admin', 'government', 'caretaker'] },
   ];
 
-  // Filter navigation based on user role
   const navItems = allNavItems.filter(item => 
     tenant.role === 'admin' || item.roles.includes(tenant.role || 'company')
   );
@@ -320,6 +314,7 @@ export default function WasteCompanyDashboard() {
                   </h1>
                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mt-0.5">
                     {activePage === 'overview' && 'Executive Dashboard'}
+                    {activePage === 'service-requests' && 'Onboarding Queue'}
                     {activePage === 'fleet' && !selectedTruck && 'Fleet Management'}
                     {activePage === 'drivers' && !selectedDriver && 'Driver Management'}
                     {activePage === 'buildings' && 'Building Registry'}
@@ -350,6 +345,7 @@ export default function WasteCompanyDashboard() {
 
           <div className="p-4 lg:p-6 flex-1">
             {activePage === 'overview' && <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />}
+            {activePage === 'service-requests' && <ServiceRequestsPage />}
             {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
             {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
             {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
@@ -361,7 +357,7 @@ export default function WasteCompanyDashboard() {
             {activePage === 'issues' && <IssuesPage issues={issues} />}
             {activePage === 'analytics' && <AnalyticsPage />}
             {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
-            {activePage === 'zones' && !selectedZone && <ZonesPage buildings={buildings} onSelectZone={setSelectedZone} />}
+            {activePage === 'zones' && !selectedZone && <ZonesPage />}
             {activePage === 'zones' && selectedZone && <ZoneDetailsPage zone={selectedZone} buildings={buildings} onBack={() => setSelectedZone(null)} />}
             {activePage === 'settings' && <SettingsPage companyName={companyName} companyId={companyId} />}
           </div>
@@ -379,6 +375,9 @@ export default function WasteCompanyDashboard() {
           companyName={companyName} 
           onSubmit={handleSaveTruck} 
         />
+
+        {/* NEW: Review Drawer Overlay */}
+        <ReviewDrawer />
       </div>
     </AuthGate>
   );

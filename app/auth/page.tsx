@@ -99,7 +99,7 @@ export default function AuthPage() {
 
   // Generate unique Building ID
   const generateBuildingId = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = 'TRK-';
     for (let i = 0; i < 6; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -181,7 +181,7 @@ export default function AuthPage() {
     setLoading(false);
   };
 
-  // --- REGISTRATION LOGIC WITH AUTO-GENERATED BUILDING ID ---
+  // --- REGISTRATION LOGIC WITH DUAL-LAYER AUTO-MATCHING ---
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setLoading(true); 
@@ -198,7 +198,6 @@ export default function AuthPage() {
       let isUnique = false;
       let attempts = 0;
       
-      // Ensure uniqueness (max 10 attempts)
       while (!isUnique && attempts < 10) {
         const { data: existingBuilding } = await supabase
           .from('Buildings')
@@ -246,29 +245,84 @@ export default function AuthPage() {
       else if (buildingType === 'Commercial') { buildingMetadata.number_of_units = parseInt(numberOfShops); buildingMetadata.unit_type = 'shops'; } 
       else { buildingMetadata.number_of_units = 1; buildingMetadata.unit_type = 'unit'; }
       
-            // ... (Your existing building metadata and insert logic) ...
-      
       const { error: buildingError } = await supabase.from('Buildings').insert([buildingMetadata]);
-      if (buildingError) { setMessage('❌ Error: ' + buildingError.message); setLoading(false); return; }
+      if (buildingError) { setMessage(' Error: ' + buildingError.message); setLoading(false); return; }
       
-      // === NEW: CREATE SERVICE REQUEST ===
+      // Create Service Request
       const requestNumber = `REQ-${Date.now().toString().slice(-6)}`;
       await supabase.from('service_requests').insert([{
         request_number: requestNumber,
         building_id: generatedId,
-        caretaker_name: 'Caretaker', // You can add a name field to the form later
+        caretaker_name: 'Caretaker',
         status: 'pending',
         submitted_at: new Date().toISOString()
       }]);
-      
-      // Also create an initial notification for all companies (or a specific admin)
-      await supabase.from('notifications').insert([{
-        title: 'New Service Request',
-        message: `New building registered: ${generatedId} at ${officialAddress}`,
-        type: 'info'
-      }]);
 
-      // Show Building ID Card
+      // === UPGRADED: DUAL-LAYER AUTO-MATCHING LOGIC ===
+      const geocodeAddress = async (address: string) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+          }
+        } catch (err) { console.error("Geocoding failed", err); }
+        return null;
+      };
+
+      const geocodedCoords = await geocodeAddress(officialAddress);
+      const { data: allZones } = await supabase.from('company_zones').select('*').eq('is_active', true);
+      
+      let matchedCompanyId = null;
+
+      if (allZones && allZones.length > 0) {
+        for (const zone of allZones) {
+          // LAYER 1: SEMANTIC TEXT MATCH
+          const addressLower = officialAddress.toLowerCase();
+          const zoneNameLower = zone.zone_name.toLowerCase();
+          
+          if (addressLower.includes(zoneNameLower) || zoneNameLower.includes(addressLower.split(',')[0].trim())) {
+            matchedCompanyId = zone.company_id;
+            console.log('✅ Matched via Text:', zone.zone_name);
+            break; 
+          }
+
+          // LAYER 2: GEOSPATIAL COORDINATE MATCH
+          const checkLat = geocodedCoords ? geocodedCoords.lat : coords.lat;
+          const checkLon = geocodedCoords ? geocodedCoords.lon : coords.lon;
+
+          const R = 6371; 
+          const dLat = (checkLat - zone.center_lat) * Math.PI / 180;
+          const dLon = (checkLon - zone.center_lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(zone.center_lat * Math.PI / 180) * Math.cos(checkLat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const distance = R * c;
+
+          if (distance <= zone.radius_km) {
+            matchedCompanyId = zone.company_id;
+            console.log('✅ Matched via GPS/Geocode:', zone.zone_name, `(${distance.toFixed(2)}km away)`);
+            break; 
+          }
+        }
+      }
+
+      if (matchedCompanyId) {
+        await supabase.from('service_requests').update({ 
+          company_id: matchedCompanyId,
+          status: 'auto_assigned' 
+        }).eq('building_id', generatedId);
+
+        await supabase.from('Buildings').update({ 
+          company_id: matchedCompanyId 
+        }).eq('custom_id', generatedId);
+        
+        console.log('🚀 Auto-assignment successful for Building:', generatedId);
+      } else {
+        console.log('⚠️ No matching zone found. Request remains unassigned.');
+      }
+
       setGeneratedBuildingId(generatedId);
       setMessage('✅ Building registered successfully!');
       setShowIdCard(true);
@@ -311,7 +365,6 @@ export default function AuthPage() {
     setLoading(false);
   };
 
-  // Clear GPS data helper
   const clearGPSData = () => {
     setGpsAddress('');
     setCoords({ lat: 6.5244, lon: 3.3792 });
@@ -328,7 +381,6 @@ export default function AuthPage() {
   const handleIdCardClose = () => {
     setShowIdCard(false);
     setIsLogin(true);
-    // Reset ALL form fields
     setBuildingId('');
     setPasscode('');
     setBuildingType('Residential Single Unit');
@@ -557,7 +609,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Building ID Card Modal */}
       {showIdCard && (
         <BuildingIdCard 
           buildingId={generatedBuildingId}
