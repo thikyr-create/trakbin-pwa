@@ -17,7 +17,7 @@ export interface TenantContext {
 export type DispatchEventType = 
   | 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' 
   | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full' 
-  | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added';
+  | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added' | 'service_activated';
 
 export interface DispatchEvent {
   id: string;
@@ -62,13 +62,16 @@ export interface CompanySessionState {
   subscribeToRealtime: () => () => void;
   unsubscribeFromRealtime: () => void;
   
-  // NEW: Service Request State
+  // Service Request State
   serviceRequests: any[];
   selectedRequest: any | null;
   isDrawerOpen: boolean;
   fetchServiceRequests: () => Promise<void>;
   setSelectedRequest: (request: any | null) => void;
   setIsDrawerOpen: (isOpen: boolean) => void;
+  
+  // NEW: Domain Event Activation
+  activateService: (requestId: string, zoneId: string, scheduleData: any) => Promise<void>;
 }
 
 export const useCompanySession = create<CompanySessionState>((set, get) => ({
@@ -78,210 +81,155 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   activeNotifications: [],
   selectedTruck: null,
   cameraMode: 'overview',
-  
-  // NEW: Initial Service Request State
   serviceRequests: [],
   selectedRequest: null,
   isDrawerOpen: false,
 
   loadTenantContext: async () => {
-    console.log(' Loading tenant context...');
     const { data: { user } } = await supabase.auth.getUser();
-    
     let userId = user?.id || null;
     let companyId = null;
     let role: UserRole = 'company';
 
     if (userId) {
-      console.log('✅ Found Supabase Auth user:', userId);
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id, role')
-        .eq('id', userId)
-        .single();
+      const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', userId).single();
       companyId = profile?.company_id;
       role = profile?.role as UserRole;
     } else {
-      console.log('❌ No Supabase Auth user, checking localStorage...');
       const storedCompany = localStorage.getItem('trakbin_company');
       const storedDriver = localStorage.getItem('trakbin_driver');
 
       if (storedCompany) {
-        try {
-          const parsed = JSON.parse(storedCompany);
-          console.log('✅ Found stored company:', parsed);
-          userId = parsed.id;
-          companyId = parsed.company_id;
-          role = 'company'; 
-        } catch (e) {
-          console.error('❌ Failed to parse stored company data:', e);
-          localStorage.removeItem('trakbin_company');
-        }
+        const parsed = JSON.parse(storedCompany);
+        userId = parsed.id;
+        companyId = parsed.company_id;
+        role = 'company'; 
       } else if (storedDriver) {
-        try {
-          const parsed = JSON.parse(storedDriver);
-          console.log('✅ Found stored driver:', parsed);
-          userId = parsed.id;
-          companyId = parsed.company_id;
-          role = 'driver';
-        } catch (e) {
-          console.error('❌ Failed to parse stored driver data:', e);
-          localStorage.removeItem('trakbin_driver');
-        }
-      } else {
-        console.log('❌ No stored session found');
+        const parsed = JSON.parse(storedDriver);
+        userId = parsed.id;
+        companyId = parsed.company_id;
+        role = 'driver';
       }
     }
 
     const numericCompanyId = companyId ? Number(companyId) : null;
-    console.log(' Final Tenant Context:', { userId, companyId: numericCompanyId, role });
 
-    set({
-      tenant: {
-        companyId: numericCompanyId,
-        userId: userId,
-        role: role,
-        loaded: true,
-      }
-    });
+    set({ tenant: { companyId: numericCompanyId, userId: userId, role: role, loaded: true } });
     
     if (numericCompanyId) {
-      console.log(' Fetching fleet for company:', numericCompanyId);
       await get().fetchFleet();
-      await get().fetchServiceRequests(); // Fetch requests on load
-    } else {
-      console.warn('️ No company_id found, skipping fleet fetch');
+      await get().fetchServiceRequests();
     }
   },
 
   fetchFleet: async () => {
     const { tenant } = get();
     let currentCompanyId = tenant.companyId;
-    
     if (!currentCompanyId) {
       const stored = localStorage.getItem('trakbin_company');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
-      }
+      if (stored) currentCompanyId = JSON.parse(stored).company_id ? Number(JSON.parse(stored).company_id) : null;
     }
     if (!currentCompanyId) return;
 
     try {
-      const { data: routes, error } = await supabase
-        .from('routes')
-        .select('*, drivers(name), trucks(truck_id)')
-        .eq('company_id', currentCompanyId) 
-        .in('status', ['active', 'paused'])
-        .order('created_at', { ascending: false });
-
+      const { data: routes, error } = await supabase.from('routes').select('*, drivers(name), trucks(truck_id)').eq('company_id', currentCompanyId).in('status', ['active', 'paused']).order('created_at', { ascending: false });
       if (error) throw error;
-
       const trucks: Truck[] = (routes || []).map((route: any) => ({
-        id: route.id,
-        truck_id: route.trucks?.truck_id || 'Unknown',
-        driver_name: route.drivers?.name || 'Unknown',
-        status: route.status === 'paused' ? 'paused' : 'on_route',
-        current_route_id: route.id,
-        capacity_percent: 0,
-        completed_stops: route.completed_stops || 0,
-        total_stops: route.total_stops || 0,
-        license_plate: '',
-        truck_type: '',
+        id: route.id, truck_id: route.trucks?.truck_id || 'Unknown', driver_name: route.drivers?.name || 'Unknown',
+        status: route.status === 'paused' ? 'paused' : 'on_route', current_route_id: route.id, capacity_percent: 0,
+        completed_stops: route.completed_stops || 0, total_stops: route.total_stops || 0, license_plate: '', truck_type: '',
       }));
-
       set({ trucks });
-    } catch (error) {
-      console.error('Error fetching fleet:', error);
-    }
+    } catch (error) { console.error('Error fetching fleet:', error); }
   },
 
-  // NEW: Fetch Service Requests
   fetchServiceRequests: async () => {
     const { tenant } = get();
     let currentCompanyId = tenant.companyId;
-    
     if (!currentCompanyId) {
       const stored = localStorage.getItem('trakbin_company');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        currentCompanyId = parsed.company_id ? Number(parsed.company_id) : null;
-      }
+      if (stored) currentCompanyId = JSON.parse(stored).company_id ? Number(JSON.parse(stored).company_id) : null;
     }
     if (!currentCompanyId) return;
 
-    const { data, error } = await supabase
-      .from('service_requests')
-      .select(`
-        *,
-        buildings:building_id (address, latitude, longitude, building_type)
-      `)
-      .eq('status', 'pending')
-      .order('submitted_at', { ascending: false });
-
+    const { data, error } = await supabase.from('service_requests').select(`*, buildings:building_id (address, latitude, longitude, building_type)`).eq('status', 'pending').order('submitted_at', { ascending: false });
     if (error) console.error('Error fetching requests:', error);
     else set({ serviceRequests: data || [] });
   },
 
-  updateTruckStatus: (truckId, status) => {
-    set((state) => ({ trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)) }));
+  // NEW: Domain Event Activation Handler
+  activateService: async (requestId, zoneId, scheduleData) => {
+    const { tenant } = get();
+    if (!tenant.companyId) return;
+
+    try {
+      const { data: request } = await supabase.from('service_requests').select('building_id').eq('id', requestId).single();
+      if (!request) throw new Error('Request not found');
+
+      const now = new Date().toISOString();
+
+      // A. Update Service Request Status
+      await supabase.from('service_requests').update({ status: 'activated', company_id: tenant.companyId, activated_at: now }).eq('id', requestId);
+
+      // B. Create the Active Service Assignment (The Contract)
+      await supabase.from('service_assignments').insert([{
+        building_id: request.building_id, company_id: tenant.companyId, zone_id: zoneId,
+        schedule_template: scheduleData.frequency, pickup_days: scheduleData.days,
+        time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now
+      }]);
+
+      // C. Create the Operational Schedule (For Drivers/Routes)
+      await supabase.from('collection_schedules').insert([{
+        company_id: tenant.companyId, building_id: request.building_id,
+        frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '),
+        time_window: scheduleData.timeWindow, is_active: true
+      }]);
+
+      // D. Update the Building Record
+      await supabase.from('Buildings').update({ company_id: tenant.companyId, status: 'active' }).eq('custom_id', request.building_id);
+
+      // E. Create Audit Log
+      await supabase.from('environmental_issue_history').insert([{
+        issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${tenant.companyId}`,
+        metadata: { request_id: requestId, building_id: request.building_id }
+      }]);
+
+      // F. Dispatch Event & Refresh
+      get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
+      await get().fetchServiceRequests();
+      get().setIsDrawerOpen(false);
+      get().addNotification('Service activated successfully!', 'success');
+
+    } catch (error) {
+      console.error('Activation failed:', error);
+      get().addNotification('Failed to activate service.', 'error');
+    }
   },
 
+  updateTruckStatus: (truckId, status) => set((state) => ({ trucks: state.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)) })),
   addDispatchEvent: (event) => {
-    const newEvent: DispatchEvent = {
-      ...event,
-      id: `event-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-    };
+    const newEvent: DispatchEvent = { ...event, id: `event-${Date.now()}`, timestamp: new Date().toISOString() };
     set((state) => ({ dispatchTimeline: [newEvent, ...state.dispatchTimeline].slice(0, 100) }));
   },
-
   addNotification: (message, type) => {
-    const notification = {
-      id: `notif-${Date.now()}`,
-      message,
-      timestamp: new Date().toISOString(),
-      type,
-    };
+    const notification = { id: `notif-${Date.now()}`, message, timestamp: new Date().toISOString(), type };
     set((state) => ({ activeNotifications: [notification, ...state.activeNotifications].slice(0, 10) }));
     setTimeout(() => get().clearNotification(notification.id), 5000);
   },
-
-  clearNotification: (id) => {
-    set((state) => ({ activeNotifications: state.activeNotifications.filter((n) => n.id !== id) }));
-  },
-
+  clearNotification: (id) => set((state) => ({ activeNotifications: state.activeNotifications.filter((n) => n.id !== id) })),
   setSelectedTruck: (truck) => set({ selectedTruck: truck }),
   setCameraMode: (mode) => set({ cameraMode: mode }),
-  
-  // NEW: Service Request Actions
   setSelectedRequest: (request) => set({ selectedRequest: request }),
   setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
   subscribeToRealtime: () => {
     const { tenant } = get();
     if (!tenant.companyId) return () => {};
-
-    const routeSubscription = supabase
-      .channel('routes-channel')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'routes',
-        filter: `company_id=eq.${tenant.companyId}` 
-      }, (payload) => {
-        const newPayload = payload.new as any;
-        const { route_id, status } = newPayload;
-        get().updateTruckStatus(route_id, status === 'paused' ? 'paused' : status === 'completed' ? 'completed' : 'on_route');
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(routeSubscription);
-    };
+    const routeSubscription = supabase.channel('routes-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${tenant.companyId}` }, (payload) => {
+      const newPayload = payload.new as any;
+      get().updateTruckStatus(newPayload.route_id, newPayload.status === 'paused' ? 'paused' : newPayload.status === 'completed' ? 'completed' : 'on_route');
+    }).subscribe();
+    return () => { supabase.removeChannel(routeSubscription); };
   },
-
-  unsubscribeFromRealtime: () => {
-    supabase.removeAllChannels();
-  },
+  unsubscribeFromRealtime: () => { supabase.removeAllChannels(); },
 }));

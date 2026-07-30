@@ -12,6 +12,8 @@ import CollectionStatusCard from './components/CollectionStatusCard';
 import ReportIssueCard from './components/ReportIssueCard';
 import AddFundsModal from './components/AddFundsModal';
 import AutopayModal from './components/AutopayModal';
+import MyWasteProviderCard from './components/MyWasteProviderCard'; // NEW
+import StatusTimeline from './components/StatusTimeline';       // NEW
 
 export default function CaretakerDashboard() {
   const router = useRouter();
@@ -59,6 +61,10 @@ export default function CaretakerDashboard() {
             </div>
           </div>
         </div>
+
+        {/* NEW: Service Provider & Timeline (Only shows when active) */}
+        <MyWasteProviderCard />
+        <StatusTimeline />
 
         {/* Top Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
