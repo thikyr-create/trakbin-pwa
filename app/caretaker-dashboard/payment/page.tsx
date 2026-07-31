@@ -7,10 +7,10 @@ import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   ArrowLeft, LogOut, Receipt, Wallet, CreditCard, Landmark, Plus, X,
   CheckCircle2, Clock, AlertCircle, ShieldCheck, ArrowUpRight, ArrowDownRight,
-  Zap, Download, Lock, Percent, Activity, Sparkles, CalendarClock, Hash,
+  Zap, Download, Lock, Activity, CalendarClock, Hash,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
-import { splitGross, formatNaira, bpsToPercent } from '@/lib/utils/money';
+import { formatNaira } from '@/lib/utils/money';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -28,13 +28,13 @@ const list: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.05
 const row: Variants = { hidden: { opacity: 0, x: -12 }, show: { opacity: 1, x: 0, transition: { duration: 0.42, ease: EASE } } };
 const reveal: Variants = { hidden: { opacity: 0, y: 22 }, show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE } } };
 
-type Tab = 'invoices' | 'ledger' | 'methods';
+type Tab = 'invoices' | 'history' | 'methods';
 type PayPhase = 'review' | 'processing' | 'done' | 'error';
 
 export default function PaymentPage() {
   const router = useRouter();
   const {
-    building, invoices, paymentMethods, walletBalance, ledger, autopaySource, platformFeeBps,
+    building, invoices, paymentMethods, walletBalance, ledger, autopaySource,
     companyProfile, loading, initializeSession, teardownRealtime, logout,
     payInvoice, addFunds, saveAutopay, disableAutopay, setAutopaySource, refreshAll,
   } = useCaretakerSession();
@@ -47,10 +47,8 @@ export default function PaymentPage() {
   const [showMethod, setShowMethod] = useState(false);
   const [showAutopay, setShowAutopay] = useState(false);
 
-  // top-up form
   const [topupAmount, setTopupAmount] = useState<number | ''>('');
   const [topupMethod, setTopupMethod] = useState<string>('');
-  // add-method form
   const [methodType, setMethodType] = useState<'card' | 'bank'>('card');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -62,7 +60,6 @@ export default function PaymentPage() {
 
   useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
-  const rateBps = platformFeeBps ?? 1000;
   const provider = companyProfile?.business_name || 'your waste provider';
   const today = startOfToday();
 
@@ -71,13 +68,6 @@ export default function PaymentPage() {
   const oldest = useMemo(() => (unpaid.length ? unpaid.reduce((a, b) => (new Date(a.due_date) <= new Date(b.due_date) ? a : b)) : null), [unpaid]);
   const isOverdue = unpaid.some((i) => new Date(i.due_date) < today);
   const allClear = unpaid.length === 0;
-
-  // frozen split per paid invoice, joined from the ledger by invoice_id
-  const ledgerByInvoice = useMemo(() => {
-    const m = new Map<string, any>();
-    ledger.forEach((t) => { if (t.invoice_id) m.set(String(t.invoice_id), t); });
-    return m;
-  }, [ledger]);
 
   const autopayOn = !!building?.autopay_enabled;
   const firstOfNext = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 1).toLocaleDateString('en-NG', { month: 'long', day: 'numeric' }); })();
@@ -93,7 +83,7 @@ export default function PaymentPage() {
   };
   const closePay = () => { setPayTarget(null); setPayPhase('review'); setPayResult(null); };
 
-  // ── top-up (record_topup via store) ────────────────────────────────────
+  // ── top-up (record_topup via store; in prod this is webhook-driven) ────
   const confirmTopup = async () => {
     const amt = Number(topupAmount);
     if (!amt || amt <= 0) return;
@@ -127,10 +117,9 @@ export default function PaymentPage() {
 
   if (!building) return null;
 
-  const heroSplit = splitGross(oldest ? Number(oldest.amount) : 7500, rateBps);
   const tabs: { id: Tab; label: string; Icon: typeof Receipt }[] = [
     { id: 'invoices', label: 'Invoices', Icon: Receipt },
-    { id: 'ledger', label: 'Ledger', Icon: Activity },
+    { id: 'history', label: 'History', Icon: Activity },
     { id: 'methods', label: 'Methods', Icon: CreditCard },
   ];
 
@@ -173,7 +162,8 @@ export default function PaymentPage() {
           </div>
         </motion.div>
 
-        {/* HERO — the money you owe, and the single act of clearing it */}
+        {/* HERO — what the customer owes, and the single act of clearing it.
+            NOTE (R9): no platform/operator split here — that is not the customer's information. */}
         <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: EASE }} className="relative mb-6 overflow-hidden rounded-[26px] border border-emerald-200/70 bg-emerald-950 p-7 text-white shadow-xl shadow-emerald-950/20 sm:p-9">
           <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 28px)' }} />
           <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-emerald-500/25 blur-3xl" />
@@ -198,7 +188,6 @@ export default function PaymentPage() {
               {allClear ? 'No invoices owing right now' : oldest ? <>Next due {new Date(oldest.due_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })} · {unpaid.length} open</> : '—'}
             </p>
 
-            {/* the decisive act + autopay */}
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
               <motion.button
                 whileTap={{ scale: 0.98 }}
@@ -213,18 +202,17 @@ export default function PaymentPage() {
               </motion.button>
             </div>
 
-            {/* transparency legend — the split, shown before any consent */}
+            {/* customer-only reassurance strip — NO fee/percentage/split (R9) */}
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-5 text-xs text-emerald-100/70">
-              <span className="flex items-center gap-1.5"><Percent className="h-3.5 w-3.5 text-emerald-300" /> platform fee {bpsToPercent(rateBps)}</span>
-              <span className="flex items-center gap-1.5"><ArrowDownRight className="h-3.5 w-3.5 text-emerald-300" /> of {formatNaira(heroSplit.gross)} → {formatNaira(heroSplit.net)} to {provider}</span>
-              <span className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-emerald-300" /> {formatNaira(heroSplit.commission)} platform fee</span>
+              <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-emerald-300" /> Secured on‑platform</span>
+              <span className="flex items-center gap-1.5"><Receipt className="h-3.5 w-3.5 text-emerald-300" /> Receipt for every payment</span>
+              {autopayOn && <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-emerald-300" /> Autopay settles on the 1st</span>}
             </div>
           </div>
         </motion.section>
 
-        {/* two-up: live wallet + split transparency card */}
+        {/* two-up: live wallet + autopay status */}
         <div className="mb-8 grid grid-cols-1 gap-3 md:grid-cols-2">
-          {/* wallet */}
           <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
             <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
             <div className="relative z-10">
@@ -242,7 +230,6 @@ export default function PaymentPage() {
             </div>
           </motion.div>
 
-          {/* transparency / autopay status */}
           <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="rounded-[22px] border border-gray-200/80 bg-white p-6 shadow-sm transition-colors hover:border-emerald-300">
             <div className="flex items-center justify-between">
               <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-600/80"><ShieldCheck className="h-4 w-4" /> Autopay</p>
@@ -297,7 +284,6 @@ export default function PaymentPage() {
                 {invoices.map((inv) => {
                   const paid = inv.status === 'paid';
                   const overdue = !paid && new Date(inv.due_date) < today;
-                  const frozen = ledgerByInvoice.get(String(inv.id));
                   return (
                     <motion.li key={inv.id} variants={row} className="group px-6 py-5 transition-colors hover:bg-gray-50/70 sm:px-8">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -322,14 +308,12 @@ export default function PaymentPage() {
                           )}
                         </div>
                       </div>
-                      {/* split line: actual (paid) or preview (unpaid) */}
-                      <div className="mt-3 ml-13 flex items-center gap-2 pl-[52px] text-[11px] font-semibold text-gray-400">
-                        {paid && frozen ? (
-                          <><ArrowDownRight className="h-3.5 w-3.5 text-emerald-500" /> {formatNaira(frozen.net)} paid to {provider} · {formatNaira(frozen.commission)} platform fee</>
-                        ) : paid ? (
-                          <span>settled</span>
+                      {/* customer-only subline (R9): paid date or due hint — never the split */}
+                      <div className="mt-3 pl-[52px] text-[11px] font-semibold text-gray-400">
+                        {paid ? (
+                          <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Paid {inv.paid_at ? new Date(inv.paid_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}</span>
                         ) : (
-                          <span className="opacity-0 transition-opacity group-hover:opacity-100">will pay {formatNaira(splitGross(Number(inv.amount), rateBps).net)} to {provider} · {formatNaira(splitGross(Number(inv.amount), rateBps).commission)} fee</span>
+                          <span className="opacity-0 transition-opacity group-hover:opacity-100">Due {new Date(inv.due_date).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })} · pay from wallet</span>
                         )}
                       </div>
                     </motion.li>
@@ -340,47 +324,37 @@ export default function PaymentPage() {
           </motion.section>
         )}
 
-        {/* LEDGER — the immutable statement, fuller than the dashboard's */}
-        {tab === 'ledger' && (
-          <motion.section key="led" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
+        {/* HISTORY — the customer's statement: their own gross only, no split, no bar */}
+        {tab === 'history' && (
+          <motion.section key="hist" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-6 py-5 sm:px-8">
-              <h2 className={`${display.className} flex items-center gap-2.5 text-lg font-extrabold tracking-tight text-gray-900`}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"><Activity className="h-4 w-4" /></span> Ledger</h2>
-              <div className="flex items-center gap-3 font-mono text-[10px] font-bold uppercase tracking-wider">
-                <span className="flex items-center gap-1.5 text-gray-400"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> to provider</span>
-                <span className="flex items-center gap-1.5 text-gray-400"><span className="h-2.5 w-2.5 rounded-sm bg-slate-300" /> platform fee</span>
-              </div>
+              <h2 className={`${display.className} flex items-center gap-2.5 text-lg font-extrabold tracking-tight text-gray-900`}><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"><Activity className="h-4 w-4" /></span> Payment history</h2>
+              <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">{ledger.length} entries</span>
             </div>
             {ledger.length === 0 ? (
               <div className="relative px-6 py-16 text-center sm:px-8">
                 <div aria-hidden className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.08) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
                 <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-gray-200"><Wallet className="h-7 w-7 text-gray-300" /></div>
-                <p className="relative mt-4 text-sm font-bold text-gray-700">No ledger activity yet</p>
-                <p className="relative mx-auto mt-1 max-w-xs text-xs text-gray-400">Every top-up and settlement writes a balanced, immutable entry here — each showing exactly how the money split.</p>
+                <p className="relative mt-4 text-sm font-bold text-gray-700">No activity yet</p>
+                <p className="relative mx-auto mt-1 max-w-xs text-xs text-gray-400">Every top‑up and payment you make is recorded here in order, with the amount taken from your wallet.</p>
               </div>
             ) : (
               <motion.ul variants={list} initial="hidden" animate="show" className="divide-y divide-gray-100">
                 {ledger.map((t) => {
                   const isTopup = t.type === 'topup';
-                  const gross = Number(t.gross) || 0; const net = Number(t.net) || 0; const comm = Number(t.commission) || 0;
-                  const netPct = gross ? (net / gross) * 100 : 100;
+                  const gross = Number(t.gross) || 0;
                   return (
                     <motion.li key={t.id} variants={row} className="group px-6 py-5 transition-colors hover:bg-gray-50/70 sm:px-8">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 transition-transform group-hover:scale-105 ${isTopup ? 'bg-sky-50 text-sky-600 ring-sky-100' : 'bg-emerald-50 text-emerald-600 ring-emerald-100'}`}>{isTopup ? <ArrowDownRight className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}</span>
                           <div>
-                            <p className="flex items-center gap-2 text-sm font-bold text-gray-900">{isTopup ? 'Wallet top-up' : 'Service settlement'}<span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-gray-500">{t.status}</span></p>
-                            <p className="mt-0.5 font-mono text-[11px] font-semibold text-gray-400">{isTopup ? 'funds added' : `${formatNaira(net)} to ${provider} · ${formatNaira(comm)} fee`}</p>
+                            <p className="flex items-center gap-2 text-sm font-bold text-gray-900">{isTopup ? 'Wallet top‑up' : 'Service payment'}<span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-gray-500">{t.status}</span></p>
+                            <p className="mt-0.5 font-mono text-[11px] font-semibold text-gray-400">{isTopup ? 'Funds added to your wallet' : 'Invoice paid from your wallet'} · {new Date(t.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                           </div>
                         </div>
                         <p className={`${display.className} text-lg font-extrabold tabular-nums ${isTopup ? 'text-sky-600' : 'text-gray-900'}`}>{isTopup ? '+' : '−'}{formatNaira(gross)}</p>
                       </div>
-                      {!isTopup && (
-                        <div className="mt-3 ml-[52px] flex h-2 overflow-hidden rounded-full bg-slate-100">
-                          <motion.span initial={{ width: 0 }} whileInView={{ width: `${netPct}%` }} viewport={{ once: true }} transition={{ duration: 0.7, ease: EASE }} className="bg-emerald-500" />
-                          <motion.span initial={{ width: 0 }} whileInView={{ width: `${100 - netPct}%` }} viewport={{ once: true }} transition={{ duration: 0.7, ease: EASE }} className="bg-slate-300" />
-                        </div>
-                      )}
                     </motion.li>
                   );
                 })}
@@ -423,19 +397,20 @@ export default function PaymentPage() {
         )}
 
         <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }} className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 pt-6">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500"><Lock className="h-3.5 w-3.5 text-emerald-500" /> Payments settle through a balanced ledger · {bpsToPercent(rateBps)} platform fee</span>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500"><Lock className="h-3.5 w-3.5 text-emerald-500" /> Payments are recorded against your wallet · receipts on every charge</span>
           <span className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400"><Activity className="h-3.5 w-3.5 text-emerald-500" /> Trakbin Billing</span>
         </motion.footer>
       </main>
 
-      {/* ── PAY CONFIRM — transparency at the moment of consent ─────────── */}
+      {/* ── PAY CONFIRM — consent on the CUSTOMER's own balance only (R9) ── */}
       <AnimatePresence>
         {payTarget && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={payPhase === 'processing' ? undefined : closePay}>
             <motion.div initial={{ scale: 0.94, opacity: 0, y: 12 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0 }} transition={{ duration: 0.28, ease: EASE }} onClick={(e) => e.stopPropagation()} className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
               {payPhase === 'review' && (() => {
-                const s = splitGross(Number(payTarget.amount), rateBps);
-                const canPay = walletBalance >= s.gross;
+                const gross = Number(payTarget.amount) || 0;
+                const canPay = walletBalance >= gross;
+                const after = Math.max(0, walletBalance - gross);
                 return (
                   <div className="p-6">
                     <div className="mb-5 flex items-center justify-between">
@@ -443,27 +418,20 @@ export default function PaymentPage() {
                       <button onClick={closePay} className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"><X size={18} /></button>
                     </div>
                     <p className="text-sm font-semibold text-gray-500">{payTarget.description || 'Service invoice'}</p>
-                    <p className={`${display.className} mt-1 text-4xl font-extrabold tracking-tight tabular-nums text-gray-900`}>{formatNaira(s.gross)}</p>
+                    <p className={`${display.className} mt-1 text-4xl font-extrabold tracking-tight tabular-nums text-gray-900`}>{formatNaira(gross)}</p>
+                    <p className="mt-1 text-xs font-medium text-gray-400">Clears your outstanding invoice with {provider}.</p>
 
+                    {/* the only arithmetic the customer sees: their own wallet before/after */}
                     <div className="mt-5 space-y-2 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-100">
-                      <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Where it goes</p>
-                      <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 font-semibold text-gray-600"><ArrowDownRight className="h-4 w-4 text-emerald-600" /> {provider}</span><span className="font-bold text-emerald-700">{formatNaira(s.net)}</span></div>
-                      <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 font-semibold text-gray-600"><Sparkles className="h-4 w-4 text-gray-400" /> Trakbin fee ({bpsToPercent(s.commissionBps)})</span><span className="font-bold text-gray-700">{formatNaira(s.commission)}</span></div>
-                      <div className="mt-1 flex h-2 overflow-hidden rounded-full bg-slate-100">
-                        <span className="bg-emerald-500" style={{ width: `${(s.net / s.gross) * 100}%` }} />
-                        <span className="bg-slate-300" style={{ width: `${(s.commission / s.gross) * 100}%` }} />
-                      </div>
+                      <div className="flex items-center justify-between text-sm"><span className="flex items-center gap-2 font-semibold text-gray-600"><Wallet className="h-4 w-4 text-emerald-600" /> Wallet balance</span><span className="font-bold text-gray-900">{formatNaira(walletBalance)}</span></div>
+                      <div className="flex items-center justify-between text-sm"><span className="font-semibold text-gray-500">Wallet after payment</span><span className="font-bold text-gray-900">{formatNaira(canPay ? after : walletBalance)}</span></div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between rounded-2xl bg-emerald-50/60 px-4 py-3 ring-1 ring-emerald-100">
-                      <span className="flex items-center gap-2 text-sm font-semibold text-gray-600"><Wallet className="h-4 w-4 text-emerald-600" /> Wallet balance</span>
-                      <span className="font-bold text-gray-900">{formatNaira(walletBalance)}</span>
-                    </div>
-                    {!canPay && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> Insufficient wallet — add {formatNaira(s.gross - walletBalance)} to continue.</p>}
+                    {!canPay && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> Insufficient wallet — add {formatNaira(gross - walletBalance)} to continue.</p>}
 
                     <div className="mt-5 flex gap-3">
                       <button onClick={closePay} className="flex-1 rounded-xl bg-gray-100 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-200">Cancel</button>
-                      <motion.button whileTap={{ scale: 0.98 }} onClick={canPay ? confirmPay : () => { closePay(); setTopupMethod(paymentMethods[0]?.id || ''); setTopupAmount(s.gross - walletBalance); setShowTopup(true); }} className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition-colors hover:bg-emerald-700">{canPay ? 'Pay now' : 'Add funds'}</motion.button>
+                      <motion.button whileTap={{ scale: 0.98 }} onClick={canPay ? confirmPay : () => { closePay(); setTopupMethod(paymentMethods[0]?.id || ''); setTopupAmount(gross - walletBalance); setShowTopup(true); }} className="flex-1 rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition-colors hover:bg-emerald-700">{canPay ? 'Pay now' : 'Add funds'}</motion.button>
                     </div>
                   </div>
                 );
@@ -479,11 +447,11 @@ export default function PaymentPage() {
               {payPhase === 'done' && payResult && (
                 <div className="p-6 text-center">
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></motion.div>
-                  <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Payment settled</h3>
-                  <p className="mt-1 text-sm font-medium text-gray-500">{payTarget.description || 'Invoice'} cleared from your wallet.</p>
+                  <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Payment successful</h3>
+                  <p className="mt-1 text-sm font-medium text-gray-500">{payTarget?.description || 'Invoice'} cleared from your wallet.</p>
                   <div className="mt-5 space-y-2 rounded-2xl bg-gray-50 p-4 text-left ring-1 ring-gray-100">
-                    <div className="flex items-center justify-between text-sm"><span className="font-semibold text-gray-600">Paid to {provider}</span><span className="font-bold text-emerald-700">{formatNaira(payResult.net)}</span></div>
-                    <div className="flex items-center justify-between text-sm"><span className="font-semibold text-gray-600">Platform fee</span><span className="font-bold text-gray-700">{formatNaira(payResult.commission)}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="font-semibold text-gray-600">Amount paid</span><span className="font-bold text-gray-900">{formatNaira(Number(payTarget?.amount) || 0)}</span></div>
+                    <div className="flex items-center justify-between text-sm"><span className="font-semibold text-gray-600">Wallet balance</span><span className="font-bold text-emerald-700">{formatNaira(walletBalance)}</span></div>
                   </div>
                   <motion.button whileTap={{ scale: 0.98 }} onClick={closePay} className="mt-5 w-full rounded-xl bg-emerald-600 py-3 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition-colors hover:bg-emerald-700">Done</motion.button>
                 </div>
@@ -507,7 +475,7 @@ export default function PaymentPage() {
         )}
       </AnimatePresence>
 
-      {/* ── TOP-UP MODAL ────────────────────────────────────────────────── */}
+      {/* ── TOP-UP MODAL — sandbox-labelled until the real PSP rail lands ─── */}
       <AnimatePresence>
         {showTopup && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => !saving && setShowTopup(false)}>
@@ -516,6 +484,15 @@ export default function PaymentPage() {
                 <h3 className={`${display.className} text-xl font-extrabold tracking-tight text-gray-900`}>Add funds</h3>
                 <button onClick={() => !saving && setShowTopup(false)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X size={18} /></button>
               </div>
+
+              {/* R2 honesty banner: never let the UI pretend a mock credit is real money */}
+              <div className="mb-4 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                <p className="text-[11px] font-semibold leading-relaxed text-amber-800">
+                  <span className="font-bold">Sandbox mode.</span> This credits your wallet instantly for testing. In production, Add funds opens a secure Paystack checkout and your wallet is credited only after the bank confirms the payment.
+                </p>
+              </div>
+
               <div className="mb-4 grid grid-cols-4 gap-2">
                 {[5000, 10000, 20000, 50000].map((q) => (
                   <button key={q} onClick={() => setTopupAmount(q)} className={`rounded-xl py-2.5 text-sm font-bold transition-all ${topupAmount === q ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{formatNaira(q)}</button>
@@ -621,13 +598,11 @@ export default function PaymentPage() {
   );
 }
 
-// tiny local presentational helpers (no state, no engine)
 const inputCls = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200';
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (<label className="block"><span className="mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">{label}</span>{children}</label>);
 }
 
-// isolated insert so the page never holds a query-building client of its own
 async function supabaseInsertMethod(data: any) {
   const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
