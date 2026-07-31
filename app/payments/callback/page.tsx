@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
@@ -13,7 +13,34 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 type Phase = 'checking' | 'success' | 'failed' | 'none';
 
-export default function PaymentCallbackPage() {
+// Ambient field shared by the fallback and the real body.
+function AmbientField({ tone = 'emerald' as 'emerald' | 'rose' }) {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0">
+      <div className="absolute inset-0 opacity-[0.55]" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.10) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
+      <div className={`absolute left-1/2 top-1/3 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl ${tone === 'rose' ? 'bg-rose-200/40' : 'bg-emerald-200/40'}`} />
+    </div>
+  );
+}
+
+// Prerender/hydration shell — shown for the instant before the query params land.
+function CallbackFallback() {
+  return (
+    <div className={`${body.className} relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f6f7f6] p-4 text-gray-900`}>
+      <AmbientField />
+      <div className="relative z-10 flex flex-col items-center gap-5">
+        <div className="relative flex h-20 w-20 items-center justify-center">
+          <motion.div className="absolute inset-0 rounded-full" animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }} style={{ background: 'conic-gradient(from 0deg, rgba(110,231,183,0.5), transparent 40%)' }} />
+          <div className="absolute inset-2 rounded-full border border-emerald-300/30" />
+          <Radio className="relative h-7 w-7 text-emerald-600" />
+        </div>
+        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.24em] text-gray-400">Confirming with your bank</p>
+      </div>
+    </div>
+  );
+}
+
+function PaymentCallbackInner() {
   const router = useRouter();
   const params = useSearchParams();
   const [phase, setPhase] = useState<Phase>('checking');
@@ -47,11 +74,7 @@ export default function PaymentCallbackPage() {
 
   return (
     <div className={`${body.className} relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f6f7f6] p-4 text-gray-900`}>
-      {/* ambient field */}
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 opacity-[0.55]" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.10) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
-        <div className={`absolute left-1/2 top-1/3 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl ${phase === 'failed' ? 'bg-rose-200/40' : 'bg-emerald-200/40'}`} />
-      </div>
+      <AmbientField tone={phase === 'failed' ? 'rose' : 'emerald'} />
 
       <motion.div initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: 0.5, ease: EASE }} className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-gray-200/80 bg-white shadow-2xl">
         {/* console band */}
@@ -92,9 +115,7 @@ export default function PaymentCallbackPage() {
 
         {/* detail */}
         <div className="px-7 py-6">
-          {phase === 'checking' && (
-            <p className="text-center text-sm font-medium text-gray-500">This takes a few seconds. Don’t close this window.</p>
-          )}
+          {phase === 'checking' && <p className="text-center text-sm font-medium text-gray-500">This takes a few seconds. Don’t close this window.</p>}
           {phase === 'success' && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 ring-1 ring-gray-100">
@@ -120,5 +141,15 @@ export default function PaymentCallbackPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+// Default export: the real body under a Suspense boundary so Next can prerender
+// the static shell while useSearchParams() resolves on the client.
+export default function PaymentCallbackPage() {
+  return (
+    <Suspense fallback={<CallbackFallback />}>
+      <PaymentCallbackInner />
+    </Suspense>
   );
 }
