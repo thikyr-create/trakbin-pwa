@@ -12,16 +12,18 @@ export async function POST(req: NextRequest) {
 
     const { data: payment } = await admin().from('payments').select('*').eq('reference', reference).maybeSingle();
     if (!payment) return NextResponse.json({ ok: false, error: 'unknown_payment' }, { status: 404 });
-    if (payment.status === 'success') return NextResponse.json({ ok: true, already: true, purpose: payment.purpose });
+    if (payment.status === 'success') {
+      return NextResponse.json({ already: true, ok: true, purpose: payment.purpose, amount: payment.amount, reference });
+    }
 
     const provider = getProvider(providerName || payment.provider);
     const verify = await provider.verify(reference);
     if (verify.status !== 'success') {
       await markFailed(reference);
-      return NextResponse.json({ ok: false, status: verify.status });
+      return NextResponse.json({ ok: false, status: verify.status, purpose: payment.purpose, amount: payment.amount });
     }
     const result = await handleSuccessfulPayment(verify, { purpose: payment.purpose, invoiceId: payment.invoice_id, buildingId: payment.building_id });
-        return NextResponse.json({ ...result, ok: true });
+    return NextResponse.json({ ...result, ok: true, purpose: payment.purpose, amount: payment.amount, reference });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'verify_failed' }, { status: 400 });
   }
