@@ -76,7 +76,7 @@ export default function CaretakerDashboard() {
   useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
   const now = new Date();
-  const monthStats = useMemo(() => {
+    const monthStats = useMemo(() => {
     const rows = fullHistory.filter((it) => { const d = new Date(it.collection_date); return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
     const completed = rows.filter((it) => (it.status || 'completed').toLowerCase() === 'completed').length;
     const missed = rows.filter((it) => (it.status || '').toLowerCase() === 'missed').length;
@@ -87,6 +87,12 @@ export default function CaretakerDashboard() {
     return { completed, missed, total, rate, weeks, weekMax: Math.max(1, ...weeks) };
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
+  // ALL hooks must run before any conditional return. `unpaid` lives here —
+  // never below the early return — or React's hook count changes between the
+  // null render and the loaded render and the page crashes at runtime (a
+  // failure the build cannot catch).
+  const unpaid = useMemo(() => invoices.filter((i) => i.status !== 'paid'), [invoices]);
+
   if (!building) return null;
   const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
@@ -94,7 +100,6 @@ export default function CaretakerDashboard() {
   const provider = companyProfile?.business_name || 'your waste provider';
   const needsPay = invoiceCount.due > 0;
   const needsService = !isActive;
-  const unpaid = useMemo(() => invoices.filter((i) => i.status !== 'paid'), [invoices]);
 
   const lat = building.latitude; const lng = building.longitude;
   const hasCoords = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
