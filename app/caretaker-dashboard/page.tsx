@@ -11,13 +11,14 @@ import {
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 import BillingCard from './components/BillingCard';
-import WalletCard from './components/WalletCard';
 import CollectionStatusCard from './components/CollectionStatusCard';
 import ReportIssueCard from './components/ReportIssueCard';
 import SupportBanner from './components/SupportBanner';
 import StatusTimeline from './components/StatusTimeline';
 import ServiceVitalsCard from './components/ServiceVitalsCard';
 import BillingStatement from './components/BillingStatement';
+// WalletCard intentionally NOT mounted: the wallet balance now has a single home
+// (the money block below). The file may remain on disk unused — it compiles cleanly.
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -130,25 +131,29 @@ export default function CaretakerDashboard() {
           )}
         </AnimatePresence>
 
-        <motion.div variants={container} initial="hidden" animate="show" className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {/* three distinct at-a-glance facts — liability · schedule · action (wallet moved to its own block below) */}
+        <motion.div variants={container} initial="hidden" animate="show" className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
           <motion.div variants={item}><BillingCard /></motion.div>
-          <motion.div variants={item}><WalletCard /></motion.div>
           <motion.div variants={item}><CollectionStatusCard /></motion.div>
           <motion.div variants={item}><ReportIssueCard /></motion.div>
         </motion.div>
 
         <ServiceVitalsCard />
 
-        {/* wallet + autopay — both route into the self-contained billing feature */}
+        {/* the single wallet home — balance + actions + autopay, all routing into billing */}
         <div className="mb-10 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
+          <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="group relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
             <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             <div className="relative z-10">
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-50/80"><Wallet className="h-4 w-4" /> Wallet balance</p>
-                <span className="rounded-full bg-white/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/20">on‑platform</span>
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/20">
+                  <motion.span className="h-1.5 w-1.5 rounded-full bg-emerald-200" animate={{ opacity: [1, 0.35, 1] }} transition={{ duration: 1.8, repeat: Infinity }} /> on‑platform
+                </span>
               </div>
               <p className={`${display.className} mt-3 text-4xl font-extrabold tracking-tight tabular-nums`}><Counter value={walletBalance} prefix="₦" /></p>
+              <p className="mt-1 text-xs font-medium text-emerald-50/80">Funds settle invoices automatically when autopay is on</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
                 <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
