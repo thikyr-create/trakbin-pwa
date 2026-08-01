@@ -4,35 +4,29 @@ import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { LogOut, Building2, Calendar, ArrowRight, CheckCircle2, Activity, Radio, ShieldCheck } from 'lucide-react';
+import {
+  LogOut, Building2, Calendar, ArrowRight, CheckCircle2, Activity, Radio,
+  ShieldCheck, Wallet, Landmark, Zap, Plus, Receipt,
+} from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 import BillingCard from './components/BillingCard';
 import WalletCard from './components/WalletCard';
 import CollectionStatusCard from './components/CollectionStatusCard';
 import ReportIssueCard from './components/ReportIssueCard';
-import AddFundsModal from './components/AddFundsModal';
-import AutopayModal from './components/AutopayModal';
 import SupportBanner from './components/SupportBanner';
 import StatusTimeline from './components/StatusTimeline';
 import ServiceVitalsCard from './components/ServiceVitalsCard';
+import BillingStatement from './components/BillingStatement';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-// Status normalization — identical rule to the history tab, so "completed"
-// means the same thing on every surface that counts it.
-const normStatus = (s?: string) => (s || 'completed').toLowerCase();
-
-// Count-up integer; re-runs when the target changes (live tick on new pickup).
-function Counter({ value, duration = 1.1 }: { value: number; duration?: number }) {
+function Counter({ value, prefix = '', duration = 1.1 }: { value: number; prefix?: string; duration?: number }) {
   const mv = useMotionValue(0);
-  const rounded = useTransform(mv, (v) => Math.round(v));
-  useEffect(() => {
-    const c = animate(mv, value, { duration, ease: EASE });
-    return () => c.stop();
-  }, [value, duration]);
+  const rounded = useTransform(mv, (v) => prefix + Math.round(v).toLocaleString('en-NG'));
+  useEffect(() => { const c = animate(mv, value, { duration, ease: EASE }); return () => c.stop(); }, [value, duration]);
   return <motion.span>{rounded}</motion.span>;
 }
 
@@ -41,42 +35,33 @@ const item: Variants = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0
 const rise: Variants = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } } };
 const reveal: Variants = { hidden: { opacity: 0, y: 26 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } };
 
+const BILLING = '/caretaker-dashboard/payment';
+
 export default function CaretakerDashboard() {
   const router = useRouter();
   const {
     building, collectionHistory, billingProcessing, fullHistory, fullHistoryLoaded,
-    initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
+    walletBalance, initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
   } = useCaretakerSession();
 
-  useEffect(() => {
-    initializeSession();
-    return () => teardownRealtime();
-  }, []);
+  useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
-  // ── Honest current-month stats, derived from the single full record ──────
   const now = new Date();
   const monthStats = useMemo(() => {
-    const rows = fullHistory.filter((it) => {
-      const d = new Date(it.collection_date);
-      return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    });
-    const completed = rows.filter((it) => normStatus(it.status) === 'completed').length;
-    const missed = rows.filter((it) => normStatus(it.status) === 'missed').length;
+    const rows = fullHistory.filter((it) => { const d = new Date(it.collection_date); return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
+    const completed = rows.filter((it) => (it.status || 'completed').toLowerCase() === 'completed').length;
+    const missed = rows.filter((it) => (it.status || '').toLowerCase() === 'missed').length;
     const total = rows.length;
     const rate = total ? Math.round((completed / total) * 100) : null;
     const weeks = [0, 0, 0, 0, 0];
-    rows.forEach((it) => {
-      if (normStatus(it.status) !== 'completed') return;
-      const day = new Date(it.collection_date).getDate();
-      weeks[Math.min(4, Math.floor((day - 1) / 7))]++;
-    });
+    rows.forEach((it) => { if ((it.status || 'completed').toLowerCase() !== 'completed') return; const day = new Date(it.collection_date).getDate(); weeks[Math.min(4, Math.floor((day - 1) / 7))]++; });
     return { completed, missed, total, rate, weeks, weekMax: Math.max(1, ...weeks) };
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
-  if (!building) return null; // shell paints from the synchronous store row; no spinner wall
-
+  if (!building) return null;
   const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
+  const autopayOn = !!building?.autopay_enabled;
 
   return (
     <div className={`${body.className} relative min-h-screen bg-[#f6f7f6] text-gray-900`}>
@@ -154,6 +139,35 @@ export default function CaretakerDashboard() {
 
         <ServiceVitalsCard />
 
+        {/* wallet + autopay — both route into the self-contained billing feature */}
+        <div className="mb-10 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
+            <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-50/80"><Wallet className="h-4 w-4" /> Wallet balance</p>
+                <span className="rounded-full bg-white/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/20">on‑platform</span>
+              </div>
+              <p className={`${display.className} mt-3 text-4xl font-extrabold tracking-tight tabular-nums`}><Counter value={walletBalance} prefix="₦" /></p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="rounded-[22px] border border-gray-200/80 bg-white p-6 shadow-sm transition-colors hover:border-emerald-300">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-600/80"><Zap className="h-4 w-4" /> Autopay</p>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${autopayOn ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-gray-100 text-gray-500 ring-gray-200'}`}><span className={`h-1.5 w-1.5 rounded-full ${autopayOn ? 'bg-emerald-500' : 'bg-gray-400'}`} /> {autopayOn ? 'Active' : 'Off'}</span>
+            </div>
+            <p className="mt-4 text-sm font-medium text-gray-500">{autopayOn ? 'Every invoice settles itself from your wallet on the 1st — no overdue, no reminders.' : 'Turn on autopay and every invoice settles itself the moment it’s due.'}</p>
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => router.push(BILLING)} className="mt-5 w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100">{autopayOn ? 'Manage autopay' : 'Enable autopay'}</motion.button>
+          </motion.div>
+        </div>
+
+        <BillingStatement />
+
         <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }} whileHover={{ y: -4 }} whileTap={{ scale: 0.995 }} onClick={() => router.push('/caretaker-dashboard/building')} className="group relative mb-10 cursor-pointer overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-8 shadow-sm transition-colors duration-200 hover:border-emerald-400 hover:shadow-xl">
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 origin-top bg-gradient-to-b from-emerald-400 to-emerald-600" />
           <div className="mb-6 flex items-start justify-between">
@@ -166,123 +180,53 @@ export default function CaretakerDashboard() {
           <p className="text-sm font-bold text-gray-600">{address}</p>
         </motion.div>
 
-        {/* ── COLLECTION RECORD — honest, living month module ───────────── */}
-        <motion.div
-          variants={reveal}
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-60px' }}
-          whileHover={{ y: -4 }}
-          whileTap={{ scale: 0.995 }}
-          onClick={() => router.push('/caretaker-dashboard/collection-history')}
-          className="group relative mb-10 cursor-pointer overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-8 shadow-sm transition-colors duration-200 hover:border-emerald-400 hover:shadow-xl"
-        >
+        <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-60px' }} whileHover={{ y: -4 }} whileTap={{ scale: 0.995 }} onClick={() => router.push('/caretaker-dashboard/collection-history')} className="group relative mb-10 cursor-pointer overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-8 shadow-sm transition-colors duration-200 hover:border-emerald-400 hover:shadow-xl">
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 origin-top bg-gradient-to-b from-emerald-400 to-emerald-600" />
           <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-50 blur-2xl" />
-
-          {/* head */}
           <div className="relative z-10 mb-6 flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-emerald-50 p-3"><Calendar className="h-8 w-8 text-emerald-600" /></div>
-              <div>
-                <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">Collection record</p>
-                <h3 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>Last pickup</h3>
-              </div>
-            </div>
-            <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-bold ${collectionHistory.length > 0 ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${collectionHistory.length > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              {collectionHistory.length > 0 ? 'Up to date' : 'Awaiting first'}
-            </span>
+            <div className="flex items-center gap-3"><div className="rounded-2xl bg-emerald-50 p-3"><Calendar className="h-8 w-8 text-emerald-600" /></div><div><p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">Collection record</p><h3 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>Last pickup</h3></div></div>
+            <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-bold ${collectionHistory.length > 0 ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${collectionHistory.length > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />{collectionHistory.length > 0 ? 'Up to date' : 'Awaiting first'}</span>
           </div>
-
-          {/* last collection headline */}
-          <h2 className={`${display.className} relative z-10 mb-2 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl`}>
-            {collectionHistory.length > 0
-              ? new Date(collectionHistory[0].collection_date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-              : 'No collections yet'}
-          </h2>
-          <p className="relative z-10 mb-6 flex items-center gap-2 text-base font-semibold text-emerald-600">
-            <CheckCircle2 className="h-5 w-5" /> {collectionHistory.length > 0 ? 'Completed successfully' : 'Awaiting first pickup'}
-          </p>
-
+          <h2 className={`${display.className} relative z-10 mb-2 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl`}>{collectionHistory.length > 0 ? new Date(collectionHistory[0].collection_date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'No collections yet'}</h2>
+          <p className="relative z-10 mb-6 flex items-center gap-2 text-base font-semibold text-emerald-600"><CheckCircle2 className="h-5 w-5" /> {collectionHistory.length > 0 ? 'Completed successfully' : 'Awaiting first pickup'}</p>
           <div className="relative z-10 my-6 h-px bg-gray-100" />
-
-          {/* honest month panel */}
           <div className="relative z-10 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50/60 p-5">
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.08) 1px, transparent 1px)', backgroundSize: '18px 18px' }} />
             <motion.span aria-hidden initial={{ scaleY: 0 }} whileInView={{ scaleY: 1 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: EASE }} className="absolute inset-y-3 left-0 w-1 origin-top rounded-r-full bg-gradient-to-b from-emerald-400 to-emerald-600" />
-
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-              {/* left: the true count */}
               <div className="pl-2">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-gray-400">This month · completed</p>
                 <div className="mt-1 flex flex-wrap items-end gap-3">
-                  <span className={`${display.className} text-4xl font-extrabold leading-none tracking-tight tabular-nums text-gray-900`}>
-                    {fullHistoryLoaded ? <Counter value={monthStats.completed} /> : <span className="inline-block w-8 animate-pulse text-gray-300">—</span>}
-                  </span>
-                  {fullHistoryLoaded && monthStats.total > 0 && (
-                    <span className="mb-1 text-xs font-semibold text-gray-400">of {monthStats.total} logged</span>
-                  )}
-                  {fullHistoryLoaded && monthStats.rate !== null && (
-                    <span className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ${monthStats.missed > 0 ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'}`}>
-                      {monthStats.missed > 0 && (
-                        <motion.span animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.6, repeat: Infinity }} className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      )}
-                      {monthStats.rate}% on-time
-                    </span>
-                  )}
+                  <span className={`${display.className} text-4xl font-extrabold leading-none tracking-tight tabular-nums text-gray-900`}>{fullHistoryLoaded ? <Counter value={monthStats.completed} /> : <span className="inline-block w-8 animate-pulse text-gray-300">—</span>}</span>
+                  {fullHistoryLoaded && monthStats.total > 0 && <span className="mb-1 text-xs font-semibold text-gray-400">of {monthStats.total} logged</span>}
+                  {fullHistoryLoaded && monthStats.rate !== null && <span className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ${monthStats.missed > 0 ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'}`}>{monthStats.missed > 0 && <motion.span animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.6, repeat: Infinity }} className="h-1.5 w-1.5 rounded-full bg-amber-500" />}{monthStats.rate}% on-time</span>}
                 </div>
-                {fullHistoryLoaded && monthStats.total === 0 && (
-                  <p className="mt-2 text-xs font-medium text-gray-400">No pickups logged this month yet.</p>
-                )}
+                {fullHistoryLoaded && monthStats.total === 0 && <p className="mt-2 text-xs font-medium text-gray-400">No pickups logged this month yet.</p>}
               </div>
-
-              {/* right: week-of-month rhythm, drawn from the record */}
               <div className="pl-2">
-                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-                  Weeks · {now.toLocaleDateString('en-US', { month: 'short' })}
-                </p>
+                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Weeks · {now.toLocaleDateString('en-US', { month: 'short' })}</p>
                 <div className="flex h-12 items-end gap-1.5">
-                  {monthStats.weeks.map((c, i) => {
-                    const h = fullHistoryLoaded && monthStats.completed > 0 ? Math.max(10, Math.round((c / monthStats.weekMax) * 100)) : 12;
-                    return (
-                      <div key={i} className="group/w relative flex h-full w-5 flex-col items-center justify-end">
-                        <span className="pointer-events-none absolute -top-6 rounded bg-gray-900 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white opacity-0 transition-opacity group-hover/w:opacity-100">{c}</span>
-                        <motion.span
-                          initial={{ height: '12%' }}
-                          whileInView={{ height: `${h}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.5, delay: 0.1 + i * 0.06, ease: EASE }}
-                          className={`w-full rounded-md transition-colors ${c > 0 ? 'bg-emerald-500 group-hover/w:bg-emerald-400' : 'bg-gray-200 group-hover/w:bg-gray-300'}`}
-                        />
-                      </div>
-                    );
-                  })}
+                  {monthStats.weeks.map((c, i) => { const h = fullHistoryLoaded && monthStats.completed > 0 ? Math.max(10, Math.round((c / monthStats.weekMax) * 100)) : 12; return (
+                    <div key={i} className="group/w relative flex h-full w-5 flex-col items-center justify-end">
+                      <span className="pointer-events-none absolute -top-6 rounded bg-gray-900 px-1.5 py-0.5 font-mono text-[9px] font-bold text-white opacity-0 transition-opacity group-hover/w:opacity-100">{c}</span>
+                      <motion.span initial={{ height: '12%' }} whileInView={{ height: `${h}%` }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 + i * 0.06, ease: EASE }} className={`w-full rounded-md transition-colors ${c > 0 ? 'bg-emerald-500 group-hover/w:bg-emerald-400' : 'bg-gray-200 group-hover/w:bg-gray-300'}`} />
+                    </div>
+                  ); })}
                 </div>
               </div>
             </div>
           </div>
-
-          {/* recency + affordance */}
           <div className="relative z-10 mt-5 flex items-center justify-between">
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">{collectionHistory.length} recent on record</p>
-            <span className="flex items-center gap-1 text-sm font-bold text-emerald-600">
-              View history <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-            </span>
+            <span className="flex items-center gap-1 text-sm font-bold text-emerald-600">View history <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" /></span>
           </div>
         </motion.div>
 
         <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }} className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 pt-6">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500">
-            <motion.span className="h-2 w-2 rounded-full bg-emerald-500" animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-            Platform synced <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">· live session</span>
-          </span>
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500"><Receipt className="h-3.5 w-3.5 text-emerald-500" /> Platform synced <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">· live session</span></span>
           <span className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400"><Activity className="h-3.5 w-3.5 text-emerald-500" /> Trakbin Operations</span>
         </motion.footer>
       </main>
-
-      <AddFundsModal />
-      <AutopayModal />
     </div>
   );
 }
