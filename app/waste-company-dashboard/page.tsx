@@ -34,7 +34,7 @@ import ZoneDetailsPage from './components/ZoneDetailsPage';
 import SettingsPage from './components/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
-import EarningsPage from './components/EarningsPage';
+import FinancePage from './components/FinancePage';
 import { formatNaira } from '@/lib/utils/money';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -177,7 +177,7 @@ export default function WasteCompanyDashboard() {
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
     { id: 'service-requests', label: 'Service Requests', icon: Inbox, roles: ['company', 'admin'] },
-    { id: 'earnings', label: 'Earnings', icon: Wallet, roles: ['company', 'admin'] },
+    { id: 'earnings', label: 'Finance', icon: Wallet, roles: ['company', 'admin'] },
     { id: 'fleet', label: 'Fleet', icon: Truck, roles: ['company', 'admin'] },
     { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
     { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
@@ -369,7 +369,7 @@ export default function WasteCompanyDashboard() {
             <motion.div key={activePage + (selectedDriver ? '-drv' : '') + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
-              {activePage === 'earnings' && <EarningsPage />}
+              {activePage === 'earnings' && <FinancePage />}
               {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
               {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
               {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
