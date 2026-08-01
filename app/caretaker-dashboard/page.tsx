@@ -59,6 +59,17 @@ const issueChip = (s?: string) => {
     : 'bg-gray-100 text-gray-600 ring-gray-200';
 };
 
+function formatNairaLocal(n: any) { return '₦' + Math.trunc(Number(n) || 0).toLocaleString('en-NG'); }
+
+function Detail({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400"><Icon className="h-3 w-3" /> {label}</p>
+      <p className="text-sm font-bold leading-snug text-gray-900">{value}</p>
+    </div>
+  );
+}
+
 export default function CaretakerDashboard() {
   const router = useRouter();
   const {
@@ -76,7 +87,7 @@ export default function CaretakerDashboard() {
   useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
   const now = new Date();
-    const monthStats = useMemo(() => {
+  const monthStats = useMemo(() => {
     const rows = fullHistory.filter((it) => { const d = new Date(it.collection_date); return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
     const completed = rows.filter((it) => (it.status || 'completed').toLowerCase() === 'completed').length;
     const missed = rows.filter((it) => (it.status || '').toLowerCase() === 'missed').length;
@@ -87,10 +98,9 @@ export default function CaretakerDashboard() {
     return { completed, missed, total, rate, weeks, weekMax: Math.max(1, ...weeks) };
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
-  // ALL hooks must run before any conditional return. `unpaid` lives here —
-  // never below the early return — or React's hook count changes between the
-  // null render and the loaded render and the page crashes at runtime (a
-  // failure the build cannot catch).
+  // EVERY hook runs before any conditional return — `unpaid` stays here, never
+  // below the guard, or the hook count changes between the null and loaded
+  // renders and the page crashes at runtime (a failure the build can't catch).
   const unpaid = useMemo(() => invoices.filter((i) => i.status !== 'paid'), [invoices]);
 
   if (!building) return null;
@@ -100,6 +110,9 @@ export default function CaretakerDashboard() {
   const provider = companyProfile?.business_name || 'your waste provider';
   const needsPay = invoiceCount.due > 0;
   const needsService = !isActive;
+  const zone = activeAssignment?.zone_id
+    ? (/^zone\s/i.test(String(activeAssignment.zone_id)) ? String(activeAssignment.zone_id) : 'Zone ' + activeAssignment.zone_id)
+    : null;
 
   const lat = building.latitude; const lng = building.longitude;
   const hasCoords = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
@@ -133,7 +146,7 @@ export default function CaretakerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* top chrome */}
+      {/* top chrome — global app bar (logo + logout only) */}
       <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-40 border-b border-gray-200/70 bg-[#f6f7f6]/85 backdrop-blur-md">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between">
@@ -150,59 +163,112 @@ export default function CaretakerDashboard() {
       </motion.header>
 
       <main className="relative z-10 mx-auto max-w-3xl px-4 pb-32 pt-6 sm:px-6">
-        {/* persistent identity strip — orientation on every tab */}
-        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="relative mb-6 overflow-hidden rounded-[22px] border border-gray-200/80 bg-white p-5 shadow-sm">
-          <div aria-hidden className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-emerald-100/40 blur-3xl" />
-          <div className="relative z-10 flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-600/80">Building console</p>
-              <h1 className={`${display.className} mt-1 truncate text-2xl font-extrabold leading-tight tracking-tight text-gray-900`}>{address}</h1>
-              <p className="mt-1 flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400"><Hash className="h-3 w-3" /> {building.custom_id}</p>
-            </div>
-            <span className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ring-1 ${isActive ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
-              <span className="relative flex h-2 w-2">{isActive && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}<span className={`relative inline-flex h-2 w-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-amber-500'}`} /></span>
-              {isActive ? 'Active' : 'Pending'}
-            </span>
-          </div>
-        </motion.section>
+        {/* NOTE: the Building Console identity strip is NO LONGER global —
+            it lives only inside the Home tab (see below), enriched with the
+            waste provider when active. Every other tab opens on its own content. */}
 
-        {/* tab panels */}
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
 
             {activeTab === 'home' && (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                {/* money + autopay panel */}
-                <motion.div {...block(0)} className="group relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
-                  <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
-                  <div aria-hidden className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between">
-                      <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-50/80"><Wallet className="h-4 w-4" /> Wallet balance</p>
-                      <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/20"><motion.span className="h-1.5 w-1.5 rounded-full bg-emerald-200" animate={{ opacity: [1, 0.35, 1] }} transition={{ duration: 1.8, repeat: Infinity }} /> on‑platform</span>
-                    </div>
-                    <p className={`${display.className} mt-3 text-4xl font-extrabold tracking-tight tabular-nums`}><Counter value={walletBalance} prefix="₦" /></p>
-                    <p className="mt-1 text-xs font-medium text-emerald-50/80">Funds settle invoices automatically when autopay is on</p>
-                    <div className="mt-5 grid grid-cols-2 gap-2">
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => setCheckout({ mode: 'topup' })} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
-                      <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAddBank(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
-                    </div>
-                    <div className="my-4 h-px bg-white/15" />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-emerald-200" />
-                        <div>
-                          <p className="text-sm font-bold leading-tight">Autopay</p>
-                          <p className="text-[11px] font-medium text-emerald-100/70">{autopayOn ? 'Settles on the 1st' : 'Currently off'}</p>
-                        </div>
-                      </div>
-                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAutopay(true)} className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold ring-1 ring-white/25 transition-colors hover:bg-white/25">{autopayOn ? 'Manage' : 'Enable'}</motion.button>
-                    </div>
-                  </div>
-                </motion.div>
+              <div className="space-y-4">
+                {/* HOME identity + provider header — only on Home */}
+                <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: EASE }} className="relative overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm sm:p-7">
+                  <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.5]" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.08) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+                  <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-emerald-100/50 blur-3xl" />
+                  <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent" />
 
-                <motion.div {...block(1)}><BillingCard /></motion.div>
-                <motion.div {...block(2)}><CollectionStatusCard /></motion.div>
+                  <div className="relative z-10 flex flex-col gap-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-600/80">Building console</p>
+                        <h1 className={`${display.className} mt-1.5 truncate text-3xl font-extrabold leading-[1.02] tracking-tight text-gray-900 sm:text-[40px]`}>{address}</h1>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                          <span className="flex items-center gap-1.5"><Hash className="h-3 w-3" /> {building.custom_id}</span>
+                          <span className="text-gray-300">·</span>
+                          <span className="normal-case tracking-normal text-gray-400">{building.building_type}</span>
+                        </p>
+                      </div>
+                      <span className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-xs font-bold ring-1 ${isActive ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>
+                        <span className="relative flex h-2 w-2">{isActive && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}<span className={`relative inline-flex h-2 w-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-amber-500'}`} /></span>
+                        {isActive ? 'Active service' : 'Pending'}
+                      </span>
+                    </div>
+
+                    {/* provider / matching row — swaps with state */}
+                    <AnimatePresence mode="wait">
+                      {isActive ? (
+                        <motion.div key="provider" initial={{ opacity: 0, y: 8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.4, ease: EASE }} className="overflow-hidden">
+                          <div className="relative flex items-center gap-4 overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-950 to-emerald-900 p-4 text-white">
+                            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 24px)' }} />
+                            <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center">
+                              <motion.span aria-hidden className="absolute inset-0 rounded-2xl" animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }} style={{ background: 'conic-gradient(from 0deg, rgba(110,231,183,0.5), transparent 40%)' }} />
+                              <span className={`${display.className} relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-lg font-black ring-1 ring-white/20 backdrop-blur-sm`}>{(companyProfile?.business_name || '?').charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div className="relative z-10 min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-200/70"><Headphones className="h-3 w-3" /> Your waste provider</p>
+                              <p className={`${display.className} mt-0.5 truncate text-lg font-extrabold leading-tight tracking-tight`}>{companyProfile?.business_name || '—'}</p>
+                              <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-100/70">
+                                <span className="inline-flex items-center gap-1"><span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" /></span> Online</span>
+                                {zone && <><span className="text-emerald-200/40">·</span> {zone}</>}
+                              </p>
+                            </div>
+                            <button onClick={() => setActiveTab('service')} className="relative z-10 hidden shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold ring-1 ring-white/15 transition-colors hover:bg-white/20 sm:flex">Details <ArrowRight className="h-3 w-3" /></button>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="matching" initial={{ opacity: 0, y: 8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.4, ease: EASE }} className="overflow-hidden">
+                          <div className="flex items-center gap-4 rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4">
+                            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 ring-1 ring-amber-200">
+                              <Radio className="relative z-10 h-5 w-5" />
+                              <span aria-hidden className="absolute inset-0 animate-ping rounded-2xl bg-amber-300/30" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700/70">Matching you with a provider</p>
+                              <p className="mt-0.5 text-sm font-bold text-amber-900">Your building is registered and queued</p>
+                              <p className="mt-0.5 text-[11px] font-semibold text-amber-700/80">A waste company in your area will activate service shortly — their details land here the moment they do.</p>
+                            </div>
+                            <button onClick={() => setActiveTab('service')} className="hidden shrink-0 items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-bold text-amber-800 ring-1 ring-amber-200 transition-colors hover:bg-amber-200 sm:flex">Track <ArrowRight className="h-3 w-3" /></button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.section>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                  {/* money + autopay panel */}
+                  <motion.div {...block(0)} className="group relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
+                    <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+                    <div aria-hidden className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between">
+                        <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-50/80"><Wallet className="h-4 w-4" /> Wallet balance</p>
+                        <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider ring-1 ring-white/20"><motion.span className="h-1.5 w-1.5 rounded-full bg-emerald-200" animate={{ opacity: [1, 0.35, 1] }} transition={{ duration: 1.8, repeat: Infinity }} /> on‑platform</span>
+                      </div>
+                      <p className={`${display.className} mt-3 text-4xl font-extrabold tracking-tight tabular-nums`}><Counter value={walletBalance} prefix="₦" /></p>
+                      <p className="mt-1 text-xs font-medium text-emerald-50/80">Funds settle invoices automatically when autopay is on</p>
+                      <div className="mt-5 grid grid-cols-2 gap-2">
+                        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setCheckout({ mode: 'topup' })} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
+                        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAddBank(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
+                      </div>
+                      <div className="my-4 h-px bg-white/15" />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-emerald-200" />
+                          <div>
+                            <p className="text-sm font-bold leading-tight">Autopay</p>
+                            <p className="text-[11px] font-medium text-emerald-100/70">{autopayOn ? 'Settles on the 1st' : 'Currently off'}</p>
+                          </div>
+                        </div>
+                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAutopay(true)} className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold ring-1 ring-white/25 transition-colors hover:bg-white/25">{autopayOn ? 'Manage' : 'Enable'}</motion.button>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  <motion.div {...block(1)}><BillingCard /></motion.div>
+                  <motion.div {...block(2)}><CollectionStatusCard /></motion.div>
+                </div>
               </div>
             )}
 
@@ -424,14 +490,3 @@ export default function CaretakerDashboard() {
     </div>
   );
 }
-
-function Detail({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
-  return (
-    <div>
-      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400"><Icon className="h-3 w-3" /> {label}</p>
-      <p className="text-sm font-bold leading-snug text-gray-900">{value}</p>
-    </div>
-  );
-}
-
-function formatNairaLocal(n: any) { return '₦' + Math.trunc(Number(n) || 0).toLocaleString('en-NG'); }
