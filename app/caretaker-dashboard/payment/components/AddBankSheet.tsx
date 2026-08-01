@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import { X, ShieldCheck, CheckCircle2, Landmark, AlertCircle } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
-import { DEFAULT_COUNTRY } from '@/lib/payments/countries';
+import { DEFAULT_COUNTRY, SUPPORTED_COUNTRIES } from '@/lib/payments/countries';
 import type { BankInfo } from '@/lib/payments/types';
 import BankPicker from './BankPicker';
 
@@ -16,6 +16,9 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 interface Props { open: boolean; onClose: () => void; }
 
 export default function AddBankSheet({ open, onClose }: Props) {
+  // NOTE: the caretaker store has NO saveRecipient — that method lives on the
+  // COMPANY store and hits a different endpoint. The caretaker saves a funding
+  // instrument via /api/payment-methods (building-scoped), done inline here.
   const { building, refreshAll } = useCaretakerSession();
 
   const [country, setCountry] = useState(DEFAULT_COUNTRY.iso);
@@ -23,7 +26,7 @@ export default function AddBankSheet({ open, onClose }: Props) {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');   // save errors only — verify errors live in the picker
+  const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -32,32 +35,36 @@ export default function AddBankSheet({ open, onClose }: Props) {
     setSaving(false); setError(''); setSaved(false);
   }, [open]);
 
+  const digits = accountNumber.replace(/[^\d]/g, '');
+  const canSave = !!bank && !!accountName && digits.length >= 8 && !saving;
+
   const save = async () => {
-    if (!building?.custom_id || !bank || !accountName) return;
+    if (!canSave || !bank || !building?.custom_id) return;
     setSaving(true); setError('');
+    const cur = SUPPORTED_COUNTRIES.find((c) => c.iso === country)?.currency || 'NGN';
     try {
       const res = await fetch('/api/payment-methods', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          buildingId: building.custom_id, instrumentType: 'bank_account', provider: 'paystack', country,
-          bankCode: bank.code, bankName: bank.name,
-          accountLast4: accountNumber.replace(/[^\d]/g, '').slice(-4), accountName,
+          buildingId: building.custom_id, instrumentType: 'bank_account', provider: 'paystack',
+          country, currency: cur, bankCode: bank.code, bankName: bank.name,
+          accountNumber: digits,                 // FULL number server-side (execution needs it)
+          accountLast4: digits.slice(-4),        // display-only
+          accountName,
         }),
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not save bank');
+      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not save account');
       await refreshAll();
       setSaved(true);
-    } catch (e: any) { setError(e?.message || 'Could not save bank'); }
+    } catch (e: any) { setError(e?.message || 'Could not save account'); }
     finally { setSaving(false); }
   };
-
-  const canSave = !!bank && !!accountName && !saving;
 
   return (
     <AnimatePresence>
       {open && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={saving ? undefined : onClose}>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1100] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={saving ? undefined : onClose}>
           <motion.div initial={{ y: 40, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 24, opacity: 0, scale: 0.98 }} transition={{ duration: 0.32, ease: EASE }} onClick={(e) => e.stopPropagation()} className={`${body.className} relative max-h-[92vh] w-full max-w-md overflow-hidden rounded-t-[28px] bg-white shadow-2xl sm:rounded-[28px]`}>
             <div className="relative overflow-hidden bg-emerald-950 px-6 pb-6 pt-5 text-white">
               <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 26px)' }} />
@@ -77,16 +84,11 @@ export default function AddBankSheet({ open, onClose }: Props) {
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="py-6 text-center">
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></motion.div>
                   <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Bank linked</h3>
-                  <p className="mt-1 text-sm font-medium text-gray-500">{bank?.name} •••• {accountNumber.replace(/[^\d]/g, '').slice(-4)} is ready to fund your wallet.</p>
+                  <p className="mt-1 text-sm font-medium text-gray-500">{bank?.name} •••• {digits.slice(-4)} is ready to fund your wallet.</p>
                 </motion.div>
               ) : (
                 <>
-                  <BankPicker
-                    country={country} onCountryChange={setCountry}
-                    bank={bank} onBankChange={setBank}
-                    accountNumber={accountNumber} onAccountNumberChange={setAccountNumber}
-                    accountName={accountName} onAccountNameChange={setAccountName}
-                  />
+                  <BankPicker country={country} onCountryChange={setCountry} bank={bank} onBankChange={setBank} accountNumber={accountNumber} onAccountNumberChange={setAccountNumber} accountName={accountName} onAccountNameChange={setAccountName} />
                   {error && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> {error}</p>}
                 </>
               )}
@@ -96,11 +98,9 @@ export default function AddBankSheet({ open, onClose }: Props) {
               {saved ? (
                 <motion.button whileTap={{ scale: 0.98 }} onClick={onClose} className="w-full rounded-2xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700">Done</motion.button>
               ) : (
-                <motion.button whileTap={canSave ? { scale: 0.98 } : undefined} onClick={save} disabled={!canSave} className="w-full rounded-2xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
-                  {saving ? 'Saving…' : 'Save bank account'}
-                </motion.button>
+                <motion.button whileTap={canSave ? { scale: 0.98 } : undefined} onClick={save} disabled={!canSave} className="w-full rounded-2xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">{saving ? 'Saving…' : 'Save bank account'}</motion.button>
               )}
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> We store only the bank, last‑4 digits & verified name — never your full account number</p>
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-gray-400"><ShieldCheck className="h-3.5 w-3.5 text-emerald-500" /> We store the verified name + last‑4 for display; the full number stays server‑side for execution</p>
             </div>
           </motion.div>
         </motion.div>

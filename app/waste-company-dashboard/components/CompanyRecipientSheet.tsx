@@ -41,7 +41,7 @@ export default function CompanyRecipientSheet({ open, onClose }: Props) {
     if (!canSave || !bank) return;
     setSaving(true); setError('');
     const cur = SUPPORTED_COUNTRIES.find((c) => c.iso === country)?.currency || 'NGN';
-    const res = await saveRecipient({ bankCode: bank.code, bankName: bank.name, accountLast4: digits.slice(-4), accountName, country, currency: cur });
+    const res = await saveRecipient({ bankCode: bank.code, bankName: bank.name, accountNumber: digits, accountLast4: digits.slice(-4), accountName, country, currency: cur });
     setSaving(false);
     if (res.ok) setSaved(true); else setError(res.error || 'Could not save account');
   };

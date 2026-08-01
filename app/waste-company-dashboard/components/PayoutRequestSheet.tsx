@@ -79,7 +79,7 @@ export default function PayoutRequestSheet({ open, onClose }: Props) {
                     {/* staging honesty banner */}
                     <div className="flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200">
                       <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                      <p className="text-[11px] font-semibold leading-relaxed text-amber-800"><span className="font-bold">Payout staging.</span> Requests reserve your funds and queue for processing; the bank transfer itself activates with the payouts rail release.</p>
+                        <p className="text-[11px] font-semibold leading-relaxed text-amber-800"><span className="font-bold">Live via Paystack Transfers.</span> We reserve the funds now and release them to your bank; arrival is typically 0–24 hours depending on the receiving bank.</p>
                     </div>
 
                     <div>

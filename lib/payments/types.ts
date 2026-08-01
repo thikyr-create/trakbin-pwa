@@ -68,3 +68,17 @@ export const supportsBankDirectory = (p: PaymentProvider): p is PaymentProvider 
   typeof (p as any).listBanks === 'function';
 export const supportsAccountResolution = (p: PaymentProvider): p is PaymentProvider & AccountResolutionProvider =>
   typeof (p as any).resolveAccount === 'function';
+
+// ── payout capabilities (6.2b) — providers opt in ────────────────────────
+export interface CreateRecipientInput { name: string; accountNumber: string; bankCode: string; currency?: string; }
+export interface CreateRecipientResult { recipientCode: string; }
+export interface TransferInput { amountKobo: number; recipientCode: string; reference?: string; reason?: string; }
+export interface TransferResult { transferCode: string; status: string; raw?: any; }
+
+export interface PayoutRecipientProvider { createRecipient(input: CreateRecipientInput): Promise<CreateRecipientResult>; }
+export interface PayoutTransferProvider { transfer(input: TransferInput): Promise<TransferResult>; }
+
+export const supportsPayoutRecipient = (p: PaymentProvider): p is PaymentProvider & PayoutRecipientProvider =>
+  typeof (p as any).createRecipient === 'function';
+export const supportsPayoutTransfer = (p: PaymentProvider): p is PaymentProvider & PayoutTransferProvider =>
+  typeof (p as any).transfer === 'function';

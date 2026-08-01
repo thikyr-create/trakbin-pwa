@@ -11,47 +11,26 @@ export interface TenantContext { companyId: number | null; userId: string | null
 export type DispatchEventType = 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full' | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added' | 'service_activated';
 export interface DispatchEvent { id: string; timestamp: string; type: DispatchEventType; truck_id: string; driver_name: string; building_id?: string; message: string; metadata?: any; }
 export interface Truck { id: string; truck_id: string; driver_name: string; status: any; current_route_id?: string; capacity_percent: number; last_location?: { lat: number; lng: number }; completed_stops: number; total_stops: number; license_plate: string; truck_type: string; }
-
-export interface EarningsState {
-  available: number; pending: number; withdrawn: number; lifetime: number; rateBps: number; feeRule: FeeRule;
-}
+export interface EarningsState { available: number; pending: number; withdrawn: number; lifetime: number; rateBps: number; feeRule: FeeRule; }
 
 export interface CompanySessionState {
-  tenant: TenantContext;
-  loadTenantContext: () => Promise<void>;
-  trucks: Truck[];
-  dispatchTimeline: DispatchEvent[];
+  tenant: TenantContext; loadTenantContext: () => Promise<void>;
+  trucks: Truck[]; dispatchTimeline: DispatchEvent[];
   activeNotifications: Array<{ id: string; message: string; timestamp: string; type: 'success' | 'warning' | 'error' | 'info' }>;
-  selectedTruck: Truck | null;
-  cameraMode: 'overview' | 'following' | 'navigating';
-  fetchFleet: () => Promise<void>;
-  updateTruckStatus: (truckId: string, status: Truck['status']) => void;
+  selectedTruck: Truck | null; cameraMode: 'overview' | 'following' | 'navigating';
+  fetchFleet: () => Promise<void>; updateTruckStatus: (truckId: string, status: Truck['status']) => void;
   addDispatchEvent: (event: Omit<DispatchEvent, 'id' | 'timestamp'>) => void;
-  addNotification: (message: string, type: 'success' | 'warning' | 'error' | 'info') => void;
-  clearNotification: (id: string) => void;
-  setSelectedTruck: (truck: Truck | null) => void;
-  setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
-  subscribeToRealtime: () => () => void;
-  unsubscribeFromRealtime: () => void;
-
-  serviceRequests: any[];
-  selectedRequest: any | null;
-  isDrawerOpen: boolean;
-  fetchServiceRequests: () => Promise<void>;
-  setSelectedRequest: (request: any | null) => void;
-  setIsDrawerOpen: (isOpen: boolean) => void;
+  addNotification: (message: string, type: 'success' | 'warning' | 'error' | 'info') => void; clearNotification: (id: string) => void;
+  setSelectedTruck: (truck: Truck | null) => void; setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
+  subscribeToRealtime: () => () => void; unsubscribeFromRealtime: () => void;
+  serviceRequests: any[]; selectedRequest: any | null; isDrawerOpen: boolean;
+  fetchServiceRequests: () => Promise<void>; setSelectedRequest: (request: any | null) => void; setIsDrawerOpen: (isOpen: boolean) => void;
   activateService: (requestId: string, zoneId: string, scheduleData: any) => Promise<void>;
-
-  // finance / treasury
-  earnings: EarningsState | null;
-  settlements: any[];
-  payouts: any[];
-  recipients: any[];
-  fetchEarnings: () => Promise<void>;
-  fetchPayouts: () => Promise<void>;
-  fetchRecipients: () => Promise<void>;
+  earnings: EarningsState | null; settlements: any[]; payouts: any[]; recipients: any[];
+  fetchEarnings: () => Promise<void>; fetchPayouts: () => Promise<void>; fetchRecipients: () => Promise<void>;
   requestPayout: (amount: number, recipientId: string, idempotencyKey: string) => Promise<{ ok: boolean; reason?: string; already?: boolean; minimum?: number; payout_id?: string; status?: string }>;
-  saveRecipient: (payload: { bankCode: string; bankName?: string; accountLast4: string; accountName: string; country?: string; currency?: string }) => Promise<{ ok: boolean; error?: string }>;
+  executePayout: (payoutId: string) => Promise<{ ok: boolean; status?: string; already?: boolean; reason?: string }>;
+  saveRecipient: (payload: { bankCode: string; bankName?: string; accountNumber: string; accountLast4: string; accountName: string; country?: string; currency?: string }) => Promise<{ ok: boolean; error?: string }>;
 }
 
 const resolveCompanyId = (tenantCompanyId: number | null): number | null => {
@@ -64,18 +43,14 @@ const resolveCompanyId = (tenantCompanyId: number | null): number | null => {
 export const useCompanySession = create<CompanySessionState>((set, get) => ({
   tenant: { companyId: null, userId: null, role: null, loaded: false },
   trucks: [], dispatchTimeline: [], activeNotifications: [], selectedTruck: null, cameraMode: 'overview',
-  serviceRequests: [], selectedRequest: null, isDrawerOpen: false,
-  earnings: null, settlements: [], payouts: [], recipients: [],
+  serviceRequests: [], selectedRequest: null, isDrawerOpen: false, earnings: null, settlements: [], payouts: [], recipients: [],
 
   loadTenantContext: async () => {
     const { data: { user } } = await supabase.auth.getUser();
     let userId = user?.id || null; let companyId: number | null = null; let role: UserRole = 'company';
-    if (userId) {
-      const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', userId).single();
-      companyId = profile?.company_id ?? null; role = (profile?.role as UserRole) || 'company';
-    } else {
-      const storedCompany = localStorage.getItem('trakbin_company');
-      const storedDriver = localStorage.getItem('trakbin_driver');
+    if (userId) { const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', userId).single(); companyId = profile?.company_id ?? null; role = (profile?.role as UserRole) || 'company'; }
+    else {
+      const storedCompany = localStorage.getItem('trakbin_company'); const storedDriver = localStorage.getItem('trakbin_driver');
       if (storedCompany) { try { const p = JSON.parse(storedCompany); userId = p.id; companyId = p.company_id; role = 'company'; } catch { localStorage.removeItem('trakbin_company'); } }
       else if (storedDriver) { try { const p = JSON.parse(storedDriver); userId = p.id; companyId = p.company_id; role = 'driver'; } catch { localStorage.removeItem('trakbin_driver'); } }
     }
@@ -89,8 +64,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     try {
       const { data: routes, error } = await supabase.from('routes').select('*, drivers(name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
       if (error) throw error;
-      const trucks: Truck[] = (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0, license_plate: '', truck_type: '' }));
-      set({ trucks });
+      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0, license_plate: '', truck_type: '' })) });
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
 
@@ -102,20 +76,11 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
 
   fetchPayouts: async () => {
     const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
-    try {
-      const res = await fetch(`/api/company/payouts?companyId=${cid}`);
-      const json = await res.json();
-      if (json.ok) set({ payouts: json.payouts || [] });
-    } catch (e) { console.error('fetchPayouts failed:', e); }
+    try { const res = await fetch(`/api/company/payouts?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ payouts: json.payouts || [] }); } catch (e) { console.error('fetchPayouts failed:', e); }
   },
-
   fetchRecipients: async () => {
     const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
-    try {
-      const res = await fetch(`/api/company/recipients?companyId=${cid}`);
-      const json = await res.json();
-      if (json.ok) set({ recipients: json.recipients || [] });
-    } catch (e) { console.error('fetchRecipients failed:', e); }
+    try { const res = await fetch(`/api/company/recipients?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ recipients: json.recipients || [] }); } catch (e) { console.error('fetchRecipients failed:', e); }
   },
 
   fetchEarnings: async () => {
@@ -128,41 +93,38 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       ]);
       const feeRule: FeeRule = {
         model: (hauler?.fee_model ?? settings?.fee_model ?? 'percent') as FeeRule['model'],
-        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000,
-        flatFee: hauler?.flat_fee ?? settings?.flat_fee ?? 0,
-        processorBps: hauler?.processor_bps ?? settings?.processor_bps ?? 0,
-        processorFlat: hauler?.processor_flat ?? settings?.processor_flat ?? 0,
+        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000, flatFee: hauler?.flat_fee ?? settings?.flat_fee ?? 0,
+        processorBps: hauler?.processor_bps ?? settings?.processor_bps ?? 0, processorFlat: hauler?.processor_flat ?? settings?.processor_flat ?? 0,
         processorCap: hauler?.processor_cap ?? settings?.processor_cap ?? null,
       };
-      set({
-        earnings: {
-          available: hauler?.available_balance ?? 0,
-          pending: hauler?.pending_balance ?? 0,
-          withdrawn: hauler?.withdrawn_total ?? 0,
-          lifetime: hauler?.lifetime_earnings ?? 0,
-          rateBps: feeRule.commissionBps,
-          feeRule,
-        },
-        settlements: txs || [],
-      });
-      await get().fetchPayouts();
-      await get().fetchRecipients();
+      set({ earnings: { available: hauler?.available_balance ?? 0, pending: hauler?.pending_balance ?? 0, withdrawn: hauler?.withdrawn_total ?? 0, lifetime: hauler?.lifetime_earnings ?? 0, rateBps: feeRule.commissionBps, feeRule }, settlements: txs || [] });
+      await get().fetchPayouts(); await get().fetchRecipients();
     } catch (e) {
       console.warn('fetchEarnings degraded:', e);
       set({ earnings: { available: 0, pending: 0, withdrawn: 0, lifetime: 0, rateBps: 1000, feeRule: { model: 'percent', commissionBps: 1000, flatFee: 0, processorBps: 0, processorFlat: 0, processorCap: null } }, settlements: [] });
     }
   },
 
+  executePayout: async (payoutId) => {
+    try {
+      const res = await fetch('/api/company/payouts/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payoutId }) });
+      const json = await res.json();
+      if (json.ok) { await get().fetchEarnings(); if (!json.already && json.status === 'paid') get().addNotification('Payout released to bank.', 'success'); }
+      else get().addNotification(json.reason || 'Could not release payout.', 'error');
+      return json;
+    } catch (e: any) { get().addNotification('Could not release payout.', 'error'); return { ok: false, reason: e?.message }; }
+  },
+
   requestPayout: async (amount, recipientId, idempotencyKey) => {
     const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return { ok: false, reason: 'no_company' };
     try {
-      const res = await fetch('/api/company/payouts/request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyId: cid, amount, recipientId, idempotencyKey }),
-      });
+      const res = await fetch('/api/company/payouts/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyId: cid, amount, recipientId, idempotencyKey }) });
       const json = await res.json();
-      if (json.ok) { await get().fetchEarnings(); get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested — funds reserved.', json.already ? 'info' : 'success'); }
-      else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
+      if (json.ok) {
+        await get().fetchEarnings();
+        get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested — releasing…', json.already ? 'info' : 'success');
+        if (!json.already && json.payout_id) { try { await get().executePayout(json.payout_id); } catch {} } // best-effort release; reservation stands if it fails
+      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
       return json;
     } catch (e: any) { get().addNotification('Could not request payout.', 'error'); return { ok: false, reason: e?.message }; }
   },
@@ -191,9 +153,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       await supabase.from('company_profiles').upsert({ id: cid, contact_numbers: hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
       await supabase.from('environmental_issue_history').insert([{ issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${cid}`, metadata: { request_id: requestId, building_id: request.building_id } }]);
       get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
-      await get().fetchServiceRequests();
-      get().setIsDrawerOpen(false);
-      get().addNotification('Service activated successfully!', 'success');
+      await get().fetchServiceRequests(); get().setIsDrawerOpen(false); get().addNotification('Service activated successfully!', 'success');
     } catch (e) { console.error('Activation failed:', e); get().addNotification('Failed to activate service.', 'error'); }
   },
 
@@ -201,16 +161,13 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   addDispatchEvent: (event) => { const e: DispatchEvent = { ...event, id: `event-${Date.now()}`, timestamp: new Date().toISOString() }; set((s) => ({ dispatchTimeline: [e, ...s.dispatchTimeline].slice(0, 100) })); },
   addNotification: (message, type) => { const n = { id: `notif-${Date.now()}`, message, timestamp: new Date().toISOString(), type }; set((s) => ({ activeNotifications: [n, ...s.activeNotifications].slice(0, 10) })); setTimeout(() => get().clearNotification(n.id), 5000); },
   clearNotification: (id) => set((s) => ({ activeNotifications: s.activeNotifications.filter((n) => n.id !== id) })),
-  setSelectedTruck: (truck) => set({ selectedTruck: truck }),
-  setCameraMode: (mode) => set({ cameraMode: mode }),
-  setSelectedRequest: (request) => set({ selectedRequest: request }),
-  setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
+  setSelectedTruck: (truck) => set({ selectedTruck: truck }), setCameraMode: (mode) => set({ cameraMode: mode }),
+  setSelectedRequest: (request) => set({ selectedRequest: request }), setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
   subscribeToRealtime: () => {
     const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return () => {};
     const routeSub = supabase.channel('routes-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` }, (p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
     const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter: `company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
-    // a payout changing state (or a new reservation) repaints the treasury live
     const payoutSub = supabase.channel(`company-payouts-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `company_id=eq.${cid}` }, () => { get().fetchPayouts(); get().fetchEarnings(); }).subscribe();
     return () => { supabase.removeChannel(routeSub); supabase.removeChannel(ledgerSub); supabase.removeChannel(payoutSub); };
   },
