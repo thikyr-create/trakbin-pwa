@@ -22,28 +22,15 @@ export default function AddBankSheet({ open, onClose }: Props) {
   const [bank, setBank] = useState<BankInfo | null>(null);
   const [accountNumber, setAccountNumber] = useState('');
   const [accountName, setAccountName] = useState<string | null>(null);
-  const [resolving, setResolving] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState('');   // save errors only — verify errors live in the picker
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setCountry(DEFAULT_COUNTRY.iso); setBank(null); setAccountNumber(''); setAccountName(null);
-    setResolving(false); setSaving(false); setError(''); setSaved(false);
+    setSaving(false); setError(''); setSaved(false);
   }, [open]);
-
-  const resolve = async () => {
-    if (!bank) return;
-    setResolving(true); setError(''); setAccountName(null);
-    try {
-      const res = await fetch(`/api/banks/resolve?country=${encodeURIComponent(country)}&bankCode=${encodeURIComponent(bank.code)}&account=${encodeURIComponent(accountNumber.replace(/[^\d]/g, ''))}`);
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'Could not verify account');
-      setAccountName(json.accountName);
-    } catch (e: any) { setError(e?.message || 'Could not verify account'); }
-    finally { setResolving(false); }
-  };
 
   const save = async () => {
     if (!building?.custom_id || !bank || !accountName) return;
@@ -99,7 +86,6 @@ export default function AddBankSheet({ open, onClose }: Props) {
                     bank={bank} onBankChange={setBank}
                     accountNumber={accountNumber} onAccountNumberChange={setAccountNumber}
                     accountName={accountName} onAccountNameChange={setAccountName}
-                    resolving={resolving} onResolve={resolve}
                   />
                   {error && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> {error}</p>}
                 </>
