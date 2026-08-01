@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
@@ -17,8 +17,10 @@ import SupportBanner from './components/SupportBanner';
 import StatusTimeline from './components/StatusTimeline';
 import ServiceVitalsCard from './components/ServiceVitalsCard';
 import BillingStatement from './components/BillingStatement';
-// WalletCard intentionally NOT mounted: the wallet balance now has a single home
-// (the money block below). The file may remain on disk unused — it compiles cleanly.
+// shared sheets, mounted here so the dashboard's money actions work in place
+import CheckoutSheet from './payment/components/CheckoutSheet';
+import AddBankSheet from './payment/components/AddBankSheet';
+import AutopaySheet from './payment/components/AutopaySheet';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -36,14 +38,17 @@ const item: Variants = { hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0
 const rise: Variants = { hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: EASE } } };
 const reveal: Variants = { hidden: { opacity: 0, y: 26 }, show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EASE } } };
 
-const BILLING = '/caretaker-dashboard/payment';
-
 export default function CaretakerDashboard() {
   const router = useRouter();
   const {
     building, collectionHistory, billingProcessing, fullHistory, fullHistoryLoaded,
     walletBalance, initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
   } = useCaretakerSession();
+
+  // inline money actions — open the shared sheets right here, no page change
+  const [showTopup, setShowTopup] = useState(false);
+  const [showAddBank, setShowAddBank] = useState(false);
+  const [showAutopay, setShowAutopay] = useState(false);
 
   useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
@@ -131,7 +136,7 @@ export default function CaretakerDashboard() {
           )}
         </AnimatePresence>
 
-        {/* three distinct at-a-glance facts — liability · schedule · action (wallet moved to its own block below) */}
+        {/* three distinct at-a-glance facts — liability · schedule · action */}
         <motion.div variants={container} initial="hidden" animate="show" className="mb-10 grid grid-cols-1 gap-6 md:grid-cols-3">
           <motion.div variants={item}><BillingCard /></motion.div>
           <motion.div variants={item}><CollectionStatusCard /></motion.div>
@@ -140,7 +145,7 @@ export default function CaretakerDashboard() {
 
         <ServiceVitalsCard />
 
-        {/* the single wallet home — balance + actions + autopay, all routing into billing */}
+        {/* the single wallet home — actions now open the sheets inline */}
         <div className="mb-10 grid grid-cols-1 gap-3 md:grid-cols-2">
           <motion.div variants={reveal} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} whileHover={{ y: -3 }} className="group relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
             <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
@@ -155,8 +160,8 @@ export default function CaretakerDashboard() {
               <p className={`${display.className} mt-3 text-4xl font-extrabold tracking-tight tabular-nums`}><Counter value={walletBalance} prefix="₦" /></p>
               <p className="mt-1 text-xs font-medium text-emerald-50/80">Funds settle invoices automatically when autopay is on</p>
               <div className="mt-5 grid grid-cols-2 gap-2">
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => router.push(BILLING)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowTopup(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
+                <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAddBank(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
               </div>
             </div>
           </motion.div>
@@ -167,7 +172,8 @@ export default function CaretakerDashboard() {
               <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${autopayOn ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-gray-100 text-gray-500 ring-gray-200'}`}><span className={`h-1.5 w-1.5 rounded-full ${autopayOn ? 'bg-emerald-500' : 'bg-gray-400'}`} /> {autopayOn ? 'Active' : 'Off'}</span>
             </div>
             <p className="mt-4 text-sm font-medium text-gray-500">{autopayOn ? 'Every invoice settles itself from your wallet on the 1st — no overdue, no reminders.' : 'Turn on autopay and every invoice settles itself the moment it’s due.'}</p>
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => router.push(BILLING)} className="mt-5 w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100">{autopayOn ? 'Manage autopay' : 'Enable autopay'}</motion.button>
+            {/* revert to navigation if you prefer: onClick={() => router.push('/caretaker-dashboard/payment')} */}
+            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowAutopay(true)} className="mt-5 w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-100">{autopayOn ? 'Manage autopay' : 'Enable autopay'}</motion.button>
           </motion.div>
         </div>
 
@@ -232,6 +238,11 @@ export default function CaretakerDashboard() {
           <span className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400"><Activity className="h-3.5 w-3.5 text-emerald-500" /> Trakbin Operations</span>
         </motion.footer>
       </main>
+
+      {/* inline money sheets — same components the billing page uses, mounted here too */}
+      <CheckoutSheet open={showTopup} mode="topup" onClose={() => setShowTopup(false)} onLinkBank={() => { setShowTopup(false); setShowAddBank(true); }} />
+      <AddBankSheet open={showAddBank} onClose={() => setShowAddBank(false)} />
+      <AutopaySheet open={showAutopay} onClose={() => setShowAutopay(false)} onLinkBank={() => { setShowAutopay(false); setShowAddBank(true); }} />
     </div>
   );
 }
