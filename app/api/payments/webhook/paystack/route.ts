@@ -29,12 +29,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // money-OUT (authoritative finalizer; idempotent via the state machine)
+  // money-OUT — pass the full options object (not the fee positionally)
   if (event.event === 'transfer.success' || event.event === 'transfer.failed' || event.event === 'transfer.reversed') {
     const code = event.data?.transfer_code; if (!code) return NextResponse.json({ ok: true });
     const fee = event.data?.fees != null ? Math.round(event.data.fees / 100) : null;
-    const outcome = event.event === 'transfer.success' ? 'paid' : event.event === 'transfer.reversed' ? 'reversed' : 'failed';
-        const res = await finalizeByReference(code, outcome, fee);
+    const amount = event.data?.amount != null ? Math.round(event.data.amount / 100) : null;
+    const currency = event.data?.currency ?? null;
+    const outcome: 'paid' | 'failed' | 'reversed' =
+      event.event === 'transfer.success' ? 'paid' : event.event === 'transfer.reversed' ? 'reversed' : 'failed';
+    const res = await finalizeByReference(code, outcome, { pspFee: fee, amount, currency, raw: event.data });
     return NextResponse.json(res);
   }
 
