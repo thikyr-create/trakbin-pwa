@@ -7,18 +7,17 @@ import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   LogOut, Building2, Calendar, ArrowRight, CheckCircle2, Activity, Radio,
   ShieldCheck, Wallet, Landmark, Zap, Plus, Receipt, Home, History,
-  Headphones, AlertTriangle, MapPin, Copy, Check, ExternalLink, Users, Hash,
-  Clock, type LucideIcon,
+  Headphones, AlertTriangle, MapPin, Copy, Check, ExternalLink, Users, Hash, Clock,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 import BillingCard from './components/BillingCard';
 import CollectionStatusCard from './components/CollectionStatusCard';
-import ReportIssueCard from './components/ReportIssueCard';
 import SupportBanner from './components/SupportBanner';
 import StatusTimeline from './components/StatusTimeline';
 import ServiceVitalsCard from './components/ServiceVitalsCard';
 import BillingStatement from './components/BillingStatement';
+import ReportConsole from './components/ReportConsole';
 import CheckoutSheet from './payment/components/CheckoutSheet';
 import AddBankSheet from './payment/components/AddBankSheet';
 import AutopaySheet from './payment/components/AutopaySheet';
@@ -52,16 +51,7 @@ const recChip = (s: string) =>
   : s === 'missed' ? 'bg-rose-50 text-rose-700 ring-rose-200'
   : 'bg-gray-100 text-gray-600 ring-gray-200';
 
-const issueChip = (s?: string) => {
-  const v = (s || '').toLowerCase();
-  return v.includes('resolv') || v.includes('clos') ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-    : v.includes('open') || v.includes('pend') || v.includes('review') ? 'bg-amber-50 text-amber-700 ring-amber-200'
-    : 'bg-gray-100 text-gray-600 ring-gray-200';
-};
-
-function formatNairaLocal(n: any) { return '₦' + Math.trunc(Number(n) || 0).toLocaleString('en-NG'); }
-
-function Detail({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
+function Detail({ Icon, label, value }: { Icon: typeof Users; label: string; value: string }) {
   return (
     <div>
       <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400"><Icon className="h-3 w-3" /> {label}</p>
@@ -74,8 +64,7 @@ export default function CaretakerDashboard() {
   const router = useRouter();
   const {
     building, collectionHistory, billingProcessing, fullHistory, fullHistoryLoaded,
-    walletBalance, invoices, invoiceCount, issues,
-    initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
+    walletBalance, initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
   } = useCaretakerSession();
 
   const [activeTab, setActiveTab] = useState<TabId>('home');
@@ -86,6 +75,7 @@ export default function CaretakerDashboard() {
 
   useEffect(() => { initializeSession(); return () => teardownRealtime(); }, []);
 
+  // every hook above this guard
   const now = new Date();
   const monthStats = useMemo(() => {
     const rows = fullHistory.filter((it) => { const d = new Date(it.collection_date); return !isNaN(d.getTime()) && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
@@ -98,21 +88,13 @@ export default function CaretakerDashboard() {
     return { completed, missed, total, rate, weeks, weekMax: Math.max(1, ...weeks) };
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
-  // EVERY hook runs before any conditional return — `unpaid` stays here, never
-  // below the guard, or the hook count changes between the null and loaded
-  // renders and the page crashes at runtime (a failure the build can't catch).
-  const unpaid = useMemo(() => invoices.filter((i) => i.status !== 'paid'), [invoices]);
-
   if (!building) return null;
   const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
   const autopayOn = !!building?.autopay_enabled;
   const provider = companyProfile?.business_name || 'your waste provider';
-  const needsPay = invoiceCount.due > 0;
+  const needsPay = false; // billing surfaces its own state; no dot needed here
   const needsService = !isActive;
-  const zone = activeAssignment?.zone_id
-    ? (/^zone\s/i.test(String(activeAssignment.zone_id)) ? String(activeAssignment.zone_id) : 'Zone ' + activeAssignment.zone_id)
-    : null;
 
   const lat = building.latitude; const lng = building.longitude;
   const hasCoords = typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng);
@@ -120,7 +102,7 @@ export default function CaretakerDashboard() {
   const mapsHref = hasCoords ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}` : null;
   const copyCoords = async () => { if (!coordStr) return; try { await navigator.clipboard.writeText(coordStr); } catch {} setCopied(true); setTimeout(() => setCopied(false), 1400); };
 
-  const TABS: { id: TabId; label: string; Icon: LucideIcon; dot?: boolean }[] = [
+  const TABS: { id: TabId; label: string; Icon: typeof Home; dot?: boolean }[] = [
     { id: 'home', label: 'Home', Icon: Home, dot: needsPay },
     { id: 'records', label: 'Records', Icon: History },
     { id: 'building', label: 'Building', Icon: Building2 },
@@ -146,7 +128,6 @@ export default function CaretakerDashboard() {
         )}
       </AnimatePresence>
 
-      {/* top chrome — global app bar (logo + logout only) */}
       <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-40 border-b border-gray-200/70 bg-[#f6f7f6]/85 backdrop-blur-md">
         <div className="mx-auto max-w-3xl px-4 sm:px-6">
           <div className="flex h-16 items-center justify-between">
@@ -163,21 +144,15 @@ export default function CaretakerDashboard() {
       </motion.header>
 
       <main className="relative z-10 mx-auto max-w-3xl px-4 pb-32 pt-6 sm:px-6">
-        {/* NOTE: the Building Console identity strip is NO LONGER global —
-            it lives only inside the Home tab (see below), enriched with the
-            waste provider when active. Every other tab opens on its own content. */}
-
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
 
             {activeTab === 'home' && (
               <div className="space-y-4">
-                {/* HOME identity + provider header — only on Home */}
                 <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: EASE }} className="relative overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm sm:p-7">
                   <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.5]" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.08) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
                   <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-emerald-100/50 blur-3xl" />
                   <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent" />
-
                   <div className="relative z-10 flex flex-col gap-5">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -194,8 +169,6 @@ export default function CaretakerDashboard() {
                         {isActive ? 'Active service' : 'Pending'}
                       </span>
                     </div>
-
-                    {/* provider / matching row — swaps with state */}
                     <AnimatePresence mode="wait">
                       {isActive ? (
                         <motion.div key="provider" initial={{ opacity: 0, y: 8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.4, ease: EASE }} className="overflow-hidden">
@@ -210,7 +183,7 @@ export default function CaretakerDashboard() {
                               <p className={`${display.className} mt-0.5 truncate text-lg font-extrabold leading-tight tracking-tight`}>{companyProfile?.business_name || '—'}</p>
                               <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-100/70">
                                 <span className="inline-flex items-center gap-1"><span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" /></span> Online</span>
-                                {zone && <><span className="text-emerald-200/40">·</span> {zone}</>}
+                                {activeAssignment?.zone_id && <><span className="text-emerald-200/40">·</span> {/^zone\s/i.test(String(activeAssignment.zone_id)) ? activeAssignment.zone_id : 'Zone ' + activeAssignment.zone_id}</>}
                               </p>
                             </div>
                             <button onClick={() => setActiveTab('service')} className="relative z-10 hidden shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold ring-1 ring-white/15 transition-colors hover:bg-white/20 sm:flex">Details <ArrowRight className="h-3 w-3" /></button>
@@ -237,7 +210,6 @@ export default function CaretakerDashboard() {
                 </motion.section>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                  {/* money + autopay panel */}
                   <motion.div {...block(0)} className="group relative overflow-hidden rounded-[22px] border border-emerald-300/40 bg-gradient-to-br from-emerald-600 to-emerald-700 p-6 text-white shadow-lg shadow-emerald-200">
                     <div aria-hidden className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl" />
                     <div aria-hidden className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
@@ -252,20 +224,8 @@ export default function CaretakerDashboard() {
                         <motion.button whileTap={{ scale: 0.97 }} onClick={() => setCheckout({ mode: 'topup' })} className="flex items-center justify-center gap-2 rounded-xl bg-white py-3 text-sm font-extrabold text-emerald-700 shadow-md transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Add funds</motion.button>
                         <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowAddBank(true)} className="flex items-center justify-center gap-2 rounded-xl bg-white/15 py-3 text-sm font-extrabold text-white ring-1 ring-white/25 transition-colors hover:bg-white/25"><Landmark className="h-4 w-4" /> Link bank</motion.button>
                       </div>
-                      <div className="my-4 h-px bg-white/15" />
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-emerald-200" />
-                          <div>
-                            <p className="text-sm font-bold leading-tight">Autopay</p>
-                            <p className="text-[11px] font-medium text-emerald-100/70">{autopayOn ? 'Settles on the 1st' : 'Currently off'}</p>
-                          </div>
-                        </div>
-                        <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAutopay(true)} className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-bold ring-1 ring-white/25 transition-colors hover:bg-white/25">{autopayOn ? 'Manage' : 'Enable'}</motion.button>
-                      </div>
                     </div>
                   </motion.div>
-
                   <motion.div {...block(1)}><BillingCard /></motion.div>
                   <motion.div {...block(2)}><CollectionStatusCard /></motion.div>
                 </div>
@@ -382,29 +342,7 @@ export default function CaretakerDashboard() {
 
             {activeTab === 'statement' && (
               <div className="space-y-4">
-                {unpaid.length > 0 && (
-                  <motion.div {...block(0)} className="overflow-hidden rounded-[24px] border border-amber-200/70 bg-white shadow-sm">
-                    <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-                      <h3 className={`${display.className} flex items-center gap-2 text-lg font-extrabold tracking-tight text-gray-900`}><Receipt className="h-5 w-5 text-amber-500" /> Outstanding</h3>
-                      <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-amber-600">{unpaid.length} open</span>
-                    </div>
-                    <ul className="divide-y divide-gray-100">
-                      {unpaid.map((inv, i) => (
-                        <motion.li key={inv.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: i * 0.04, ease: EASE }} className="flex items-center justify-between gap-3 px-6 py-4">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-gray-900">{inv.description || 'Service invoice'}</p>
-                            <p className="mt-0.5 font-mono text-[11px] font-semibold text-gray-400">due {new Date(inv.due_date).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-3">
-                            <span className={`${display.className} text-base font-extrabold tabular-nums text-gray-900`}>{formatNairaLocal(inv.amount)}</span>
-                            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setCheckout({ mode: 'invoice', invoiceId: String(inv.id), amount: Number(inv.amount), description: inv.description })} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-200 transition-colors hover:bg-emerald-700">Pay</motion.button>
-                          </div>
-                        </motion.li>
-                      ))}
-                    </ul>
-                  </motion.div>
-                )}
-                <motion.div {...block(unpaid.length > 0 ? 1 : 0)}><BillingStatement /></motion.div>
+                <motion.div {...block(0)}><BillingStatement /></motion.div>
               </div>
             )}
 
@@ -416,46 +354,7 @@ export default function CaretakerDashboard() {
               </div>
             )}
 
-            {activeTab === 'report' && (
-              <div className="space-y-4">
-                <motion.div {...block(0)} className="relative overflow-hidden rounded-[24px] border border-amber-200/60 bg-amber-950 p-7 text-white shadow-xl shadow-amber-950/20">
-                  <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 26px)' }} />
-                  <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-amber-500/25 blur-3xl" />
-                  <div className="relative z-10">
-                    <p className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200/70"><AlertTriangle className="h-3.5 w-3.5" /> Community watch</p>
-                    <h2 className={`${display.className} mt-2 text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl`}>Keep your area clean</h2>
-                    <p className="mt-2 max-w-md text-sm font-medium text-amber-100/80">Report illegal dumping, overflowing bins, or sanitation concerns — your reports go straight to your waste provider and the platform.</p>
-                  </div>
-                </motion.div>
-
-                <motion.div {...block(1)}><ReportIssueCard /></motion.div>
-
-                <motion.div {...block(2)} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
-                  <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
-                    <h3 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>Your reports</h3>
-                    <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">{issues.length} filed</span>
-                  </div>
-                  {issues.length === 0 ? (
-                    <div className="px-6 py-12 text-center"><CheckCircle2 className="mx-auto h-6 w-6 text-gray-300" /><p className="mt-2 text-sm font-bold text-gray-700">No reports yet</p><p className="mt-1 text-xs text-gray-400">When you flag an issue, it will appear here with its status.</p></div>
-                  ) : (
-                    <ul className="divide-y divide-gray-100">
-                      {issues.map((it: any, i: number) => (
-                        <motion.li key={it.id || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: i * 0.04, ease: EASE }} className="px-6 py-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-gray-900">{it.issue_type || 'Environmental issue'}</p>
-                              <p className="mt-0.5 font-mono text-[11px] font-semibold text-gray-400">{it.issue_number || it.id} · {it.created_at ? new Date(it.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' }) : ''}</p>
-                            </div>
-                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ${issueChip(it.status)}`}>{it.status || 'received'}</span>
-                          </div>
-                          {(it.description || it.notes) && <p className="mt-2 text-xs font-medium leading-relaxed text-gray-500">{it.description || it.notes}</p>}
-                        </motion.li>
-                      ))}
-                    </ul>
-                  )}
-                </motion.div>
-              </div>
-            )}
+            {activeTab === 'report' && <ReportConsole />}
 
           </motion.div>
         </AnimatePresence>
