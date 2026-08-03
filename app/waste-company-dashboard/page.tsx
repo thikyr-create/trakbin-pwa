@@ -123,7 +123,7 @@ export default function WasteCompanyDashboard() {
         supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_id', currentCompanyId).order('employee_id', { ascending: true }),
         supabase.from('Buildings').select('*').eq('company_id', currentCompanyId).order('custom_id', { ascending: true }),
         supabase.from('collections').select('*').eq('company_id', currentCompanyId).order('collection_date', { ascending: false }),
-        supabase.from('issues').select('*').eq('company_id', currentCompanyId).order('created_at', { ascending: false }),
+        supabase.from('environmental_issues').select('*').eq('company_id', currentCompanyId).order('created_at', { ascending: false }),
       ]);
       if (trucksData.data) setTrucks(trucksData.data);
       if (driversData.data) setDrivers(driversData.data);

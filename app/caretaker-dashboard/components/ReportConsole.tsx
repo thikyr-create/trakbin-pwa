@@ -14,7 +14,6 @@ const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-di
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const BUCKET = 'trakbin-issue-media';
-const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 type Kind = 'dump' | 'miss';
 type MediaItem = { id: string; blob: Blob; url: string; kind: 'image' | 'video'; uploadedUrl?: string; failed?: boolean };
@@ -34,7 +33,6 @@ function relTime(iso?: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-// light client-side image compression so mobile uploads stay small
 function compressImage(file: File, max = 1600, quality = 0.82): Promise<Blob> {
   return new Promise((resolve) => {
     if (!file.type.startsWith('image/')) return resolve(file);
@@ -66,6 +64,7 @@ export default function ReportConsole() {
   const [dumpNote, setDumpNote] = useState('');
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [missedDate, setMissedDate] = useState('');
+  const [missWindow, setMissWindow] = useState('');
   const [missNote, setMissNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
@@ -76,21 +75,8 @@ export default function ReportConsole() {
 
   const supabase = useMemo(() => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!), []);
 
-  const missedWindow = activeAssignment?.time_window || schedule?.time_window || '';
-  const scheduledDates = useMemo(() => {
-    const raw = Array.isArray(activeAssignment?.pickup_days) ? activeAssignment.pickup_days
-      : typeof schedule?.pickup_day === 'string' ? schedule.pickup_day.split(',') : [];
-    const set = new Set(raw.map((d: string) => String(d).trim().toLowerCase()).filter(Boolean));
-    if (set.size === 0) return [];
-    const out: { key: string; label: string; weekday: string }[] = [];
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-      if (set.has(WEEK[d.getDay()].toLowerCase())) {
-        out.push({ key: d.toISOString().slice(0, 10), weekday: WEEK[d.getDay()], label: d.toLocaleDateString('en-NG', { weekday: 'short', day: 'numeric', month: 'short' }) });
-      }
-    }
-    return out;
-  }, [activeAssignment?.pickup_days, schedule?.pickup_day]);
+  // the building's scheduled window, shown ONLY as a placeholder hint (never as data)
+  const scheduledWindow = activeAssignment?.time_window || schedule?.time_window || '';
 
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 3200); return () => clearTimeout(t); }, [toast]);
   useEffect(() => { const urls = media.map((m) => m.url); return () => { urls.forEach((u) => URL.revokeObjectURL(u)); }; }, [media]);
@@ -98,6 +84,7 @@ export default function ReportConsole() {
   if (!building) return null;
 
   const provider = companyProfile?.business_name || 'your waste provider';
+  const todayISO = new Date().toISOString().slice(0, 10);
   const reports = (issues || []).filter((it: any) => it.issue_type === 'illegal_dumping' || it.issue_type === 'missed_collection');
   const openCount = reports.filter((it: any) => !['resolved', 'closed'].includes((it.status || '').toLowerCase())).length;
 
@@ -163,7 +150,7 @@ export default function ReportConsole() {
     return id;
   };
 
-  const reset = () => { media.forEach((m) => URL.revokeObjectURL(m.url)); setMedia([]); setDumpLocation(''); setCoords(null); setDumpNote(''); setMissedDate(''); setMissNote(''); setKind(null); };
+  const reset = () => { media.forEach((m) => URL.revokeObjectURL(m.url)); setMedia([]); setDumpLocation(''); setCoords(null); setDumpNote(''); setMissedDate(''); setMissWindow(''); setMissNote(''); setKind(null); };
 
   const submitDump = async () => {
     if (!canDump) return;
@@ -195,9 +182,11 @@ export default function ReportConsole() {
     setSubmitting(true); setToast({ msg: 'Submitting…', tone: 'info' });
     try {
       const wd = new Date(missedDate + 'T00:00:00').toLocaleDateString('en-NG', { weekday: 'long' });
-      const lines = ['Missed collection reported.', `Scheduled date missed: ${wd}, ${missedDate}`, `Time window: ${missedWindow || 'as scheduled'}`];
+      const win = missWindow.trim() || scheduledWindow || '';
+      const lines = ['Missed collection reported.', `Date missed: ${missedDate} (${wd})`];
+      if (win) lines.push(`Time window: ${win}`);
       if (missNote.trim()) lines.push(`Note: ${missNote.trim()}`);
-      await saveReport({ issue_type: 'missed_collection', description: lines.join('\n') }, { missed_date: missedDate, missed_window: missedWindow || null });
+      await saveReport({ issue_type: 'missed_collection', description: lines.join('\n') }, { missed_date: missedDate, missed_window: win || null });
       await fetchIssues();
       setToast({ msg: 'Missed collection reported. We’ll follow up.', tone: 'ok' });
       reset();
@@ -226,7 +215,6 @@ export default function ReportConsole() {
         <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl" />
         <motion.div aria-hidden className="pointer-events-none absolute right-8 top-8 h-24 w-24 rounded-full border border-amber-300/20" animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeOut' }} />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/50 to-transparent" />
-
         <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-md">
             <p className="font-mono text-[11px] font-bold uppercase tracking-[0.24em] text-amber-300/80">Community watch · {provider}</p>
@@ -330,33 +318,19 @@ export default function ReportConsole() {
               <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-rose-400 to-rose-600" />
               <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-rose-600">Missed collection</p>
               <h3 className={`${display.className} mt-1 text-xl font-extrabold tracking-tight text-gray-900`}>Which pickup was missed?</h3>
-              <p className="mt-1 text-sm font-medium text-gray-500">Pick the scheduled day the truck didn’t show. No photo needed.</p>
+              <p className="mt-1 text-sm font-medium text-gray-500">Enter the date the truck didn’t show and the window you expected it. No photo needed.</p>
 
-              {scheduledDates.length === 0 ? (
-                <div className="mt-5 rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 px-4 py-6 text-center">
-                  <CalendarX className="mx-auto h-6 w-6 text-gray-300" />
-                  <p className="mt-2 text-sm font-bold text-gray-700">No schedule on file yet</p>
-                  <p className="mt-1 text-xs text-gray-400">Once your provider sets pickup days, the missed dates will appear here to tap.</p>
+              {/* manual inputs — the caretaker's own data, never a preset */}
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400"><CalendarX className="h-3 w-3" /> Date missed <span className="text-rose-500">*</span></label>
+                  <input type="date" value={missedDate} max={todayISO} onChange={(e) => setMissedDate(e.target.value)} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-200" />
                 </div>
-              ) : (
-                <div className="mt-5">
-                  <label className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Scheduled day missed</label>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {scheduledDates.map((d) => {
-                      const sel = missedDate === d.key;
-                      return (
-                        <motion.button key={d.key} whileTap={{ scale: 0.97 }} onClick={() => setMissedDate(d.key)} className={`rounded-2xl border-2 p-3 text-left transition-all ${sel ? 'border-rose-400 bg-rose-50 ring-1 ring-rose-200' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                          <span className="block text-sm font-extrabold text-gray-900">{d.weekday}</span>
-                          <span className="font-mono text-[11px] font-semibold text-gray-500">{d.label}</span>
-                        </motion.button>
-                      );
-                    })}
-                  </div>
-                  {missedWindow ? (
-                    <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-gray-500"><Clock className="h-3.5 w-3.5 text-rose-500" /> Expected window · <span className="font-bold text-gray-700">{missedWindow}</span></p>
-                  ) : null}
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400"><Clock className="h-3 w-3" /> Time window <span className="text-gray-300">(optional)</span></label>
+                  <input type="text" value={missWindow} onChange={(e) => setMissWindow(e.target.value)} placeholder={scheduledWindow || 'e.g. 08:00 AM – 11:00 AM'} className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-200" />
                 </div>
-              )}
+              </div>
 
               <div className="mt-4">
                 <label className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Note <span className="text-gray-300">(optional)</span></label>
@@ -391,7 +365,7 @@ export default function ReportConsole() {
               const attachMatch = String(it.description || '').match(/Attachments:\s*(\d+)/);
               const attachN = attachMatch ? Number(attachMatch[1]) : 0;
               const locMatch = String(it.description || '').match(/Location:\s*([^\n]+)/);
-              const missMatch = String(it.description || '').match(/Scheduled date missed:\s*([^\n]+)/);
+              const missMatch = String(it.description || '').match(/Date missed:\s*([^\n]+)/);
               const st = (it.status || 'open').toLowerCase();
               const stChip = st.includes('resolv') || st.includes('clos') ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : st.includes('progress') || st.includes('review') ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-amber-50 text-amber-700 ring-amber-200';
               return (
