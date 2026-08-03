@@ -71,6 +71,17 @@ export const authAdapter = {
   async insertHauler(row: any) { return supabase.from('haulers').insert([row]).select().single(); },
 
   async insertUser(row: any) { return supabase.from('users').insert([row]); },
+    async queryBuildingByIdAndAddress(buildingId: string, officialAddress: string) {
+    const { data } = await supabase.from('Buildings').select('*').eq('custom_id', buildingId).maybeSingle();
+    if (!data) return null;
+    const a = (data.address || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const b = (officialAddress || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    return a === b ? data : null;
+  },
+
+  async updateBuildingPasscode(customId: string, passcode: string) {
+    return supabase.from('Buildings').update({ passcode }).eq('custom_id', customId);
+  },
 
   // dual-layer (+estate/street/address) matcher
   async matchBuilding(opts: { officialAddress: string; estate?: string; coords: { lat: number; lon: number } }): Promise<number | null> {

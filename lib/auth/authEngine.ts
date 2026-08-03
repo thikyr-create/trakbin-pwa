@@ -76,7 +76,7 @@ export const authEngine = {
     return { ok: true, message: '✅ Building registered successfully!', buildingId: generatedId };
   },
 
-  async registerCompany(input: CompanyRegisterInput): Promise<AuthResult> {
+    async registerCompany(input: CompanyRegisterInput): Promise<AuthResult & { companyId?: number }> {
     const exists = await authAdapter.emailExists(input.email);
     if (exists) return { ok: false, message: '❌ Email already registered.' };
     const { data: haulerData, error: haulerError } = await authAdapter.insertHauler({
@@ -89,7 +89,15 @@ export const authEngine = {
       company_name: input.companyName, license_number: input.licenseNumber, company_id: haulerData.id,
     });
     if (userError) return { ok: false, message: 'Registration failed: ' + userError.message };
-    return { ok: true, message: '✅ Waste Company account created!' };
+    return { ok: true, message: '✅ Waste Company account created!', companyId: haulerData.id };
+  },
+
+  // Caretaker knowledge-based recovery: Building ID + registered official address.
+  async resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
+    const building = await authAdapter.queryBuildingByIdAndAddress(buildingId.trim(), officialAddress.trim());
+    if (!building) return { ok: false, message: '❌ Building ID and address do not match our records.' };
+    await authAdapter.updateBuildingPasscode(buildingId.trim(), newPasscode);
+    return { ok: true, message: '✅ Passcode updated!', building: { ...building, passcode: newPasscode } };
   },
 
   // restores the session from the SAME localStorage keys the dashboards already read

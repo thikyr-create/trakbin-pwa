@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import { Building2, UserPlus, Truck, MapPin, Phone, Loader2, Search, CheckCircle2, AlertCircle, Smartphone, Monitor, ChevronDown } from 'lucide-react';
+import CompanyIdCard from './CompanyIdCard';
 import { authEngine } from '@/lib/auth/authEngine';
 import type { AccountType } from '@/lib/auth/types';
 
@@ -13,6 +14,7 @@ const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const inputCls = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200';
 const labelCls = `${''}mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`;
+const [companyCard, setCompanyCard] = useState<null | { id: number; name: string; email: string; license: string }>(null);
 
 interface Props { accountType: AccountType; onRegistered: (id: string, passcode: string, address: string) => void; onSwitchToLogin: () => void; }
 
@@ -90,11 +92,16 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
       setLoading(false);
       return;
     }
-    const res = await authEngine.registerCompany({ email, password, companyName, licenseNumber, operatingAddress, contactNumber });
+        const res = await authEngine.registerCompany({ email, password, companyName, licenseNumber, operatingAddress, contactNumber });
     setMessage(res.message);
-    if (res.ok) setTimeout(() => { onSwitchToLogin(); setMessage(''); }, 2000);
+    if (res.ok && res.companyId) {
+      setCompanyCard({ id: res.companyId, name: companyName, email, license: licenseNumber });
+    }
     setLoading(false);
   };
+        {companyCard && (
+        <CompanyIdCard company={companyCard} onClose={() => { setCompanyCard(null); onSwitchToLogin(); }} />
+      )}
 
   return (
     <motion.form key={accountType} onSubmit={submit} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="space-y-4">
