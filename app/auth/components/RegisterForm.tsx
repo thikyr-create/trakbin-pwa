@@ -13,8 +13,7 @@ const DraggableMap = dynamic(() => import('../../dashboard/DraggableMap'), { ssr
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const inputCls = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200';
-const labelCls = `${''}mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`;
-const [companyCard, setCompanyCard] = useState<null | { id: number; name: string; email: string; license: string }>(null);
+const labelCls = 'mb-1 block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400';
 
 interface Props { accountType: AccountType; onRegistered: (id: string, passcode: string, address: string) => void; onSwitchToLogin: () => void; }
 
@@ -42,6 +41,9 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
   const [licenseNumber, setLicenseNumber] = useState('');
   const [operatingAddress, setOperatingAddress] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+
+  // INSIDE the component — this was the bug (it was at module scope)
+  const [companyCard, setCompanyCard] = useState<null | { id: number; name: string; email: string; license: string }>(null);
 
   useEffect(() => { if (typeof window !== 'undefined') setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)); }, []);
 
@@ -92,16 +94,13 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
       setLoading(false);
       return;
     }
-        const res = await authEngine.registerCompany({ email, password, companyName, licenseNumber, operatingAddress, contactNumber });
+    const res = await authEngine.registerCompany({ email, password, companyName, licenseNumber, operatingAddress, contactNumber });
     setMessage(res.message);
     if (res.ok && res.companyId) {
       setCompanyCard({ id: res.companyId, name: companyName, email, license: licenseNumber });
     }
     setLoading(false);
   };
-        {companyCard && (
-        <CompanyIdCard company={companyCard} onClose={() => { setCompanyCard(null); onSwitchToLogin(); }} />
-      )}
 
   return (
     <motion.form key={accountType} onSubmit={submit} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="space-y-4">
@@ -242,6 +241,11 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
           {message.includes('❌') ? <AlertCircle size={18} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={18} className="mt-0.5 shrink-0" />}
           <p>{message}</p>
         </motion.div>
+      )}
+
+      {/* INSIDE the returned JSX — this was floating outside before */}
+      {companyCard && (
+        <CompanyIdCard company={companyCard} onClose={() => { setCompanyCard(null); onSwitchToLogin(); }} />
       )}
     </motion.form>
   );
