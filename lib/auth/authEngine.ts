@@ -71,7 +71,7 @@ export const authEngine = {
     });
     if (matchedCompanyId) {
       await authAdapter.assignServiceRequest(generatedId, matchedCompanyId);
-      await authAdapter.setBuildingCompany(generatedId, matchedCompanyId);
+      ;
     }
     return { ok: true, message: '✅ Building registered successfully!', buildingId: generatedId };
   },
