@@ -9,7 +9,6 @@ import EndShiftModal from './components/EndShiftModal';
 import ShiftCard from './components/ShiftCard';
 import RouteProgressCard from './components/RouteProgressCard';
 import SkipReasonModal from './components/SkipReasonModal';
-import ReportIssueModal from './components/ReportIssueModal';
 import BottomPanel from './components/BottomPanel';
 import MapboxMap from './MapboxMap';
 import { calculateTotalDistanceKm } from './utils/geo';
@@ -103,7 +102,7 @@ export default function HaulerDashboard() {
       <BottomPanel />
 
         <SkipReasonModal />
-      <ReportIssueModal />
+      
       <EndShiftModal /> {/* ✅ Add this line */}
     </div>
   );
