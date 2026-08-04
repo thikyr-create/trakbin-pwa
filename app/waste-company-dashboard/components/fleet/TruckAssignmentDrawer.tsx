@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Truck, UserRound, UserPlus, UserMinus } from "lucide-react";
+import { X, Truck, UserRound, UserPlus, UserMinus, Pencil, Wrench } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import TruckStatusBadge from "./TruckStatusBadge";
 import type { TruckFormDriverOption } from "./TruckForm";
@@ -33,6 +33,8 @@ interface TruckAssignmentDrawerProps {
   drivers?: TruckFormDriverOption[];
   onClose: () => void;
   onSuccess: () => void; // Trigger parent refetch
+  onEdit: (truck: TruckRecord) => void;
+  onMaintenance: (truck: TruckRecord) => void;
 }
 
 export default function TruckAssignmentDrawer({
@@ -41,6 +43,8 @@ export default function TruckAssignmentDrawer({
   drivers = [],
   onClose,
   onSuccess,
+  onEdit,
+  onMaintenance,
 }: TruckAssignmentDrawerProps) {
   const [selected, setSelected] = useState("");
   const [submitting, setSubmitting] = useState<"assign" | "unassign" | null>(null);
@@ -232,6 +236,26 @@ export default function TruckAssignmentDrawer({
                 </motion.button>
               </motion.div>
             </motion.div>
+
+            {/* Footer actions */}
+            <div className="grid grid-cols-2 gap-3 border-t border-gray-100 px-6 py-4">
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onEdit(truck)}
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700"
+              >
+                <Pencil size={15} />
+                Edit
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onMaintenance(truck)}
+                className="flex items-center justify-center gap-2 rounded-xl bg-amber-50 py-3 text-sm font-bold text-amber-700 ring-1 ring-amber-200 transition hover:bg-amber-100"
+              >
+                <Wrench size={15} />
+                Maintenance
+              </motion.button>
+            </div>
           </motion.aside>
         </>
       )}
