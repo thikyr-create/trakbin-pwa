@@ -15,7 +15,6 @@ import {
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import AuthGate from './components/AuthGate';
-import DispatchTimeline from './components/DispatchTimeline';
 import NotificationsPanel from './components/NotificationsPanel';
 import AddDriverModal from './components/AddDriverModal';
 import AddTruckModal from './components/AddTruckModal';
@@ -35,7 +34,6 @@ import SettingsPage from './components/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
 import FinancePage from './components/FinancePage';
-import { formatNaira } from '@/lib/utils/money';
 import { canOperate } from '@/lib/auth/companyVerification';
 import CompanyVerificationCard from './components/CompanyVerificationCard';
 
