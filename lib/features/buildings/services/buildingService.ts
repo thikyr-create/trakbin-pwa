@@ -38,6 +38,13 @@ export interface BuildingRecord {
   assigned_driver_name: string | null;
 }
 
+export interface ZoneGeo {
+  zone_name: string;
+  center_lat: number;
+  center_lng: number;
+  radius_km: number;
+}
+
 export interface BuildingDetail extends BuildingRecord {
   service_assignment: any | null;
   collection_schedule: any | null;
@@ -46,6 +53,8 @@ export interface BuildingDetail extends BuildingRecord {
   payments: any[];
   issues: any[];
   payment_methods: any[];
+  zone_geo: ZoneGeo | null;
+  route_geometry: any | null;
 }
 
 async function resolveAssignedDrivers(
@@ -113,6 +122,35 @@ async function resolveAssignedDrivers(
   });
 
   return result;
+}
+
+async function resolveRouteGeometry(custom_id: string): Promise<any | null> {
+  const { data: abs } = await supabase
+    .from('assignment_buildings')
+    .select('assignment_id')
+    .eq('building_id', custom_id);
+  if (!abs || abs.length === 0) return null;
+
+  const ids = [...new Set(abs.map((a: any) => a.assignment_id))];
+  const { data: assignments } = await supabase
+    .from('assignments')
+    .select('id, route_id')
+    .in('id', ids)
+    .neq('status', 'archived');
+  if (!assignments || assignments.length === 0) return null;
+
+  const routeIds = [
+    ...new Set(assignments.map((a: any) => a.route_id).filter(Boolean)),
+  ];
+  if (routeIds.length === 0) return null;
+
+  const { data: routes } = await supabase
+    .from('routes')
+    .select('id, geometry')
+    .in('id', routeIds);
+
+  const withGeo = (routes || []).find((r: any) => r.geometry);
+  return withGeo?.geometry ?? null;
 }
 
 export async function fetchBuildingsList(company_id: number): Promise<BuildingRecord[]> {
@@ -247,7 +285,7 @@ export async function fetchBuildingDetail(
       .eq('company_id', company_id),
     supabase
       .from('company_zones')
-      .select('id, zone_name')
+      .select('id, zone_name, center_lat, center_lng, radius_km')
       .eq('company_id', company_id),
   ]);
 
@@ -257,6 +295,9 @@ export async function fetchBuildingDetail(
   });
 
   const driverMap = await resolveAssignedDrivers([custom_id]);
+  const routeGeometry = await resolveRouteGeometry(custom_id);
+
+  const zoneRow = assignment ? zonesMap[assignment.zone_id] : null;
 
   return {
     ...building,
@@ -264,10 +305,7 @@ export async function fetchBuildingDetail(
       schedule?.next_pickup_date,
       assignment?.pickup_days
     ),
-    zone_name:
-      assignment && zonesMap[assignment.zone_id]
-        ? zonesMap[assignment.zone_id].zone_name
-        : null,
+    zone_name: zoneRow ? zoneRow.zone_name : null,
     service_status: assignment?.service_status || null,
     pickup_days: assignment?.pickup_days || null,
     assigned_driver_name: driverMap[custom_id] || null,
@@ -278,5 +316,14 @@ export async function fetchBuildingDetail(
     payments: payments || [],
     issues: issues || [],
     payment_methods: paymentMethods || [],
+    zone_geo: zoneRow
+      ? {
+          zone_name: zoneRow.zone_name,
+          center_lat: zoneRow.center_lat,
+          center_lng: zoneRow.center_lng,
+          radius_km: zoneRow.radius_km,
+        }
+      : null,
+    route_geometry: routeGeometry,
   };
 }
