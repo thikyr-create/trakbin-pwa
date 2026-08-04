@@ -4,6 +4,7 @@ export interface CreateDriverInput {
   name: string;
   email: string;
   phone?: string;
+  license_number?: string;
   truck_id?: string | null;
 }
 
@@ -13,13 +14,15 @@ export interface DriverCredentials {
 }
 
 export interface DriverRecord {
-  id: string;
-  name: string;
+  id?: string;
+  employee_id: string;
+  full_name: string;
   email: string;
   phone?: string | null;
-  employee_id: string;
+  license_number?: string | null;
   truck_id?: string | null;
-  status: string;
+  status?: string;
+  company_id?: string;
   created_at?: string;
 }
 
@@ -36,6 +39,28 @@ export class DriverEngineError extends Error {
     super(message);
     this.name = 'DriverEngineError';
     this.status = status;
+  }
+}
+
+function getCompanyContext(): {
+  company_id: string | null;
+  company_name: string | null;
+} {
+  if (typeof window === 'undefined') {
+    return { company_id: null, company_name: null };
+  }
+
+  try {
+    const stored = window.localStorage.getItem('trakbin_company');
+    if (!stored) return { company_id: null, company_name: null };
+
+    const parsed = JSON.parse(stored);
+    return {
+      company_id: parsed?.id || parsed?.company_id || null,
+      company_name: parsed?.company_name || null,
+    };
+  } catch {
+    return { company_id: null, company_name: null };
   }
 }
 
@@ -60,11 +85,22 @@ export async function createDriver(
 ): Promise<CreateDriverResult> {
   validateCreateDriverInput(input);
 
-  const payload: CreateDriverInput = {
+  const company = getCompanyContext();
+
+  if (!company.company_id) {
+    throw new DriverEngineError(
+      'Company session not found. Please log in again.'
+    );
+  }
+
+  const payload = {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     phone: input.phone?.trim() || undefined,
+    license_number: input.license_number?.trim() || undefined,
     truck_id: input.truck_id ?? null,
+    company_id: company.company_id,
+    company_name: company.company_name,
   };
 
   const res = await fetch('/api/company/drivers', {
