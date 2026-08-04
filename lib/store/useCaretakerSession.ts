@@ -41,7 +41,7 @@ export interface CaretakerSessionState {
   subscribeRealtime: () => void;
   teardownRealtime: () => void;
   fetchIssues: () => Promise<void>;
-  createIssue: (issueData: any) => Promise<void>;
+    createIssue: (issueData: any) => Promise<{ ok: boolean; error?: string; message?: string }>;
   checkAndGenerateInvoice: (bId: string, nextBillingDate: string, autopayEnabled: boolean, currentWalletBalance: number) => Promise<void>;
   addFunds: (amount: number, methodId: string) => Promise<void>;
   saveAutopay: () => Promise<void>;
@@ -191,15 +191,32 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (data) set({ issues: data });
   },
 
-  createIssue: async (issueData) => {
-    const { building } = get(); if (!building) return;
-    const issueNumber = `ENV-${Date.now().toString().slice(-6)}`;
-    const { data: newIssue, error } = await supabase.from('environmental_issues').insert([{ ...issueData, issue_number: issueNumber, building_id: building.custom_id, reported_by: building.custom_id, company_id: building.company_id || null }]).select().single();
-    if (error) { console.error('Error creating issue:', error); alert('Failed to submit report.'); }
-    else {
-      await supabase.from('environmental_issue_history').insert([{ issue_id: newIssue.id, action: 'REPORT_CREATED', performed_by: 'caretaker', metadata: { type: issueData.issue_type } }]);
-      alert(`Report Submitted! ID: ${issueNumber}`);
-      await get().fetchIssues();
+   createIssue: async (issueData: any) => {
+    const { building, fetchIssues } = get();
+
+    // GATE: a caretaker may only report once a waste company is assigned/activated.
+    if (!building?.company_id) {
+      return {
+        ok: false,
+        error: 'unassigned',
+        message: 'Reports can only be submitted after a waste company has been assigned to your building.',
+      };
+    }
+
+    try {
+      const issue_number = `ENV-${Date.now().toString().slice(-6)}`;
+      const { error } = await supabase.from('environmental_issues').insert([{
+        ...issueData,
+        issue_number,
+        building_id: building.custom_id,
+        reported_by: building.custom_id,
+        company_id: building.company_id,
+      }]);
+      if (error) throw error;
+      await fetchIssues();
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message };
     }
   },
 

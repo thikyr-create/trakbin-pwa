@@ -91,6 +91,7 @@ export default function CaretakerDashboard() {
   if (!building) return null;
   const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
+  const assignedCompany = !!building?.company_id;
   const autopayOn = !!building?.autopay_enabled;
   const provider = companyProfile?.business_name || 'your waste provider';
   const needsPay = false; // billing surfaces its own state; no dot needed here
@@ -354,7 +355,16 @@ export default function CaretakerDashboard() {
               </div>
             )}
 
-            {activeTab === 'report' && <ReportConsole />}
+                        {activeTab === 'report' && (assignedCompany ? (
+              <ReportConsole />
+            ) : (
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="relative overflow-hidden rounded-[24px] border border-amber-200/70 bg-amber-50/60 p-8 text-center">
+                <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.5]" style={{ backgroundImage: 'radial-gradient(circle, rgba(245,158,11,0.08) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+                <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-600 ring-1 ring-amber-200"><ShieldCheck className="h-7 w-7" /></div>
+                <h3 className={`${display.className} relative mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>No waste company assigned yet</h3>
+                <p className="relative mx-auto mt-2 max-w-sm text-sm font-medium text-gray-600">You'll be able to report illegal dumping and missed collections as soon as a waste company activates your building.</p>
+              </motion.div>
+            ))}
 
           </motion.div>
         </AnimatePresence>
