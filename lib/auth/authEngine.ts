@@ -1,4 +1,5 @@
 import { authAdapter } from './authAdapter';
+import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
 
@@ -20,7 +21,30 @@ export const authEngine = {
       useAuthStore.getState().setSession('caretaker', building);
       return { ok: true, message: '✅ Login successful! Redirecting...', role: 'caretaker' };
     }
-    const res = await authAdapter.queryUserByCredentials((input.email || '').trim(), (input.password || '').trim());
+
+    const email = (input.email || '').trim();
+    const password = (input.password || '').trim();
+
+    // 1) Supabase Auth first (hashed password, real session)
+    try {
+      const { data, error } = await supabaseAuth.signInWithPassword(email, password);
+      if (error) {
+        if (/confirm/i.test(error.message)) return { ok: false, message: '⚠️ Please confirm your email before signing in — check your inbox.' };
+      } else if (data.user) {
+        const res = await authAdapter.queryUserByAuthOrEmail(data.user.id, email);
+        const accountType = res?.accountType || 'WasteCompany';
+        const row = res?.user || { id: data.user.id, email };
+        if (data.user.email_confirmed_at && row.company_id) { await authAdapter.markEmailVerified(row.company_id).catch(() => {}); }
+        const role: Role = accountType === 'Driver' ? 'driver' : 'company';
+        const key = accountType === 'Driver' ? KEYS.driver : KEYS.company;
+        localStorage.setItem(key, JSON.stringify(row));
+        useAuthStore.getState().setSession(role, row);
+        return { ok: true, message: '✅ Login successful! Redirecting...', role };
+      }
+    } catch { /* fall through to legacy */ }
+
+    // 2) legacy fallback (existing users not yet migrated)
+    const res = await authAdapter.queryUserByCredentials(email, password);
     if (!res) return { ok: false, message: '❌ Invalid ID/Email or password' };
     if (res.accountType === 'WasteCompany') {
       localStorage.setItem(KEYS.company, JSON.stringify(res.user));
@@ -32,7 +56,7 @@ export const authEngine = {
     return { ok: true, message: '✅ Login successful! Redirecting...', role: 'driver' };
   },
 
-    async registerCaretaker(input: CaretakerRegisterInput): Promise<RegisterCaretakerResult> {
+  async registerCaretaker(input: CaretakerRegisterInput): Promise<RegisterCaretakerResult> {
     let generatedId = generateBuildingId();
     let isUnique = false; let attempts = 0;
     while (!isUnique && attempts < 10) {
@@ -60,39 +84,43 @@ export const authEngine = {
     if (buildingError) return { ok: false, message: 'Error: ' + buildingError.message };
 
     const requestNumber = `REQ-${Date.now().toString().slice(-6)}`;
-    await authAdapter.insertServiceRequest({
-      request_number: requestNumber, building_id: generatedId, caretaker_name: 'Caretaker',
-      status: 'pending', submitted_at: new Date().toISOString(),
-    });
+    await authAdapter.insertServiceRequest({ request_number: requestNumber, building_id: generatedId, caretaker_name: 'Caretaker', status: 'pending', submitted_at: new Date().toISOString() });
 
-    const matchedCompanyId = await authAdapter.matchBuilding({
-      officialAddress: input.officialAddress, estate: input.estate,
-      coords: { lat: input.latitude, lon: input.longitude },
-    });
-    if (matchedCompanyId) {
-      await authAdapter.assignServiceRequest(generatedId, matchedCompanyId);
-      ;
-    }
+    const matchedCompanyId = await authAdapter.matchBuilding({ officialAddress: input.officialAddress, estate: input.estate, coords: { lat: input.latitude, lon: input.longitude } });
+    if (matchedCompanyId) await authAdapter.assignServiceRequest(generatedId, matchedCompanyId);
+
     return { ok: true, message: '✅ Building registered successfully!', buildingId: generatedId };
   },
 
-    async registerCompany(input: CompanyRegisterInput): Promise<AuthResult & { companyId?: number }> {
+  async registerCompany(input: CompanyRegisterInput): Promise<AuthResult & { companyId?: number }> {
     const exists = await authAdapter.emailExists(input.email);
     if (exists) return { ok: false, message: '❌ Email already registered.' };
+
     const { data: haulerData, error: haulerError } = await authAdapter.insertHauler({
       business_name: input.companyName, license_number: input.licenseNumber,
       operating_address: input.operatingAddress, contact_number: input.contactNumber,
     });
     if (haulerError || !haulerData) return { ok: false, message: '❌ Failed to create company: ' + (haulerError?.message || 'unknown') };
+
+    // Supabase Auth signup (hashed). Email confirmation ON → they must confirm before login.
+    let authId: string | null = null; let needsConfirm = false;
+    try {
+      const { data, error } = await supabaseAuth.signUp(input.email, input.password);
+      if (!error && data.user) { authId = data.user.id; needsConfirm = !data.session; }
+    } catch { /* fall back to legacy-only row */ }
+
     const { error: userError } = await authAdapter.insertUser({
-      email: input.email, password: input.password, account_type: 'WasteCompany',
-      company_name: input.companyName, license_number: input.licenseNumber, company_id: haulerData.id,
+      email: input.email, password: authId ? null : input.password, auth_id: authId,
+      account_type: 'WasteCompany', company_name: input.companyName,
+      license_number: input.licenseNumber, company_id: haulerData.id,
     });
     if (userError) return { ok: false, message: 'Registration failed: ' + userError.message };
-    return { ok: true, message: '✅ Waste Company account created!', companyId: haulerData.id };
+    return {
+      ok: true, companyId: haulerData.id,
+      message: needsConfirm ? '✅ Account created! Check your email to confirm your address, then sign in.' : '✅ Waste Company account created!',
+    };
   },
 
-  // Caretaker knowledge-based recovery: Building ID + registered official address.
   async resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
     const building = await authAdapter.queryBuildingByIdAndAddress(buildingId.trim(), officialAddress.trim());
     if (!building) return { ok: false, message: '❌ Building ID and address do not match our records.' };
@@ -100,7 +128,6 @@ export const authEngine = {
     return { ok: true, message: '✅ Passcode updated!', building: { ...building, passcode: newPasscode } };
   },
 
-  // restores the session from the SAME localStorage keys the dashboards already read
   restoreSession(): void {
     try {
       const c = localStorage.getItem(KEYS.caretaker);
@@ -114,9 +141,7 @@ export const authEngine = {
   },
 
   signOut(): void {
-    localStorage.removeItem(KEYS.caretaker);
-    localStorage.removeItem(KEYS.company);
-    localStorage.removeItem(KEYS.driver);
+    localStorage.removeItem(KEYS.caretaker); localStorage.removeItem(KEYS.company); localStorage.removeItem(KEYS.driver);
     useAuthStore.getState().clearSession();
   },
 

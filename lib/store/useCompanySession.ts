@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { type FeeRule } from '@/lib/utils/money';
+import { canOperate } from '@/lib/auth/companyVerification';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -139,8 +140,11 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e: any) { return { ok: false, error: e?.message }; }
   },
 
-  activateService: async (requestId, zoneId, scheduleData) => {
+    activateService: async (requestId, zoneId, scheduleData) => {
     const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
+    // verification gate — email + profile certify; documents do NOT gate.
+    const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
+    if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
       const { data: request } = await supabase.from('service_requests').select('building_id').eq('id', requestId).single();
       if (!request) throw new Error('Request not found');

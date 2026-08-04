@@ -36,6 +36,8 @@ import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
 import FinancePage from './components/FinancePage';
 import { formatNaira } from '@/lib/utils/money';
+import { canOperate } from '@/lib/auth/companyVerification';
+import CompanyVerificationCard from './components/CompanyVerificationCard';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -140,6 +142,9 @@ export default function WasteCompanyDashboard() {
   const handleSaveDriver = async (formData: any) => {
     let currentCompanyId = tenant.companyId;
     if (!currentCompanyId) { const s = localStorage.getItem('trakbin_company'); if (s) currentCompanyId = JSON.parse(s).company_id ? Number(JSON.parse(s).company_id) : null; }
+    // verification gate — email + profile certify; documents do NOT gate.
+    const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', currentCompanyId).maybeSingle();
+    if (haulerRow && !canOperate(haulerRow)) { addNotification('Confirm your email and complete your profile before adding drivers.', 'warning'); return { success: false, message: 'Verification required' }; }
     const employeeId = generateEmployeeId();
     const generatedPassword = `Trakbin${Math.floor(1000 + Math.random() * 9000)}!`;
     try {
@@ -367,7 +372,7 @@ export default function WasteCompanyDashboard() {
           {/* content */}
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
             <motion.div key={activePage + (selectedDriver ? '-drv' : '') + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
-              {activePage === 'overview' && <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />}
+              {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
               {activePage === 'earnings' && <FinancePage />}
               {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
