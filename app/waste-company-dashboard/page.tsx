@@ -8,18 +8,17 @@ import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   LayoutDashboard, Truck, Users, ClipboardList, CheckCircle2,
   AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut,
-  TrendingUp, Phone, Activity, Menu, X, Building2,
-  ArrowLeft, Mail, Hash, Inbox, Wallet, Radio, Radar,
+  TrendingUp, Activity, Menu, X, Building2,
+  ArrowLeft, Hash, Inbox, Wallet, Radio, Radar,
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import AuthGate from './components/AuthGate';
 import NotificationsPanel from './components/NotificationsPanel';
-import AddDriverModal from './components/AddDriverModal';
 import AddTruckModal from './components/AddTruckModal';
 import OverviewPage from './components/OverviewPage';
 import FleetPage from './components/FleetPage';
-import DriversPage from './components/DriversPage';
+import DriversPage from './components/drivers/DriversPage';
 import BuildingsPage from './components/BuildingsPage';
 import AssignmentsPage from './components/AssignmentsPage';
 import IssuesPage from './components/IssuesPage';
@@ -65,7 +64,6 @@ export default function WasteCompanyDashboard() {
   const [companyId, setCompanyId] = useState<string>('');
   const [activePage, setActivePage] = useState<PageView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [selectedTruck, setSelectedTruck] = useState<any>(null);
   const [selectedZone, setSelectedZone] = useState<any>(null);
 
@@ -76,11 +74,9 @@ export default function WasteCompanyDashboard() {
   const [issues, setIssues] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [showDriverModal, setShowDriverModal] = useState(false);
   const [showTruckModal, setShowTruckModal] = useState(false);
 
   const [searchFleet, setSearchFleet] = useState('');
-  const [searchDrivers, setSearchDrivers] = useState('');
 
   const {
     tenant, loadTenantContext,
@@ -117,7 +113,7 @@ export default function WasteCompanyDashboard() {
     try {
       const [trucksData, driversData, buildingsData, collectionsData, issuesData] = await Promise.all([
         supabase.from('trucks').select('*').eq('company_id', currentCompanyId).order('truck_id', { ascending: true }),
-        supabase.from('users').select('*').eq('account_type', 'Driver').eq('company_id', currentCompanyId).order('employee_id', { ascending: true }),
+        supabase.from('drivers').select('*').eq('company_id', currentCompanyId).order('employee_id', { ascending: true }),
         supabase.from('Buildings').select('*').eq('company_id', currentCompanyId).order('custom_id', { ascending: true }),
         supabase.from('collections').select('*').eq('company_id', currentCompanyId).order('collection_date', { ascending: false }),
         supabase.from('environmental_issues').select('*').eq('company_id', currentCompanyId).order('created_at', { ascending: false }),
@@ -131,27 +127,7 @@ export default function WasteCompanyDashboard() {
     finally { setLoading(false); }
   };
 
-  const generateEmployeeId = () => `DRV-${Math.floor(1000 + Math.random() * 9000)}`;
   const generateTruckId = () => `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
-
-  const handleSaveDriver = async (formData: any) => {
-    let currentCompanyId = tenant.companyId;
-    if (!currentCompanyId) { const s = localStorage.getItem('trakbin_company'); if (s) currentCompanyId = JSON.parse(s).company_id ? Number(JSON.parse(s).company_id) : null; }
-    const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', currentCompanyId).maybeSingle();
-    if (haulerRow && !canOperate(haulerRow)) { addNotification('Confirm your email and complete your profile before adding drivers.', 'warning'); return { success: false, message: 'Verification required' }; }
-    const employeeId = generateEmployeeId();
-    const generatedPassword = `Trakbin${Math.floor(1000 + Math.random() * 9000)}!`;
-    try {
-      const { error: userError } = await supabase.from('users').insert([{ email: formData.email, employee_id: employeeId, password: generatedPassword, account_type: 'Driver', company_name: companyName, full_name: formData.full_name, phone: formData.phone, company_id: currentCompanyId }]);
-      if (userError) throw userError;
-      const { error: driverError } = await supabase.from('drivers').insert([{ employee_id: employeeId, full_name: formData.full_name, email: formData.email, phone: formData.phone, license_number: formData.license_number, company_name: companyName, company_id: currentCompanyId }]);
-      if (driverError) throw driverError;
-      addDispatchEvent({ type: 'driver_added', truck_id: 'N/A', driver_name: formData.full_name, message: `New driver registered: ${formData.full_name} (${employeeId})` });
-      addNotification(`Driver ${formData.full_name} created successfully!`, 'success');
-      fetchData();
-      return { success: true, message: `✅ Driver Created Successfully!\n\n Employee ID: ${employeeId}\n Email: ${formData.email}\n Password: ${generatedPassword}\n\nPlease save these credentials!`, employeeId, password: generatedPassword };
-    } catch (error: any) { addNotification(`Failed to create driver: ${error.message}`, 'error'); return { success: false, message: error.message }; }
-  };
 
   const handleSaveTruck = async (formData: any) => {
     let currentCompanyId = tenant.companyId;
@@ -172,6 +148,12 @@ export default function WasteCompanyDashboard() {
   const served = buildings.length;
   const treasury = earnings?.available ?? null;
 
+  const truckOptions = useMemo(() => trucks.map((t) => ({
+    id: t.truck_id,
+    label: `${t.truck_id} · ${t.license_plate || 'No plate'}`,
+    helper: t.truck_type,
+  })), [trucks]);
+
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
     { id: 'service-requests', label: 'Service Requests', icon: Inbox, roles: ['company', 'admin'] },
@@ -191,14 +173,13 @@ export default function WasteCompanyDashboard() {
 
   const filterText = (text: string) => text?.toLowerCase() || '';
   const filteredTrucks = trucks.filter((t) => filterText(t.truck_id).includes(searchFleet.toLowerCase()) || filterText(t.license_plate).includes(searchFleet.toLowerCase()) || filterText(t.driver_name).includes(searchFleet.toLowerCase()));
-  const filteredDrivers = drivers.filter((d) => filterText(d.full_name).includes(searchDrivers.toLowerCase()) || filterText(d.employee_id).includes(searchDrivers.toLowerCase()));
 
   const subtitle: Record<PageView, string> = {
     overview: 'Command deck',
     'service-requests': 'Onboarding queue',
     earnings: 'Treasury & settlements',
     fleet: selectedTruck ? 'Vehicle record' : 'Fleet management',
-    drivers: selectedDriver ? 'Driver record' : 'Crew management',
+    drivers: 'Crew management',
     buildings: 'Building registry',
     assignments: 'Dispatch center',
     issues: 'Issue management',
@@ -248,7 +229,7 @@ export default function WasteCompanyDashboard() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => { setActivePage(item.id as PageView); setSelectedDriver(null); setSelectedTruck(null); setSelectedZone(null); setSidebarOpen(false); }}
+                  onClick={() => { setActivePage(item.id as PageView); setSelectedTruck(null); setSelectedZone(null); setSidebarOpen(false); }}
                   className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   {isActive && <motion.span layoutId="navglow" className="absolute inset-0 -z-0 rounded-xl bg-emerald-600" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />}
@@ -272,7 +253,7 @@ export default function WasteCompanyDashboard() {
                 <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 lg:hidden"><Menu size={22} /></button>
                 <div>
                   <h1 className={`${display.className} text-xl font-black uppercase tracking-tight text-gray-900`}>
-                    {selectedDriver && activePage === 'drivers' ? 'Driver Profile' : selectedTruck && activePage === 'fleet' ? 'Truck Profile' : selectedZone && activePage === 'zones' ? 'Zone Detail' : navItems.find((n) => n.id === activePage)?.label}
+                    {selectedTruck && activePage === 'fleet' ? 'Truck Profile' : selectedZone && activePage === 'zones' ? 'Zone Detail' : navItems.find((n) => n.id === activePage)?.label}
                   </h1>
                   <p className="mt-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">{subtitle[activePage]}</p>
                 </div>
@@ -295,7 +276,7 @@ export default function WasteCompanyDashboard() {
             transition={{ duration: 0.5, ease: EASE }}
             className="relative mx-4 mt-4 overflow-hidden rounded-[22px] border border-emerald-200/70 bg-emerald-950 p-5 text-white shadow-xl shadow-emerald-950/20 sm:mx-6 sm:p-6 lg:mx-8"
           >
-            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 28px)' }} />
+            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 1px, transparent 1px 28px)' }} />
             <div aria-hidden className="pointer-events-none absolute -left-24 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
             <div aria-hidden className="pointer-events-none absolute right-6 top-1/2 hidden h-24 w-24 -translate-y-1/2 sm:block">
               <motion.div className="absolute inset-0 rounded-full" animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }} style={{ background: 'conic-gradient(from 0deg, rgba(110,231,183,0.35), transparent 35%)' }} />
@@ -354,14 +335,13 @@ export default function WasteCompanyDashboard() {
           )}
 
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
-            <motion.div key={activePage + (selectedDriver ? '-drv' : '') + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+            <motion.div key={activePage + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
               {activePage === 'earnings' && <FinancePage />}
               {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
               {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
-              {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
-              {activePage === 'drivers' && selectedDriver && <DriverProfile driver={selectedDriver} trucks={trucks} onBack={() => setSelectedDriver(null)} />}
+              {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
               {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
               {activePage === 'assignments' && <AssignmentsPage />}
               {activePage === 'issues' && <IssuesPage issues={issues} />}
@@ -382,7 +362,6 @@ export default function WasteCompanyDashboard() {
           </div>
         </main>
 
-        <AddDriverModal isOpen={showDriverModal} onClose={() => setShowDriverModal(false)} companyName={companyName} onSubmit={handleSaveDriver} />
         <AddTruckModal isOpen={showTruckModal} onClose={() => setShowTruckModal(false)} companyName={companyName} onSubmit={handleSaveTruck} />
 
         <ReviewDrawer />
@@ -397,7 +376,7 @@ function TruckProfile({ truck, onBack }: any) {
       <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-600 transition-all hover:text-emerald-600"><ArrowLeft size={18} /> Back to Fleet</button>
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
         <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-emerald-800 p-6 text-white">
-          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 26px)' }} />
+          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 1px, transparent 1px 26px)' }} />
           <div className="relative z-10 flex items-center gap-4">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm"><Truck className="h-8 w-8 text-white" /></div>
             <div>
@@ -422,49 +401,6 @@ function TruckProfile({ truck, onBack }: any) {
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p className="font-mono text-[10px] font-black uppercase tracking-wider text-emerald-600">Collections</p><p className={`${display.className} mt-1 text-3xl font-black text-emerald-700`}>{truck.collections_today || 0}</p></div>
               <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4"><p className="font-mono text-[10px] font-black uppercase tracking-wider text-sky-600">Efficiency</p><p className={`${display.className} mt-1 text-3xl font-black text-sky-700`}>98<span className="text-sm">%</span></p></div>
             </div>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function DriverProfile({ driver, trucks, onBack }: any) {
-  const assignedTruck = trucks.find((t: any) => t.driver_name === driver.full_name);
-  return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-600 transition-all hover:text-emerald-600"><ArrowLeft size={18} /> Back to Drivers</button>
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
-        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-emerald-800 p-6 text-white">
-          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 26px)' }} />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm"><span className={`${display.className} text-2xl font-black`}>{(driver.full_name || 'D').charAt(0).toUpperCase()}</span></div>
-            <div>
-              <h2 className={`${display.className} text-2xl font-black uppercase tracking-tight`}>{driver.full_name || 'Unknown Driver'}</h2>
-              <p className="flex items-center gap-2 text-sm font-bold text-emerald-100"><Hash size={14} /> {driver.employee_id}</p>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <h3 className="font-mono text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Personal Information</h3>
-            <div className="space-y-3">
-              <ProfileRow Icon={Users} tone="bg-emerald-50 text-emerald-600" label="Full Name" value={driver.full_name || 'Not provided'} />
-              <ProfileRow Icon={Mail} tone="bg-sky-50 text-sky-600" label="Email" value={driver.email || 'Not provided'} />
-              <ProfileRow Icon={Phone} tone="bg-emerald-50 text-emerald-600" label="Phone" value={driver.phone || 'Not provided'} />
-              <ProfileRow Icon={Hash} tone="bg-orange-50 text-orange-600" label="License Number" value={driver.license_number || 'Not provided'} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-mono text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Assigned Vehicle</h3>
-            {assignedTruck ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="mb-3 flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100"><Truck className="h-5 w-5 text-emerald-600" /></div><div><p className={`${display.className} text-sm font-black uppercase text-gray-900`}>{assignedTruck.truck_id}</p><p className="text-xs font-bold text-gray-500">{assignedTruck.license_plate}</p></div></div>
-                <div className="space-y-2 text-xs"><div className="flex justify-between"><span className="font-black uppercase text-gray-500">Type</span><span className="font-bold text-gray-900">{assignedTruck.truck_type}</span></div><div className="flex justify-between"><span className="font-black uppercase text-gray-500">Status</span><span className="font-bold text-emerald-600">{assignedTruck.status}</span></div></div>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-center"><Truck className="mx-auto mb-2 h-8 w-8 text-gray-400" /><p className="text-sm font-bold text-gray-500">No truck assigned</p></div>
-            )}
           </div>
         </div>
       </motion.div>
