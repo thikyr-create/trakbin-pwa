@@ -18,7 +18,7 @@ import NotificationsPanel from './components/NotificationsPanel';
 import OverviewPage from './components/OverviewPage';
 import FleetPage from './components/fleet/FleetPage';
 import DriversPage from './components/drivers/DriversPage';
-import BuildingsPage from './components/BuildingsPage';
+import BuildingsPage from './components/buildings/BuildingsPage';
 import AssignmentsPage from './components/AssignmentsPage';
 import IssuesPage from './components/IssuesPage';
 import AnalyticsPage from './components/AnalyticsPage';
@@ -162,7 +162,7 @@ export default function WasteCompanyDashboard() {
     earnings: 'Treasury & settlements',
     fleet: 'Fleet management',
     drivers: 'Crew management',
-    buildings: 'Building registry',
+    buildings: 'Service assets',
     assignments: 'Dispatch center',
     issues: 'Issue management',
     analytics: 'Performance analytics',
@@ -323,7 +323,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'earnings' && <FinancePage />}
               {activePage === 'fleet' && <FleetPage trucks={trucks} drivers={driverOptions} onRefetch={fetchData} />}
               {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
-              {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
+              {activePage === 'buildings' && <BuildingsPage />}
               {activePage === 'assignments' && <AssignmentsPage />}
               {activePage === 'issues' && <IssuesPage issues={issues} />}
               {activePage === 'analytics' && <AnalyticsPage />}
