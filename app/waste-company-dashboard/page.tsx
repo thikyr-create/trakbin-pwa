@@ -6,18 +6,17 @@ import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-  LayoutDashboard, Truck, Users, ClipboardList, CheckCircle2,
+  LayoutDashboard, Truck, Users, ClipboardList,
   AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut,
-  TrendingUp, Activity, Menu, X, Building2,
-  ArrowLeft, Hash, Inbox, Wallet, Radio, Radar,
+  Activity, Menu, X, Building2,
+  ArrowLeft, Inbox, Wallet, Radio, Radar,
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import AuthGate from './components/AuthGate';
 import NotificationsPanel from './components/NotificationsPanel';
-import AddTruckModal from './components/AddTruckModal';
 import OverviewPage from './components/OverviewPage';
-import FleetPage from './components/FleetPage';
+import FleetPage from './components/fleet/FleetPage';
 import DriversPage from './components/drivers/DriversPage';
 import BuildingsPage from './components/BuildingsPage';
 import AssignmentsPage from './components/AssignmentsPage';
@@ -64,7 +63,6 @@ export default function WasteCompanyDashboard() {
   const [companyId, setCompanyId] = useState<string>('');
   const [activePage, setActivePage] = useState<PageView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedTruck, setSelectedTruck] = useState<any>(null);
   const [selectedZone, setSelectedZone] = useState<any>(null);
 
   const [trucks, setTrucks] = useState<any[]>([]);
@@ -74,9 +72,6 @@ export default function WasteCompanyDashboard() {
   const [issues, setIssues] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
-  const [showTruckModal, setShowTruckModal] = useState(false);
-
-  const [searchFleet, setSearchFleet] = useState('');
 
   const {
     tenant, loadTenantContext,
@@ -127,22 +122,6 @@ export default function WasteCompanyDashboard() {
     finally { setLoading(false); }
   };
 
-  const generateTruckId = () => `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
-
-  const handleSaveTruck = async (formData: any) => {
-    let currentCompanyId = tenant.companyId;
-    if (!currentCompanyId) { const s = localStorage.getItem('trakbin_company'); if (s) currentCompanyId = JSON.parse(s).company_id ? Number(JSON.parse(s).company_id) : null; }
-    const truckId = generateTruckId();
-    try {
-      const { error } = await supabase.from('trucks').insert([{ truck_id: truckId, license_plate: formData.license_plate, driver_name: formData.driver_name, truck_type: formData.truck_type, capacity: formData.capacity, status: formData.status, company_name: companyName, company_id: currentCompanyId }]);
-      if (error) throw error;
-      addDispatchEvent({ type: 'truck_added', truck_id: truckId, driver_name: formData.driver_name || 'Unassigned', message: `New truck registered: ${truckId} (${formData.license_plate})` });
-      addNotification(`Truck ${truckId} registered successfully!`, 'success');
-      fetchData();
-      return { success: true, message: `✅ Truck Registered Successfully!\n\n Truck ID: ${truckId}`, truckId };
-    } catch (error: any) { addNotification(`Failed to register truck: ${error.message}`, 'error'); return { success: false, message: error.message }; }
-  };
-
   const onRoad = useMemo(() => liveFleet.filter((t) => t.status === 'on_route' || t.status === 'active').length, [liveFleet]);
   const pendingRequests = serviceRequests.length;
   const served = buildings.length;
@@ -153,6 +132,12 @@ export default function WasteCompanyDashboard() {
     label: `${t.truck_id} · ${t.license_plate || 'No plate'}`,
     helper: t.truck_type,
   })), [trucks]);
+
+  const driverOptions = useMemo(() => drivers.map((d) => ({
+    id: d.employee_id,
+    label: d.full_name || 'Unnamed driver',
+    helper: trucks.find((t) => t.current_driver === d.employee_id || t.driver_name === d.full_name)?.truck_id,
+  })), [drivers, trucks]);
 
   const allNavItems = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
@@ -171,14 +156,11 @@ export default function WasteCompanyDashboard() {
 
   const navItems = allNavItems.filter((item) => tenant.role === 'admin' || item.roles.includes(tenant.role || 'company'));
 
-  const filterText = (text: string) => text?.toLowerCase() || '';
-  const filteredTrucks = trucks.filter((t) => filterText(t.truck_id).includes(searchFleet.toLowerCase()) || filterText(t.license_plate).includes(searchFleet.toLowerCase()) || filterText(t.driver_name).includes(searchFleet.toLowerCase()));
-
   const subtitle: Record<PageView, string> = {
     overview: 'Command deck',
     'service-requests': 'Onboarding queue',
     earnings: 'Treasury & settlements',
-    fleet: selectedTruck ? 'Vehicle record' : 'Fleet management',
+    fleet: 'Fleet management',
     drivers: 'Crew management',
     buildings: 'Building registry',
     assignments: 'Dispatch center',
@@ -229,7 +211,7 @@ export default function WasteCompanyDashboard() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => { setActivePage(item.id as PageView); setSelectedTruck(null); setSelectedZone(null); setSidebarOpen(false); }}
+                  onClick={() => { setActivePage(item.id as PageView); setSelectedZone(null); setSidebarOpen(false); }}
                   className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   {isActive && <motion.span layoutId="navglow" className="absolute inset-0 -z-0 rounded-xl bg-emerald-600" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />}
@@ -253,7 +235,7 @@ export default function WasteCompanyDashboard() {
                 <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 lg:hidden"><Menu size={22} /></button>
                 <div>
                   <h1 className={`${display.className} text-xl font-black uppercase tracking-tight text-gray-900`}>
-                    {selectedTruck && activePage === 'fleet' ? 'Truck Profile' : selectedZone && activePage === 'zones' ? 'Zone Detail' : navItems.find((n) => n.id === activePage)?.label}
+                    {selectedZone && activePage === 'zones' ? 'Zone Detail' : navItems.find((n) => n.id === activePage)?.label}
                   </h1>
                   <p className="mt-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">{subtitle[activePage]}</p>
                 </div>
@@ -335,12 +317,11 @@ export default function WasteCompanyDashboard() {
           )}
 
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
-            <motion.div key={activePage + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+            <motion.div key={activePage + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
               {activePage === 'earnings' && <FinancePage />}
-              {activePage === 'fleet' && !selectedTruck && <FleetPage trucks={filteredTrucks} search={searchFleet} setSearch={setSearchFleet} setShowTruckModal={setShowTruckModal} onSelectTruck={setSelectedTruck} />}
-              {activePage === 'fleet' && selectedTruck && <TruckProfile truck={selectedTruck} onBack={() => setSelectedTruck(null)} />}
+              {activePage === 'fleet' && <FleetPage trucks={trucks} drivers={driverOptions} onRefetch={fetchData} />}
               {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
               {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
               {activePage === 'assignments' && <AssignmentsPage />}
@@ -362,57 +343,8 @@ export default function WasteCompanyDashboard() {
           </div>
         </main>
 
-        <AddTruckModal isOpen={showTruckModal} onClose={() => setShowTruckModal(false)} companyName={companyName} onSubmit={handleSaveTruck} />
-
         <ReviewDrawer />
       </div>
     </AuthGate>
-  );
-}
-
-function TruckProfile({ truck, onBack }: any) {
-  return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-600 transition-all hover:text-emerald-600"><ArrowLeft size={18} /> Back to Fleet</button>
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
-        <div className="relative overflow-hidden bg-gradient-to-r from-emerald-700 to-emerald-800 p-6 text-white">
-          <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 1px, transparent 1px 26px)' }} />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm"><Truck className="h-8 w-8 text-white" /></div>
-            <div>
-              <h2 className={`${display.className} text-2xl font-black uppercase tracking-tight`}>{truck.truck_id || 'Unknown Truck'}</h2>
-              <p className="flex items-center gap-2 text-sm font-bold text-emerald-100"><Hash size={14} /> {truck.license_plate || 'No Plate'}</p>
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <h3 className="font-mono text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Vehicle Details</h3>
-            <div className="space-y-3">
-              <ProfileRow Icon={Users} tone="bg-emerald-50 text-emerald-600" label="Assigned Driver" value={truck.driver_name || 'Unassigned'} />
-              <ProfileRow Icon={Truck} tone="bg-violet-50 text-violet-600" label="Truck Type" value={truck.truck_type || 'N/A'} />
-              <ProfileRow Icon={TrendingUp} tone="bg-orange-50 text-orange-600" label="Capacity" value={truck.capacity || 'N/A'} />
-              <ProfileRow Icon={CheckCircle2} tone="bg-emerald-50 text-emerald-600" label="Status" value={(truck.status || 'Idle').toUpperCase()} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            <h3 className="font-mono text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Performance</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p className="font-mono text-[10px] font-black uppercase tracking-wider text-emerald-600">Collections</p><p className={`${display.className} mt-1 text-3xl font-black text-emerald-700`}>{truck.collections_today || 0}</p></div>
-              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4"><p className="font-mono text-[10px] font-black uppercase tracking-wider text-sky-600">Efficiency</p><p className={`${display.className} mt-1 text-3xl font-black text-sky-700`}>98<span className="text-sm">%</span></p></div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function ProfileRow({ Icon, tone, label, value }: { Icon: typeof Users; tone: string; label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tone}`}><Icon className="h-4 w-4" /></div>
-      <div><p className="font-mono text-[10px] font-black uppercase tracking-wider text-gray-400">{label}</p><p className="text-sm font-bold text-gray-900">{value}</p></div>
-    </div>
   );
 }
