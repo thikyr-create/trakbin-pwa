@@ -363,7 +363,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'drivers' && !selectedDriver && <DriversPage drivers={filteredDrivers} search={searchDrivers} setSearch={setSearchDrivers} setShowDriverModal={setShowDriverModal} onSelectDriver={setSelectedDriver} />}
               {activePage === 'drivers' && selectedDriver && <DriverProfile driver={selectedDriver} trucks={trucks} onBack={() => setSelectedDriver(null)} />}
               {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
-              {activePage === 'assignments' && <AssignmentsPage trucks={trucks} drivers={drivers} />}
+              {activePage === 'assignments' && <AssignmentsPage />}
               {activePage === 'issues' && <IssuesPage issues={issues} />}
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
