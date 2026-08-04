@@ -181,8 +181,8 @@ export default function BuildingDetailsDrawer({
                         <BuildingMapPreview
                           latitude={detail.latitude}
                           longitude={detail.longitude}
-                          zone={null}
-                          routeGeometry={null}
+                          zone={detail.zone_geo}
+                          routeGeometry={detail.route_geometry}
                           issues={detail.issues}
                         />
                         <QuickActions
