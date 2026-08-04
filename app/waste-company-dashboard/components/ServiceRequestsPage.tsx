@@ -1,109 +1,126 @@
 "use client";
-import { useEffect } from 'react';
-import { Inbox, Clock, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
+
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
+import { Inbox, MapPin, Building2, CheckCircle2, X, Loader2, Globe, CalendarClock } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
+const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
+const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
+const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export default function ServiceRequestsPage() {
-  const { serviceRequests, fetchServiceRequests, setSelectedRequest, setIsDrawerOpen } = useCompanySession();
+  const { tenant, serviceRequests, activateService, addNotification } = useCompanySession();
+  const [zones, setZones] = useState<any[]>([]);
+  const [reviewing, setReviewing] = useState<any>(null);
+  const [zoneId, setZoneId] = useState('');
+  const [frequency, setFrequency] = useState('weekly');
+  const [days, setDays] = useState<string[]>(['Mon']);
+  const [timeWindow, setTimeWindow] = useState('08:00 AM – 11:00 AM');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchServiceRequests();
-  }, []);
+    const cid = tenant.companyId; if (!cid) return;
+    supabase.from('company_zones').select('*').eq('company_id', cid).eq('is_active', true).then(({ data }) => setZones(data || []));
+  }, [tenant.companyId]);
 
-  const handleReview = (request: any) => {
-    setSelectedRequest(request);
-    setIsDrawerOpen(true);
+  const toggleDay = (d: string) => setDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]);
+
+  const approve = async () => {
+    if (!reviewing) return;
+    if (!zoneId) { addNotification('Select one of your zones first.', 'warning'); return; }
+    if (days.length === 0) { addNotification('Pick at least one pickup day.', 'warning'); return; }
+    setSaving(true);
+    await activateService(reviewing.id, zoneId, { frequency, days, timeWindow });
+    setSaving(false); setReviewing(null);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Stats Header */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-amber-50 rounded-xl"><Inbox className="w-6 h-6 text-amber-600" /></div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Pending Queue</p>
-            <p className="text-2xl font-black text-gray-900">{serviceRequests.length}</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-green-50 rounded-xl"><CheckCircle2 className="w-6 h-6 text-green-600" /></div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Activated Today</p>
-            <p className="text-2xl font-black text-gray-900">0</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 rounded-xl"><Clock className="w-6 h-6 text-blue-600" /></div>
-          <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">Avg Response Time</p>
-            <p className="text-2xl font-black text-gray-900">--</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Queue Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">Service Request Queue</h2>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search Building ID..." className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 outline-none" />
-            </div>
-            <button className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-100 flex items-center gap-2">
-              <Filter size={14} /> Filter
-            </button>
-          </div>
+    <div className="space-y-4">
+      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="overflow-hidden rounded-[24px] border border-gray-200/80 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-5">
+          <h3 className={`${display.className} flex items-center gap-2 text-lg font-extrabold tracking-tight text-gray-900`}><Inbox className="h-5 w-5 text-emerald-600" /> Onboarding queue</h3>
+          <span className={`${mono.className} text-[11px] font-bold uppercase tracking-wider text-gray-400`}>{serviceRequests.length} pending</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-              <tr>
-                <th className="px-6 py-4">Building ID</th>
-                <th className="px-6 py-4">Address</th>
-                <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Submitted</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {serviceRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                    <Inbox className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                    No pending service requests.
-                  </td>
-                </tr>
+        {serviceRequests.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <Inbox className="mx-auto h-8 w-8 text-gray-300" />
+            <p className="mt-3 text-sm font-bold text-gray-700">No pending service requests</p>
+            <p className="mx-auto mt-1 max-w-xs text-xs text-gray-400">When a caretaker in one of your zones registers, the request lands here for approval.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {serviceRequests.map((r: any, i: number) => (
+              <motion.li key={r.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: i * 0.04, ease: EASE }} className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"><Building2 className="h-5 w-5" /></span>
+                  <div>
+                    <p className="flex items-center gap-2 text-sm font-extrabold text-gray-900">{r.building_id}
+                      <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ring-1 ${r.status === 'auto_assigned' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200'}`}>{r.status === 'auto_assigned' ? 'matched to you' : 'pending'}</span>
+                    </p>
+                    <p className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-gray-500"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {r.buildings?.address || 'Address on file'}</p>
+                  </div>
+                </div>
+                <motion.button whileTap={{ scale: 0.96 }} onClick={() => { setReviewing(r); setZoneId(zones[0]?.id || ''); }} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-200 hover:bg-emerald-700">Review & activate</motion.button>
+              </motion.li>
+            ))}
+          </ul>
+        )}
+      </motion.section>
+
+      {/* approval sheet */}
+      <AnimatePresence>
+        {reviewing && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1100] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => !saving && setReviewing(null)}>
+            <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 24, opacity: 0 }} transition={{ duration: 0.3, ease: EASE }} onClick={(e) => e.stopPropagation()} className={`${body.className} w-full max-w-md rounded-t-[24px] bg-white p-6 shadow-2xl sm:rounded-[24px]`}>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>Activate {reviewing.building_id}</h3>
+                <button onClick={() => setReviewing(null)} className="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"><X size={18} /></button>
+              </div>
+
+              {zones.length === 0 ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">You have no active zones yet — add one under Zones before activating buildings.</p>
               ) : (
-                serviceRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-bold text-green-600">{req.building_id}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">{req.buildings?.address || 'Unknown Address'}</td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-bold rounded-md uppercase">
-                        {req.buildings?.building_type || 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(req.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => handleReview(req)}
-                        className="px-4 py-2 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 transition-all"
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                <div className="space-y-4">
+                  <div>
+                    <label className={`${mono.className} mb-1.5 flex items-center gap-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`}><Globe className="h-3 w-3" /> Zone</label>
+                    <select value={zoneId} onChange={(e) => setZoneId(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
+                      {zones.map((z) => (<option key={z.id} value={z.id}>{z.zone_name}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`${mono.className} mb-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`}>Frequency</label>
+                    <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200">
+                      <option value="daily">Daily</option><option value="weekly">Weekly</option><option value="twice">Twice weekly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`${mono.className} mb-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`}>Pickup days</label>
+                    <div className="flex flex-wrap gap-2">
+                      {DAYS.map((d) => (
+                        <button key={d} onClick={() => toggleDay(d)} className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${days.includes(d) ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{d}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`${mono.className} mb-1.5 flex items-center gap-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400`}><CalendarClock className="h-3 w-3" /> Time window</label>
+                    <input value={timeWindow} onChange={(e) => setTimeWindow(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
+                  </div>
+                  <motion.button whileTap={{ scale: 0.98 }} onClick={approve} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
+                    {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />} Activate service
+                  </motion.button>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

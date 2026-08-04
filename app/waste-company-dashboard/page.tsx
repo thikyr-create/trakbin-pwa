@@ -6,11 +6,10 @@ import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-  LayoutDashboard, Truck, Users, MapPin, ClipboardList, CheckCircle2,
-  AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut, Plus,
-  TrendingUp, Clock, Navigation, Phone, Activity, Menu, X, Map, Building2,
-  ArrowLeft, Mail, Hash, Save, Search, Inbox, Wallet, Radio, ShieldCheck,
-  Radar,
+  LayoutDashboard, Truck, Users, ClipboardList, CheckCircle2,
+  AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut,
+  TrendingUp, Phone, Activity, Menu, X, Building2,
+  ArrowLeft, Mail, Hash, Inbox, Wallet, Radio, Radar,
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
@@ -23,8 +22,6 @@ import FleetPage from './components/FleetPage';
 import DriversPage from './components/DriversPage';
 import BuildingsPage from './components/BuildingsPage';
 import AssignmentsPage from './components/AssignmentsPage';
-import MissionMapPage from './components/MissionMapPage';
-import VerificationPage from './components/VerificationPage';
 import IssuesPage from './components/IssuesPage';
 import AnalyticsPage from './components/AnalyticsPage';
 import MaintenancePage from './components/MaintenancePage';
@@ -46,8 +43,8 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 type PageView =
-  | 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments' | 'mission'
-  | 'verification' | 'issues' | 'analytics' | 'maintenance' | 'zones'
+  | 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments'
+  | 'issues' | 'analytics' | 'maintenance' | 'zones'
   | 'settings' | 'service-requests' | 'earnings';
 
 function Counter({ value, prefix = '', duration = 1.1 }: { value: number; prefix?: string; duration?: number }) {
@@ -101,7 +98,7 @@ export default function WasteCompanyDashboard() {
 
     loadTenantContext();
 
-    if (tenant.role === 'driver') { router.push('/driver-dashboard'); return; }
+    if (tenant.role === 'driver') { router.push('/hauler-dashboard'); return; }
 
     const t = setTimeout(() => { fetchData(); }, 400);
     const cleanup = subscribeToRealtime();
@@ -140,7 +137,6 @@ export default function WasteCompanyDashboard() {
   const handleSaveDriver = async (formData: any) => {
     let currentCompanyId = tenant.companyId;
     if (!currentCompanyId) { const s = localStorage.getItem('trakbin_company'); if (s) currentCompanyId = JSON.parse(s).company_id ? Number(JSON.parse(s).company_id) : null; }
-    // verification gate — email + profile certify; documents do NOT gate.
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', currentCompanyId).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { addNotification('Confirm your email and complete your profile before adding drivers.', 'warning'); return { success: false, message: 'Verification required' }; }
     const employeeId = generateEmployeeId();
@@ -171,7 +167,6 @@ export default function WasteCompanyDashboard() {
     } catch (error: any) { addNotification(`Failed to register truck: ${error.message}`, 'error'); return { success: false, message: error.message }; }
   };
 
-  // ── command-strip metrics, all real, all live ─────────────────────────
   const onRoad = useMemo(() => liveFleet.filter((t) => t.status === 'on_route' || t.status === 'active').length, [liveFleet]);
   const pendingRequests = serviceRequests.length;
   const served = buildings.length;
@@ -185,8 +180,6 @@ export default function WasteCompanyDashboard() {
     { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
     { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
     { id: 'assignments', label: 'Assignments', icon: ClipboardList, roles: ['company', 'admin'] },
-    { id: 'mission', label: 'Mission Map', icon: Map, roles: ['company', 'admin'] },
-    { id: 'verification', label: 'Verification', icon: CheckCircle2, roles: ['company', 'admin', 'government'] },
     { id: 'issues', label: 'Issues', icon: AlertTriangle, roles: ['company', 'admin', 'government', 'caretaker'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['company', 'admin', 'government'] },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['company', 'admin'] },
@@ -208,8 +201,6 @@ export default function WasteCompanyDashboard() {
     drivers: selectedDriver ? 'Driver record' : 'Crew management',
     buildings: 'Building registry',
     assignments: 'Dispatch center',
-    mission: 'Live operations map',
-    verification: 'Collection verification',
     issues: 'Issue management',
     analytics: 'Performance analytics',
     maintenance: 'Fleet maintenance',
@@ -227,7 +218,6 @@ export default function WasteCompanyDashboard() {
   return (
     <AuthGate>
       <div className={`${body.className} relative min-h-screen bg-[#f6f7f6] text-gray-900`}>
-        {/* ambient field */}
         <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute inset-0 opacity-[0.5]" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.09) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
           <div className="absolute inset-x-0 top-0 h-80 bg-gradient-to-b from-emerald-50/70 via-emerald-50/20 to-transparent" />
@@ -238,7 +228,6 @@ export default function WasteCompanyDashboard() {
 
         {sidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
 
-        {/* sidebar */}
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
           <div className="flex items-center justify-between border-b border-gray-100 p-4">
             <div className="flex items-center gap-3">
@@ -277,7 +266,6 @@ export default function WasteCompanyDashboard() {
         </aside>
 
         <main className="relative z-10 flex min-w-0 flex-col lg:pl-64">
-          {/* header */}
           <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-30 border-b border-gray-200/70 bg-[#f6f7f6]/85 px-4 py-3 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -299,7 +287,8 @@ export default function WasteCompanyDashboard() {
             </div>
           </motion.header>
 
-          {/* ── COMMAND STRIP — the company's live posture, on every screen ── */}
+          {/* ── COMMAND STRIP — overview only ── */}
+          {activePage === 'overview' && (
           <motion.section
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -308,7 +297,6 @@ export default function WasteCompanyDashboard() {
           >
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]" style={{ backgroundImage: 'repeating-radial-gradient(circle at 100% 0%, rgba(255,255,255,0.5) 0 1px, transparent 1px 28px)' }} />
             <div aria-hidden className="pointer-events-none absolute -left-24 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-emerald-500/20 blur-3xl" />
-            {/* slow radar sweep */}
             <div aria-hidden className="pointer-events-none absolute right-6 top-1/2 hidden h-24 w-24 -translate-y-1/2 sm:block">
               <motion.div className="absolute inset-0 rounded-full" animate={{ rotate: 360 }} transition={{ duration: 6, repeat: Infinity, ease: 'linear' }} style={{ background: 'conic-gradient(from 0deg, rgba(110,231,183,0.35), transparent 35%)' }} />
               <div className="absolute inset-2 rounded-full border border-emerald-300/20" />
@@ -318,7 +306,6 @@ export default function WasteCompanyDashboard() {
             <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/60 to-transparent" />
 
             <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              {/* mission status block */}
               <div className="flex items-center gap-4">
                 <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15">
                   <Radar className="h-6 w-6 text-emerald-200" />
@@ -337,7 +324,6 @@ export default function WasteCompanyDashboard() {
                 </div>
               </div>
 
-              {/* live metrics */}
               <motion.div variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }} initial="hidden" animate="show" className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:items-stretch lg:gap-2">
                 {deckStats.map((s) => {
                   const Icon = s.Icon;
@@ -353,7 +339,6 @@ export default function WasteCompanyDashboard() {
                     </motion.div>
                   );
                 })}
-                {/* treasury — distinct, the money posture */}
                 <motion.div variants={deckCell} className="col-span-2 flex items-center justify-between rounded-2xl bg-emerald-400/15 px-3.5 py-2.5 ring-1 ring-emerald-300/30 sm:col-span-4 lg:col-span-1">
                   <div>
                     <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-200/70"><Wallet className="h-3 w-3" /> Treasury</p>
@@ -366,8 +351,8 @@ export default function WasteCompanyDashboard() {
               </motion.div>
             </div>
           </motion.section>
+          )}
 
-          {/* content */}
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
             <motion.div key={activePage + (selectedDriver ? '-drv' : '') + (selectedTruck ? '-trk' : '') + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
@@ -379,8 +364,6 @@ export default function WasteCompanyDashboard() {
               {activePage === 'drivers' && selectedDriver && <DriverProfile driver={selectedDriver} trucks={trucks} onBack={() => setSelectedDriver(null)} />}
               {activePage === 'buildings' && <BuildingsPage buildings={buildings} />}
               {activePage === 'assignments' && <AssignmentsPage trucks={trucks} drivers={drivers} />}
-              {activePage === 'mission' && <MissionMapPage buildings={buildings} />}
-              {activePage === 'verification' && <VerificationPage />}
               {activePage === 'issues' && <IssuesPage issues={issues} />}
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
