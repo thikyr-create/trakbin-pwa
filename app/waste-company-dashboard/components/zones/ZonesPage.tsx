@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, MapPin, Building2, Zap, Layers } from "lucide-react";
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
@@ -9,6 +9,8 @@ import type { ZoneRecord } from "@/lib/features/zones/services/zoneService";
 import ZoneTable from "./ZoneTable";
 import ZoneDetailsDrawer from "./ZoneDetailsDrawer";
 import CreateZoneModal from "./CreateZoneModal";
+import EditZoneModal from "./EditZoneModal";
+import ZoneSearch from "./ZoneSearch";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const body = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
@@ -16,10 +18,24 @@ const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function ZonesPage() {
-  const { zones, loading, error, createZone, deleteZone, toggleZone } = useZones();
+  const { zones, loading, error, createZone, updateZone, deleteZone, toggleZone } = useZones();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingZone, setEditingZone] = useState<ZoneRecord | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+
+  const filteredZones = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return zones;
+    return zones.filter(
+      (z) =>
+        (z.zone_name || "").toLowerCase().includes(q) ||
+        (z.estates || []).some((e) => e.toLowerCase().includes(q)) ||
+        (z.streets || []).some((s) => s.toLowerCase().includes(q)) ||
+        (z.addresses || []).some((a) => a.toLowerCase().includes(q))
+    );
+  }, [zones, search]);
 
   const totalBuildings = zones.reduce((s, z) => s + z.building_count, 0);
   const activeZones = zones.filter((z) => z.is_active !== false).length;
@@ -33,6 +49,7 @@ export default function ZonesPage() {
   ];
 
   const handleView = (zone: ZoneRecord) => setSelectedZoneId(zone.id);
+  const handleEdit = (zone: ZoneRecord) => setEditingZone(zone);
 
   const handleToggle = async (zone: ZoneRecord) => {
     setBusyId(zone.id);
@@ -96,6 +113,9 @@ export default function ZonesPage() {
         })}
       </div>
 
+      {/* Search */}
+      <ZoneSearch value={search} onChange={setSearch} />
+
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">
           {error}
@@ -107,8 +127,9 @@ export default function ZonesPage() {
         <div className="h-64 animate-pulse rounded-[24px] bg-gray-200/60" />
       ) : (
         <ZoneTable
-          zones={zones}
+          zones={filteredZones}
           onView={handleView}
+          onEdit={handleEdit}
           onToggle={handleToggle}
           onDelete={handleDelete}
           busyId={busyId}
@@ -121,6 +142,12 @@ export default function ZonesPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreate={createZone}
+      />
+      <EditZoneModal
+        open={!!editingZone}
+        zone={editingZone}
+        onClose={() => setEditingZone(null)}
+        onUpdate={updateZone}
       />
     </div>
   );

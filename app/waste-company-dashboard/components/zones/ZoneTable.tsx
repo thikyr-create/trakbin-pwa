@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { MapPin, Eye, Trash2, Power, Radius } from "lucide-react";
+import { MapPin, Eye, Trash2, Power, Radius, Pencil } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { ZoneRecord } from "@/lib/features/zones/services/zoneService";
 
@@ -12,6 +12,7 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 interface ZoneTableProps {
   zones: ZoneRecord[];
   onView: (zone: ZoneRecord) => void;
+  onEdit: (zone: ZoneRecord) => void;
   onToggle: (zone: ZoneRecord) => void;
   onDelete: (zone: ZoneRecord) => void;
   busyId?: string | null;
@@ -27,6 +28,7 @@ function formatDate(value?: string | null): string {
 export default function ZoneTable({
   zones,
   onView,
+  onEdit,
   onToggle,
   onDelete,
   busyId,
@@ -140,10 +142,18 @@ export default function ZoneTable({
                         <Eye size={15} />
                       </button>
                       <button
+                        onClick={() => onEdit(z)}
+                        disabled={busy}
+                        title="Edit zone"
+                        className="rounded-lg p-2 text-gray-400 transition hover:bg-sky-50 hover:text-sky-600 disabled:opacity-40"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
                         onClick={() => onToggle(z)}
                         disabled={busy}
                         title={isActive ? "Deactivate zone" : "Activate zone"}
-                        className="rounded-lg p-2 text-gray-400 transition hover:bg-sky-50 hover:text-sky-600 disabled:opacity-40"
+                        className="rounded-lg p-2 text-gray-400 transition hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"
                       >
                         <Power size={15} />
                       </button>
