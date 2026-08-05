@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Download } from "lucide-react";
 import { Plus_Jakarta_Sans } from "next/font/google";
@@ -13,6 +14,7 @@ import FleetSnapshotChart from "./FleetSnapshotChart";
 import BuildingGrowthChart from "./BuildingGrowthChart";
 import DriverPerformanceTable from "./DriverPerformanceTable";
 import InsightsSection from "./InsightsSection";
+import ExportReportModal from "./ExportReportModal";
 
 const body = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -32,33 +34,9 @@ export default function AnalyticsPage() {
     insights,
   } = useAnalytics();
 
+  const [showExport, setShowExport] = useState(false);
+
   const executionGap = (data?.plannedRuns ?? 0) === 0;
-
-  const exportCsv = () => {
-    if (!kpis) return;
-
-    const rows: Array<Array<string | number>> = [
-      ["Metric", "Value"],
-      ["Period preset", preset],
-      ["Buildings served", kpis.buildingsServed],
-      ["Collections completed", executionGap ? "no execution data" : kpis.collectionsCompleted],
-      ["Collection success rate %", kpis.collectionSuccessRate ?? "no runs to measure"],
-      ["Revenue (period)", kpis.revenue],
-      ["Outstanding", kpis.outstanding],
-      ["Active drivers", kpis.activeDrivers],
-      ["Fleet utilization %", kpis.fleetUtilization],
-      ["Issue reports", kpis.issueReports],
-    ];
-
-    const csv = rows.map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `trakbin-analytics-${preset}-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className={`${body.className} space-y-5`}>
@@ -71,12 +49,12 @@ export default function AnalyticsPage() {
       >
         <AnalyticsFilters preset={preset} onChange={setPreset} />
         <button
-          onClick={exportCsv}
+          onClick={() => setShowExport(true)}
           disabled={!kpis}
           className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:ring-emerald-300 disabled:opacity-50"
         >
           <Download size={14} />
-          Export CSV
+          Export reports
         </button>
       </motion.div>
 
@@ -190,6 +168,15 @@ export default function AnalyticsPage() {
           <InsightsSection insights={insights} />
         )}
       </motion.div>
+
+      <ExportReportModal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        kpis={kpis}
+        preset={preset}
+        invoices={data?.invoices ?? []}
+        drivers={data?.drivers ?? []}
+      />
     </div>
   );
 }
