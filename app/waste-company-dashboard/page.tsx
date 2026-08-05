@@ -23,7 +23,7 @@ import AssignmentsPage from './components/AssignmentsPage';
 import IssuesPage from './components/IssuesPage';
 import AnalyticsPage from './components/analytics/AnalyticsPage';
 import MaintenancePage from './components/MaintenancePage';
-import ZonesPage from './components/ZonesPage';
+import ZonesPage from './components/zones/ZonesPage';
 import ZoneDetailsPage from './components/ZoneDetailsPage';
 import SettingsPage from './components/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
