@@ -58,7 +58,6 @@ export async function fetchZones(company_id: number): Promise<ZoneRecord[]> {
     return [];
   }
 
-  // One query for all membership, grouped by zone name (Option A matching)
   const { data: assignments } = await supabase
     .from('service_assignments')
     .select('zone_id, service_status')
@@ -187,6 +186,42 @@ export async function createZone(
       addresses: payload.addresses || [],
     },
   ]);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Updates only the SAFE fields of a zone.
+ * zone_name is deliberately NOT editable here: under Option A it is the
+ * join key to service_assignments.zone_id — renaming would orphan buildings.
+ */
+export async function updateZone(
+  zone_id: string,
+  payload: {
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
+    is_active?: boolean;
+    estates?: string[];
+    streets?: string[];
+    addresses?: string[];
+  }
+): Promise<{ ok: boolean; error?: string }> {
+  const patch: Record<string, unknown> = {};
+
+  if (payload.center_lat !== undefined) patch.center_lat = payload.center_lat;
+  if (payload.center_lng !== undefined) patch.center_lng = payload.center_lng;
+  if (payload.radius_km !== undefined) patch.radius_km = payload.radius_km;
+  if (payload.is_active !== undefined) patch.is_active = payload.is_active;
+  if (payload.estates !== undefined) patch.estates = payload.estates;
+  if (payload.streets !== undefined) patch.streets = payload.streets;
+  if (payload.addresses !== undefined) patch.addresses = payload.addresses;
+
+  const { error } = await supabase
+    .from('company_zones')
+    .update(patch)
+    .eq('id', zone_id);
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
