@@ -62,7 +62,7 @@ export default function WasteCompanyDashboard() {
   const [companyId, setCompanyId] = useState<string>('');
   const [activePage, setActivePage] = useState<PageView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedZone, setSelectedZone] = useState<any>(null);
+  
 
   const [trucks, setTrucks] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -166,7 +166,7 @@ export default function WasteCompanyDashboard() {
     issues: 'Issue management',
     analytics: 'Performance analytics',
     maintenance: 'Fleet maintenance',
-    zones: selectedZone ? 'Zone detail' : 'Zone management',
+    zones: 'Zone management',
     settings: 'Company settings',
   };
 
@@ -210,7 +210,7 @@ export default function WasteCompanyDashboard() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => { setActivePage(item.id as PageView); setSelectedZone(null); setSidebarOpen(false); }}
+                  onClick={() => { setActivePage(item.id as PageView); setSidebarOpen(false); }}
                   className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide transition-all ${isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-600 hover:bg-gray-100'}`}
                 >
                   {isActive && <motion.span layoutId="navglow" className="absolute inset-0 -z-0 rounded-xl bg-emerald-600" transition={{ type: 'spring', stiffness: 380, damping: 30 }} />}
@@ -234,7 +234,7 @@ export default function WasteCompanyDashboard() {
                 <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 lg:hidden"><Menu size={22} /></button>
                 <div>
                   <h1 className={`${display.className} text-xl font-black uppercase tracking-tight text-gray-900`}>
-                    {selectedZone && activePage === 'zones' ? 'Zone Detail' : navItems.find((n) => n.id === activePage)?.label}
+                    {navItems.find((n) => n.id === activePage)?.label}
                   </h1>
                   <p className="mt-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">{subtitle[activePage]}</p>
                 </div>
@@ -316,7 +316,7 @@ export default function WasteCompanyDashboard() {
           )}
 
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
-            <motion.div key={activePage + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
+            <motion.div key={activePage} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
               {activePage === 'earnings' && <FinancePage onNavigateToBuildings={() => setActivePage('buildings')} />}
