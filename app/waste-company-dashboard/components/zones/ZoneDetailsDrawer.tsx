@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Building2, CalendarDays, Search, Globe, Radius } from "lucide-react";
+import { X, MapPin, Building2, CalendarDays, Search, Globe } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { useZoneDetail } from "@/lib/features/zones/hooks/useZones";
 import BuildingStatusBadge from "../buildings/BuildingStatusBadge";
+import ZoneMap from "./ZoneMap";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -166,44 +167,44 @@ export default function ZoneDetailsDrawer({ zoneId, onClose }: ZoneDetailsDrawer
                           ))}
                         </div>
 
-                        {/* Coverage */}
+                        {/* Live zone map */}
+                        <ZoneMap zone={detail.zone} buildings={detail.buildings} />
+
+                        {/* Service area arrays */}
                         <div className="rounded-2xl border border-gray-100 bg-white p-4">
                           <p className={`${mono.className} mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400`}>
-                            <Globe size={12} /> Coverage definition
+                            <Globe size={12} /> Service area definition
                           </p>
-
-                          {detail.zone.center_lat != null && detail.zone.center_lng != null ? (
-                            <p className="text-xs font-semibold text-gray-700">
-                              Center {Number(detail.zone.center_lat).toFixed(4)}, {Number(detail.zone.center_lng).toFixed(4)}
-                              {detail.zone.radius_km != null && (
-                                <span className="ml-2 inline-flex items-center gap-1 text-gray-500">
-                                  <Radius size={11} /> {Number(detail.zone.radius_km).toFixed(1)} km
-                                </span>
-                              )}
-                            </p>
-                          ) : (
-                            <p className="text-xs font-semibold text-gray-400">No geographic center set</p>
-                          )}
 
                           {[
                             { label: "Estates", items: detail.zone.estates },
                             { label: "Streets", items: detail.zone.streets },
                             { label: "Addresses", items: detail.zone.addresses },
-                          ].map((g) =>
-                            g.items && g.items.length > 0 ? (
-                              <div key={g.label} className="mt-3">
-                                <p className={`${mono.className} mb-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-400`}>
-                                  {g.label} ({g.items.length})
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {g.items.map((item, i) => (
-                                    <span key={i} className="rounded-full bg-gray-50 px-2.5 py-1 text-[10px] font-semibold text-gray-600 ring-1 ring-gray-200">
-                                      {item}
-                                    </span>
-                                  ))}
+                          ].every((g) => !g.items || g.items.length === 0) ? (
+                            <p className="text-xs font-semibold text-gray-400">
+                              No estates, streets, or addresses listed for this zone.
+                            </p>
+                          ) : (
+                            [
+                              { label: "Estates", items: detail.zone.estates },
+                              { label: "Streets", items: detail.zone.streets },
+                              { label: "Addresses", items: detail.zone.addresses },
+                            ].map((g) =>
+                              g.items && g.items.length > 0 ? (
+                                <div key={g.label} className="mt-3 first:mt-0">
+                                  <p className={`${mono.className} mb-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-400`}>
+                                    {g.label} ({g.items.length})
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {g.items.map((item, i) => (
+                                      <span key={i} className="rounded-full bg-gray-50 px-2.5 py-1 text-[10px] font-semibold text-gray-600 ring-1 ring-gray-200">
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                            ) : null
+                              ) : null
+                            )
                           )}
                         </div>
                       </div>
