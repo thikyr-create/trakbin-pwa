@@ -15,9 +15,13 @@ import PayoutRequestSheet from '../PayoutRequestSheet';
 import CompanyRecipientSheet from '../CompanyRecipientSheet';
 import RevenueCards from './RevenueCards';
 import RevenueChart from './RevenueChart';
+import PaymentMethodChart from './PaymentMethodChart';
 import OutstandingBillsTable from './OutstandingBillsTable';
 import RecentTransactions from './RecentTransactions';
 import TransactionDetailsDrawer from './TransactionDetailsDrawer';
+import InvoicesSection from './InvoicesSection';
+import FinanceSearch from './FinanceSearch';
+import FinanceFilters from './FinanceFilters';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -51,6 +55,11 @@ export default function FinancePage({ onNavigateToBuildings }: FinancePageProps)
   const [releasing, setReleasing] = useState<Record<string, boolean>>({});
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
+  // Transaction feed controls
+  const [txSearch, setTxSearch] = useState('');
+  const [txType, setTxType] = useState('all');
+  const [txStatus, setTxStatus] = useState('all');
+
   useEffect(() => { fetchEarnings(); }, []);
 
   const available = earnings?.available ?? 0;
@@ -59,6 +68,31 @@ export default function FinancePage({ onNavigateToBuildings }: FinancePageProps)
   const lifetime = earnings?.lifetime ?? 0;
   const platformPaid = settlements.reduce((s: number, t: any) => s + (Number(t.commission) || 0), 0);
   const queued = useMemo(() => payouts.filter((p: any) => p.status === 'requested'), [payouts]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!overview) return [];
+    let list = overview.transactions;
+
+    if (txType !== 'all') list = list.filter((t) => t.type === txType);
+    if (txStatus !== 'all') list = list.filter((t) => t.status === txStatus);
+
+    const q = txSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) =>
+        (t.building_id || '').toLowerCase().includes(q) ||
+        (t.building_address || '').toLowerCase().includes(q) ||
+        (t.reference || '').toLowerCase().includes(q) ||
+        (t.provider || '').toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [overview, txType, txStatus, txSearch]);
+
+  const filterActiveCount =
+    (txType !== 'all' ? 1 : 0) +
+    (txStatus !== 'all' ? 1 : 0) +
+    (txSearch.trim() ? 1 : 0);
 
   const release = async (id: string) => {
     setReleasing((r) => ({ ...r, [id]: true }));
@@ -81,17 +115,38 @@ export default function FinancePage({ onNavigateToBuildings }: FinancePageProps)
       {/* ── Revenue cards ── */}
       <RevenueCards overview={overview} available={available} loading={financeLoading} />
 
-      {/* ── Revenue graph ── */}
-      {!financeLoading && overview && <RevenueChart series={overview.monthlyRevenue} />}
+      {/* ── Charts: revenue + payment methods ── */}
+      {!financeLoading && overview && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-3"><RevenueChart series={overview.monthlyRevenue} /></div>
+          <div className="lg:col-span-2"><PaymentMethodChart /></div>
+        </div>
+      )}
 
       {/* ── Outstanding bills ── */}
       {!financeLoading && overview && (
         <OutstandingBillsTable bills={overview.outstandingBills} onViewBuilding={onNavigateToBuildings ? () => onNavigateToBuildings() : undefined} />
       )}
 
-      {/* ── Recent transactions ── */}
+      {/* ── Invoices (Billing Engine) ── */}
+      <InvoicesSection />
+
+      {/* ── Recent transactions + controls ── */}
       {!financeLoading && overview && (
-        <RecentTransactions transactions={overview.transactions} onOpenTransaction={(tx) => setSelectedTx(tx)} />
+        <div className="space-y-3">
+          <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <FinanceSearch value={txSearch} onChange={setTxSearch} />
+            <FinanceFilters
+              type={txType}
+              status={txStatus}
+              onTypeChange={setTxType}
+              onStatusChange={setTxStatus}
+              activeCount={filterActiveCount}
+              onReset={() => { setTxType('all'); setTxStatus('all'); setTxSearch(''); }}
+            />
+          </div>
+          <RecentTransactions transactions={filteredTransactions} onOpenTransaction={(tx) => setSelectedTx(tx)} />
+        </div>
       )}
 
       {/* ── treasury hero ── */}
@@ -201,7 +256,6 @@ export default function FinancePage({ onNavigateToBuildings }: FinancePageProps)
                         )}
                       </div>
                     </div>
-                    {/* lifecycle */}
                     <div className="mt-3 flex items-center gap-2">
                       {STAGES.map((s, idx) => {
                         const failed = p.status === 'failed' || p.status === 'reversed';
