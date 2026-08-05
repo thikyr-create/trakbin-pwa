@@ -11,9 +11,8 @@ import { useSettings } from "@/lib/features/settings/hooks/useSettings";
 import {
   SETTINGS_CATEGORIES,
   type SettingsSectionId,
-  type SettingsSectionProps,
 } from "./settingsConfig";
-import CompanyProfile from "./CompanyProfile";
+import { SECTIONS } from "./settingsRegistry";
 
 const body = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -31,11 +30,6 @@ const SECTION_ICONS: Record<SettingsSectionId, React.ComponentType<{ size?: numb
   security: Shield,
   users: Users,
   danger: AlertTriangle,
-};
-
-/** Registry — each section mounts here as it ships. */
-const SECTIONS: Partial<Record<SettingsSectionId, React.ComponentType<SettingsSectionProps>>> = {
-  profile: CompanyProfile,
 };
 
 export default function SettingsPage() {
