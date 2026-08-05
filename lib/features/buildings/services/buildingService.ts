@@ -124,6 +124,93 @@ async function resolveAssignedDrivers(
   return result;
 }
 
+/**
+ * Builds a collection-history row set from the verified execution chain:
+ *   collections.building_id → assignments.id (status, assigned_at, route_id)
+ *   → routes.driver_id → drivers.full_name
+ *
+ * Output shape matches what CollectionHistory.tsx renders:
+ *   { id, collection_date, status, hauler_name, notes }
+ */
+async function resolveCollectionHistory(custom_id: string): Promise<any[]> {
+  const { data: stops } = await supabase
+    .from('collections')
+    .select('id, assignment_id, stop_order')
+    .eq('building_id', custom_id);
+
+  if (!stops || stops.length === 0) return [];
+
+  const assignmentIds = [
+    ...new Set(stops.map((s: any) => s.assignment_id).filter(Boolean)),
+  ];
+  if (assignmentIds.length === 0) return [];
+
+  const { data: assignments } = await supabase
+    .from('assignments')
+    .select('id, status, assigned_at, route_id')
+    .in('id', assignmentIds)
+    .order('assigned_at', { ascending: false });
+
+  if (!assignments || assignments.length === 0) return [];
+
+  // Route → driver chain for hauler name
+  const routeIds = [
+    ...new Set(assignments.map((a: any) => a.route_id).filter(Boolean)),
+  ];
+  const driverByRoute = new Map<string, string>();
+  const nameByEmployee = new Map<string, string>();
+
+  if (routeIds.length > 0) {
+    const { data: routes } = await supabase
+      .from('routes')
+      .select('id, driver_id')
+      .in('id', routeIds);
+    (routes || []).forEach((r: any) => {
+      if (r.driver_id) driverByRoute.set(r.id, r.driver_id);
+    });
+
+    const employeeIds = [...new Set([...driverByRoute.values()])];
+    if (employeeIds.length > 0) {
+      const { data: drivers } = await supabase
+        .from('drivers')
+        .select('employee_id, full_name')
+        .in('employee_id', employeeIds);
+      (drivers || []).forEach((d: any) => {
+        nameByEmployee.set(d.employee_id, d.full_name);
+      });
+    }
+  }
+
+  const assignmentMap = new Map(assignments.map((a: any) => [a.id, a]));
+
+  const rows = stops
+    .map((s: any) => {
+      const a = assignmentMap.get(s.assignment_id);
+      if (!a) return null;
+      const emp = a.route_id ? driverByRoute.get(a.route_id) : null;
+      const hauler_name = emp ? nameByEmployee.get(emp) || null : null;
+      return {
+        id: s.id,
+        assignment_id: s.assignment_id,
+        stop_order: s.stop_order,
+        collection_date: a.assigned_at,
+        status: a.status || 'planned',
+        hauler_name,
+        notes: null,
+      };
+    })
+    .filter(Boolean) as any[];
+
+  // Sort newest first (matching the original order-by intent)
+  rows.sort((a, b) => {
+    const ta = new Date(a.collection_date).getTime() || 0;
+    const tb = new Date(b.collection_date).getTime() || 0;
+    return tb - ta;
+  });
+
+  return rows;
+}
+
 async function resolveRouteGeometry(custom_id: string): Promise<any | null> {
   const { data: abs } = await supabase
     .from('assignment_buildings')
@@ -230,7 +317,7 @@ export async function fetchBuildingDetail(
   const [
     { data: assignment },
     { data: schedule },
-    { data: collections },
+    collections,
     { data: receipts },
     { data: payments },
     { data: issues },
@@ -251,13 +338,7 @@ export async function fetchBuildingDetail(
       .eq('building_id', custom_id)
       .eq('company_id', company_id)
       .maybeSingle(),
-    supabase
-      .from('collections')
-      .select('*')
-      .eq('building_id', custom_id)
-      .eq('company_id', company_id)
-      .order('collection_date', { ascending: false })
-      .limit(20),
+    resolveCollectionHistory(custom_id),
     supabase
       .from('receipts')
       .select('*')
