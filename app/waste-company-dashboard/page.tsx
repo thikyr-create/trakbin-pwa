@@ -24,7 +24,6 @@ import IssuesPage from './components/IssuesPage';
 import AnalyticsPage from './components/analytics/AnalyticsPage';
 import MaintenancePage from './components/MaintenancePage';
 import ZonesPage from './components/zones/ZonesPage';
-import ZoneDetailsPage from './components/ZoneDetailsPage';
 import SettingsPage from './components/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
@@ -328,8 +327,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'issues' && <IssuesPage issues={issues} />}
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
-              {activePage === 'zones' && !selectedZone && <ZonesPage />}
-              {activePage === 'zones' && selectedZone && <ZoneDetailsPage zone={selectedZone} buildings={buildings} onBack={() => setSelectedZone(null)} />}
+              {activePage === 'zones' && <ZonesPage />}
               {activePage === 'settings' && <SettingsPage companyName={companyName} companyId={companyId} />}
             </motion.div>
 
