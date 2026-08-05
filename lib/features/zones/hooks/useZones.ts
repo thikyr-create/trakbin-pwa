@@ -6,6 +6,7 @@ import {
   fetchZones,
   fetchZoneDetail,
   createZone,
+  updateZone,
   deleteZone,
   toggleZoneActive,
   type ZoneRecord,
@@ -75,6 +76,23 @@ export function useZones() {
     [refetch]
   );
 
+  const handleUpdate = useCallback(
+    async (zoneId: string, payload: {
+      center_lat?: number | null;
+      center_lng?: number | null;
+      radius_km?: number | null;
+      is_active?: boolean;
+      estates?: string[];
+      streets?: string[];
+      addresses?: string[];
+    }) => {
+      const result = await updateZone(zoneId, payload);
+      if (result.ok) await refetch();
+      return result;
+    },
+    [refetch]
+  );
+
   const handleDelete = useCallback(
     async (zoneId: string) => {
       const result = await deleteZone(zoneId);
@@ -99,6 +117,7 @@ export function useZones() {
     error,
     refetch,
     createZone: handleCreate,
+    updateZone: handleUpdate,
     deleteZone: handleDelete,
     toggleZone: handleToggle,
   };
