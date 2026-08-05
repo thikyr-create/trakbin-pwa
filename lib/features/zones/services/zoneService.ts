@@ -30,6 +30,8 @@ export interface ZoneBuildingRow {
   service_status: string | null;
   pickup_days: string[] | null;
   activated_at: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface ZoneStats {
@@ -109,7 +111,7 @@ export async function fetchZoneDetail(
   if (buildingIds.length > 0) {
     const { data: buildings } = await supabase
       .from('Buildings')
-      .select('custom_id, address, estate, status, payment_status')
+      .select('custom_id, address, estate, status, payment_status, latitude, longitude')
       .in('custom_id', buildingIds);
     (buildings || []).forEach((b: any) => buildingsMap.set(b.custom_id, b));
   }
@@ -125,6 +127,8 @@ export async function fetchZoneDetail(
       service_status: a.service_status || null,
       pickup_days: a.pickup_days || null,
       activated_at: a.activated_at || null,
+      latitude: b.latitude ? Number(b.latitude) : null,
+      longitude: b.longitude ? Number(b.longitude) : null,
     };
   });
 
