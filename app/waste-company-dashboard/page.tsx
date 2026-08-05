@@ -28,7 +28,7 @@ import ZoneDetailsPage from './components/ZoneDetailsPage';
 import SettingsPage from './components/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
-import FinancePage from './components/FinancePage';
+import FinancePage from './components/finance/FinancePage';
 import { canOperate } from '@/lib/auth/companyVerification';
 import CompanyVerificationCard from './components/CompanyVerificationCard';
 
@@ -320,7 +320,7 @@ export default function WasteCompanyDashboard() {
             <motion.div key={activePage + (selectedZone ? '-zn' : '')} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
               {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
-              {activePage === 'earnings' && <FinancePage />}
+              {activePage === 'earnings' && <FinancePage onNavigateToBuildings={() => setActivePage('buildings')} />}
               {activePage === 'fleet' && <FleetPage trucks={trucks} drivers={driverOptions} onRefetch={fetchData} />}
               {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
               {activePage === 'buildings' && <BuildingsPage />}
