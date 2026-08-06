@@ -6,6 +6,7 @@ import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Building2, Users, Truck, Inbox, Activity, AlertTriangle, ArrowUpRight, Wallet } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { formatNaira } from '@/lib/utils/money';
+import DispatchPlanner from './dispatch/DispatchPlanner';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -32,7 +33,7 @@ export default function OverviewPage({ trucks, drivers, buildings, collections, 
     { Icon: Users, label: 'Crew', value: drivers.length, page: 'drivers', tone: 'text-sky-600 bg-sky-50 ring-sky-100' },
     { Icon: Truck, label: 'Fleet on road', value: onRoad, page: 'fleet', tone: 'text-violet-600 bg-violet-50 ring-violet-100', live: onRoad > 0 },
     { Icon: Inbox, label: 'Pending requests', value: serviceRequests.length, page: 'service-requests', tone: 'text-amber-600 bg-amber-50 ring-amber-100', pulse: serviceRequests.length > 0 },
-        { Icon: Activity, label: 'Collections this month', value: collectionsThisMonth.length, page: 'analytics', tone: 'text-emerald-600 bg-emerald-50 ring-emerald-100' },
+    { Icon: Activity, label: 'Collections this month', value: collectionsThisMonth.length, page: 'analytics', tone: 'text-emerald-600 bg-emerald-50 ring-emerald-100' },
     { Icon: AlertTriangle, label: 'Open issues', value: openIssues.length, page: 'issues', tone: 'text-rose-600 bg-rose-50 ring-rose-100', pulse: openIssues.length > 0 },
   ];
 
@@ -55,6 +56,9 @@ export default function OverviewPage({ trucks, drivers, buildings, collections, 
           </motion.button>
         ))}
       </div>
+
+      {/* Dispatch Planner — materialization engine */}
+      <DispatchPlanner />
 
       {/* treasury strip */}
       <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-emerald-200/70 bg-emerald-50/60 p-5">
