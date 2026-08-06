@@ -6,6 +6,8 @@ import {
   periodLabel,
   isBillableForCycle,
   cycleOfDate,
+  type BillingSettings,
+  DEFAULTS,
 } from '@/lib/features/finance/utils/billingHelpers';
 
 const supabaseAdmin = createClient(
@@ -27,6 +29,68 @@ function bump(skipped: Record<string, number>, reason: string) {
   skipped[reason] = (skipped[reason] || 0) + 1;
 }
 
+/**
+ * Fetch billing settings for a company.
+ * Returns DEFAULTS if no settings row exists (backward compatible).
+ */
+async function fetchSettings(company_id: number): Promise<BillingSettings> {
+  const { data } = await supabaseAdmin
+    .from('company_settings')
+    .select('cutoff_day, invoice_day, due_day, grace_period_days, auto_invoice_generation')
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!data) return DEFAULTS;
+
+  return {
+    cutoff_day: data.cutoff_day ?? DEFAULTS.cutoff_day,
+    invoice_day: data.invoice_day ?? DEFAULTS.invoice_day,
+    due_day: data.due_day ?? DEFAULTS.due_day,
+    grace_period_days: data.grace_period_days ?? DEFAULTS.grace_period_days,
+    auto_invoice_generation: data.auto_invoice_generation ?? DEFAULTS.auto_invoice_generation,
+  };
+}
+
+/**
+ * Resolve amount for a building.
+ * Priority: billing_plan (explicit) → pricing_plan (by building_type) → null (skip)
+ */
+async function resolveAmount(
+  building_id: string,
+  company_id: number,
+  buildingType: string | null
+): Promise<number | null> {
+  // 1) Explicit billing_plan
+  const { data: plan } = await supabaseAdmin
+    .from('billing_plans')
+    .select('amount')
+    .eq('building_id', building_id)
+    .eq('company_id', company_id)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (plan) return Number(plan.amount) || null;
+
+  // 2) Fallback to pricing_plan by building_type
+  if (!buildingType) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: pricing } = await supabaseAdmin
+    .from('pricing_plans')
+    .select('monthly_fee')
+    .eq('company_id', company_id)
+    .eq('building_type', buildingType)
+    .eq('is_active', true)
+    .lte('effective_date', today)
+    .order('effective_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (pricing) return Number(pricing.monthly_fee) || null;
+
+  return null;
+}
+
 async function runGeneration(
   company_id: number,
   cycle: { year: number; month: number },
@@ -34,18 +98,22 @@ async function runGeneration(
 ): Promise<GenResult> {
   const result: GenResult = { generated: 0, skipped: {} };
 
-  // Company cutoff day (per-company configurable, default 25)
-  const { data: hauler } = await supabaseAdmin
-    .from('haulers')
-    .select('billing_cutoff_day')
-    .eq('id', company_id)
-    .maybeSingle();
-  const cutoffDay = Number(hauler?.billing_cutoff_day) || 25;
+  // Read billing settings (cutoff, due_day, auto_invoice_generation)
+  const settings = await fetchSettings(company_id);
+
+  // If auto-generation is OFF, skip entirely (company prefers manual billing)
+  if (!settings.auto_invoice_generation) {
+    bump(result.skipped, 'auto_generation_disabled');
+    return result;
+  }
+
+  const cutoffDay = settings.cutoff_day;
+  const dueDay = settings.due_day;
 
   // Rule 1+2+6: only active buildings of this company
   let buildingsQuery = supabaseAdmin
     .from('Buildings')
-    .select('custom_id, status')
+    .select('custom_id, status, building_type')
     .eq('company_id', company_id)
     .eq('status', 'active');
   if (onlyCustomId) buildingsQuery = buildingsQuery.eq('custom_id', onlyCustomId);
@@ -55,15 +123,6 @@ async function runGeneration(
     if (onlyCustomId) bump(result.skipped, 'building_not_eligible');
     return result;
   }
-
-  // Rule 3: active billing plans
-  const { data: plans } = await supabaseAdmin
-    .from('billing_plans')
-    .select('*')
-    .eq('company_id', company_id)
-    .eq('status', 'active');
-  const planMap = new Map<string, any>();
-  (plans || []).forEach((p: any) => planMap.set(p.building_id, p));
 
   // Cutoff rule: activation dates
   const { data: sas } = await supabaseAdmin
@@ -79,18 +138,12 @@ async function runGeneration(
   });
 
   for (const b of buildings) {
-    const plan = planMap.get(b.custom_id);
-    if (!plan) {
-      bump(result.skipped, 'no_billing_plan');
-      continue;
-    }
-
-    const dueDay = Number(plan.due_day) || 5;
     const dueDate = invoiceDueDate(cycle, dueDay);
 
-    // Rule 5: start date reached
-    if (plan.start_date && new Date(plan.start_date).getTime() > new Date(dueDate).getTime()) {
-      bump(result.skipped, 'service_not_started');
+    // Resolve amount: billing_plan → pricing_plan → skip
+    const amount = await resolveAmount(b.custom_id, company_id, b.building_type || null);
+    if (amount === null) {
+      bump(result.skipped, 'no_pricing_plan');
       continue;
     }
 
@@ -121,7 +174,7 @@ async function runGeneration(
     const { error } = await supabaseAdmin.from('invoices').insert({
       building_id: b.custom_id,
       company_id,
-      amount: Number(plan.amount) || 0,
+      amount,
       due_date: dueDate,
       status: 'issued',
       description: `Waste service — ${periodLabel(cycle)}`,
@@ -154,7 +207,7 @@ export async function PATCH(req: NextRequest) {
     switch (action) {
       case 'generate': {
         if (!body.custom_id) {
-          return NextResponse.json({ error: 'custom_id is required' }, { status: 400 });
+          return NextResponse.json({ error: 'custom_id is required' }, { status:400 });
         }
         const result = await runGeneration(Number(company_id), cycle, body.custom_id);
         return NextResponse.json({ ok: true, ...result });
@@ -174,7 +227,7 @@ export async function PATCH(req: NextRequest) {
           .maybeSingle();
 
         if (!invoice) {
-          return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+          return NextResponse.json({ error: 'Invoice not found' }, { status: 404});
         }
         if (invoice.status === 'paid') {
           return NextResponse.json(
@@ -183,20 +236,26 @@ export async function PATCH(req: NextRequest) {
           );
         }
 
-        // Refresh amount from current plan if available
-        const { data: plan } = await supabaseAdmin
-          .from('billing_plans')
-          .select('amount')
-          .eq('building_id', invoice.building_id)
+        // Fetch building type for pricing lookup
+        const { data: building } = await supabaseAdmin
+          .from('Buildings')
+          .select('building_type')
+          .eq('custom_id', invoice.building_id)
           .eq('company_id', Number(company_id))
-          .eq('status', 'active')
           .maybeSingle();
+
+        // Refresh amount from current plan if available
+        const amount = await resolveAmount(
+          invoice.building_id,
+          Number(company_id),
+          building?.building_type || null
+        );
 
         const { data: updated, error } = await supabaseAdmin
           .from('invoices')
           .update({
             status: 'issued',
-            amount: plan ? Number(plan.amount) : invoice.amount,
+            amount: amount ?? invoice.amount,
             issued_at: new Date().toISOString(),
             paid_at: null,
             description: `Waste service — ${periodLabel(cycleOfDate(new Date(invoice.due_date)))}`,
