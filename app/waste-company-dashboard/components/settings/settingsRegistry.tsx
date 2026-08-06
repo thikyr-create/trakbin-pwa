@@ -8,6 +8,7 @@ import CollectionSettings from "./CollectionSettings";
 import NotificationSettings from "./NotificationSettings";
 import PaymentSettings from "./PaymentSettings";
 import Preferences from "./Preferences";
+import IntegrationsSettings from "./IntegrationsSettings";
 
 /** Mount each shipped section here. Unmounted ids render the honest "under construction" state. */
 export const SECTIONS: Partial<Record<SettingsSectionId, ComponentType<SettingsSectionProps>>> = {
@@ -18,4 +19,5 @@ export const SECTIONS: Partial<Record<SettingsSectionId, ComponentType<SettingsS
   notifications: NotificationSettings,
   payments: PaymentSettings,
   preferences: Preferences,
+  integrations: IntegrationsSettings,
 };
