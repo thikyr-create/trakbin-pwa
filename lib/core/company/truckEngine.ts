@@ -101,7 +101,7 @@ export async function createTruck(input: CreateTruckInput): Promise<TruckRecord>
     status: input.status || 'active',
     driver_employee_id: input.driver_employee_id ?? null,
     company_id: company.company_id,
-    company_name: company.company_name,
+    
   });
 
   if (!data?.truck) {

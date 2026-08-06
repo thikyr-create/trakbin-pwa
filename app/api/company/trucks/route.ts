@@ -79,7 +79,6 @@ export async function POST(req: NextRequest) {
       status,
       driver_employee_id,
       company_id,
-      company_name,
     } = body;
 
     if (!(license_plate || '').trim()) {
@@ -91,13 +90,14 @@ export async function POST(req: NextRequest) {
 
     const truckId = await generateTruckId();
 
+    // FIX: Removed company_name — column doesn't exist on trucks table.
+    // Schema only has company_id + business_name.
     const { error: insertError } = await supabaseAdmin.from('trucks').insert({
       truck_id: truckId,
       license_plate: license_plate.trim().toUpperCase(),
       truck_type: truck_type || 'Compactor',
       capacity: capacity || null,
       status: status || 'active',
-      company_name: company_name || null,
       company_id,
     });
 
