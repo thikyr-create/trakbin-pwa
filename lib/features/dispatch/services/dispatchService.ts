@@ -1,6 +1,7 @@
 // lib/features/dispatch/services/dispatchService.ts
 import { createClient } from '@supabase/supabase-js';
 import { optimizeStops, estimateDurationMin, type Stop } from '@/lib/core/assignment/RouteOptimizer';
+import { optimizeDispatch, enrichDriverContext, type ScoredResource } from '../utils/dispatchOptimizer';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -24,7 +25,7 @@ export interface DispatchPreview {
 export interface DispatchResult {
   routesCreated: number;
   stopsMaterialized: number;
-  unassignedRoutes: number; // Routes created but no driver/truck available
+  unassignedRoutes: number;
 }
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -36,15 +37,23 @@ function getTargetDateInfo(date: Date) {
 }
 
 /**
- * Previews the dispatch plan for a specific date without writing to the database.
+ * Emits a platform event for downstream consumers (analytics, notifications, etc.)
  */
+async function emitPlatformEvent(
+  company_id: number,
+  event_type: string,
+  payload: Record<string, any>
+) {
+  // For now, log to console. Future: write to a platform_events table or push to a message queue.
+  console.log(`[Platform Event] ${event_type}`, { company_id, ...payload });
+}
+
 export async function previewDispatch(
   company_id: number,
   targetDate: Date
 ): Promise<DispatchPreview> {
   const { iso, dayName } = getTargetDateInfo(targetDate);
 
-  // 1. Fetch settings for capacity limits
   const { data: settings } = await supabase
     .from('company_settings')
     .select('max_stops_per_route, auto_assign_drivers')
@@ -53,7 +62,6 @@ export async function previewDispatch(
 
   const maxStops = settings?.max_stops_per_route ?? 60;
 
-  // 2. Fetch scheduled demand for this day
   const { data: assignments } = await supabase
     .from('service_assignments')
     .select('zone_id, building_id, pickup_days')
@@ -77,7 +85,6 @@ export async function previewDispatch(
     };
   }
 
-  // 3. Filter to active, paid buildings with GPS
   const uniqueIds = [...new Set(scheduledBuildingIds.map((s: any) => s.building_id))];
   const { data: buildings } = await supabase
     .from('Buildings')
@@ -96,7 +103,6 @@ export async function previewDispatch(
 
   const validIds = new Set(validBuildings.map((b: any) => b.custom_id));
 
-  // 4. Group by zone and calculate route chunks
   const zoneMap = new Map<string, number>();
   scheduledBuildingIds.forEach((s: any) => {
     if (validIds.has(s.building_id)) {
@@ -112,7 +118,6 @@ export async function previewDispatch(
 
   const totalRequiredRoutes = zones.reduce((sum, z) => sum + z.requiredRoutes, 0);
 
-  // 5. Check resource availability
   const [{ count: driverCount }, { count: truckCount }] = await Promise.all([
     supabase
       .from('drivers')
@@ -146,10 +151,6 @@ export async function previewDispatch(
   };
 }
 
-/**
- * Materializes the dispatch plan.
- * Creates `routes` and `route_stops`. Assigns drivers/trucks if available and auto-assign is ON.
- */
 export async function executeDispatch(
   company_id: number,
   targetDate: Date
@@ -157,7 +158,7 @@ export async function executeDispatch(
   const { iso, dayName } = getTargetDateInfo(targetDate);
   const result: DispatchResult = { routesCreated: 0, stopsMaterialized: 0, unassignedRoutes: 0 };
 
-  // Idempotency check: abort if routes already exist for this date
+  // Idempotency check
   const startOfDay = `${iso}T00:00:00.000Z`;
   const endOfDay = `${iso}T23:59:59.999Z`;
   const { count: existingRoutes } = await supabase
@@ -171,7 +172,6 @@ export async function executeDispatch(
     throw new Error(`Routes already exist for ${dayName}, ${iso}. Cancel them first or choose another date.`);
   }
 
-  // Fetch settings
   const { data: settings } = await supabase
     .from('company_settings')
     .select('max_stops_per_route, auto_assign_drivers, working_hours_start')
@@ -183,7 +183,6 @@ export async function executeDispatch(
   const startTime = settings?.working_hours_start ?? '07:00';
   const scheduledStart = `${iso}T${startTime}:00.000Z`;
 
-  // Fetch demand
   const { data: assignments } = await supabase
     .from('service_assignments')
     .select('zone_id, building_id, pickup_days')
@@ -215,7 +214,6 @@ export async function executeDispatch(
       .map((b: any) => [b.custom_id, b])
   );
 
-  // Group by zone
   const zoneGroups = new Map<string, Stop[]>();
   scheduled.forEach((s: any) => {
     const b = buildingMap.get(s.building_id);
@@ -231,8 +229,8 @@ export async function executeDispatch(
 
   // Fetch available resources
   const [{ data: drivers }, { data: trucks }] = await Promise.all([
-    supabase.from('drivers').select('id, full_name').eq('company_id', company_id).eq('status', 'available'),
-    supabase.from('trucks').select('id, truck_id').eq('company_id', company_id).eq('status', 'available'),
+    supabase.from('drivers').select('*').eq('company_id', company_id).eq('status', 'available'),
+    supabase.from('trucks').select('*').eq('company_id', company_id).eq('status', 'available'),
   ]);
 
   const driverPool = [...(drivers || [])];
@@ -240,15 +238,34 @@ export async function executeDispatch(
 
   // Materialize routes
   for (const [zoneName, stops] of zoneGroups.entries()) {
-    // Chunk by max capacity
+    // Enrich driver context for optimizer
+    const enrichedDrivers = await enrichDriverContext(company_id, driverPool, zoneName, iso);
+
     for (let i = 0; i < stops.length; i += maxStops) {
       const chunk = stops.slice(i, i + maxStops);
       const { ordered, distanceKm } = optimizeStops(chunk);
       const durationMin = estimateDurationMin(distanceKm, ordered.length);
 
-      // Allocate resources
-      const driver = autoAssign ? driverPool.shift() : null;
-      const truck = autoAssign ? truckPool.shift() : null;
+      // Run Dispatch Optimizer
+      const scoredResources = optimizeDispatch(enrichedDrivers, truckPool, {
+        zone_name: zoneName,
+        required_stops: ordered.length,
+        target_date: iso,
+      });
+
+      // Pick the best match (or null if none available)
+      const bestMatch: ScoredResource | null = autoAssign && scoredResources.length > 0
+        ? scoredResources[0]
+        : null;
+
+      const driver = bestMatch?.driver || null;
+      const truck = bestMatch?.truck || null;
+
+      // Driver ID format: prefer employee_id, fallback to String(id)
+      const driverId = driver
+        ? (driver.employee_id || driver.id)
+        : '__unassigned__';
+      const truckId = truck ? String(truck.id) : '__unassigned__';
 
       const geometry = ordered.map((s, idx) => ({
         stop: idx + 1,
@@ -257,15 +274,15 @@ export async function executeDispatch(
         lng: s.lng,
       }));
 
-      // Create Route
+      // Create Route (NOT NULL fix: use placeholder IDs when unassigned)
       const { data: route, error: routeErr } = await supabase
         .from('routes')
         .insert([{
           company_id,
           zone_id: zoneName,
           route_name: `${zoneName} - ${dayName} ${i / maxStops + 1}`,
-          driver_id: driver ? String(driver.id) : null,
-          truck_id: truck ? String(truck.id) : null,
+          driver_id: driverId,
+          truck_id: truckId,
           geometry,
           distance_km: distanceKm,
           duration_min: durationMin,
@@ -300,10 +317,25 @@ export async function executeDispatch(
       // Update resource status if assigned
       if (driver) {
         await supabase.from('drivers').update({ status: 'busy' }).eq('id', driver.id);
+        // Remove from pool so it's not reused
+        const idx = driverPool.findIndex((d) => d.id === driver.id);
+        if (idx >= 0) driverPool.splice(idx, 1);
       }
       if (truck) {
         await supabase.from('trucks').update({ status: 'assigned', current_driver: driver?.full_name || null }).eq('id', truck.id);
+        const idx = truckPool.findIndex((t) => t.id === truck.id);
+        if (idx >= 0) truckPool.splice(idx, 1);
       }
+
+      // Emit platform event
+      await emitPlatformEvent(company_id, 'route_materialized', {
+        route_id: route.id,
+        zone_name: zoneName,
+        stops: ordered.length,
+        driver_id: driverId,
+        truck_id: truckId,
+        target_date: iso,
+      });
     }
   }
 
