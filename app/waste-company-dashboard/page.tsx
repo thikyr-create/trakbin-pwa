@@ -24,7 +24,7 @@ import IssuesPage from './components/IssuesPage';
 import AnalyticsPage from './components/analytics/AnalyticsPage';
 import MaintenancePage from './components/MaintenancePage';
 import ZonesPage from './components/zones/ZonesPage';
-import SettingsPage from './components/SettingsPage';
+import SettingsPage from './components/settings/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
 import FinancePage from './components/finance/FinancePage';
@@ -328,7 +328,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
               {activePage === 'zones' && <ZonesPage />}
-              {activePage === 'settings' && <SettingsPage companyName={companyName} companyId={companyId} />}
+              {activePage === 'settings' && <SettingsPage />}
             </motion.div>
 
             <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }} className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 pt-6">
