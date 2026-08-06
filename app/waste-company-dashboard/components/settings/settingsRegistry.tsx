@@ -10,9 +10,10 @@ import PaymentSettings from "./PaymentSettings";
 import Preferences from "./Preferences";
 import IntegrationsSettings from "./IntegrationsSettings";
 import SecuritySettings from "./SecuritySettings";
+import UserManagement from "./UserManagement";
 import DangerZone from "./DangerZone";
 
-/** Mount each shipped section here. Unmounted ids render the honest "under construction" state. */
+/** All sections mounted. The registry stays the single growth point for future additions. */
 export const SECTIONS: Partial<Record<SettingsSectionId, ComponentType<SettingsSectionProps>>> = {
   profile: CompanyProfile,
   billing: BillingSettings,
@@ -23,5 +24,6 @@ export const SECTIONS: Partial<Record<SettingsSectionId, ComponentType<SettingsS
   preferences: Preferences,
   integrations: IntegrationsSettings,
   security: SecuritySettings,
+  users: UserManagement,
   danger: DangerZone,
 };
