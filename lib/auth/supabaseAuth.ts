@@ -13,8 +13,12 @@ export const supabaseAuth = {
   async signInWithPassword(email: string, password: string) {
     return supabase.auth.signInWithPassword({ email, password });
   },
-  async signUp(email: string, password: string) {
-    return supabase.auth.signUp({ email, password });
+    async signUp(email: string, password: string, meta?: { companyId?: number; role?: string }) {
+    return supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { company_id: meta?.companyId ?? null, role: meta?.role ?? 'company' } },
+    });
   },
 
   // email OTP (no password) — used for recovery

@@ -1,15 +1,9 @@
 import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
-import { createClient } from '@supabase/supabase-js';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
 
 const KEYS = { caretaker: 'trakbin_caretaker', company: 'trakbin_company', driver: 'trakbin_driver' } as const;
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 function generateBuildingId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -108,27 +102,18 @@ export const authEngine = {
     });
     if (haulerError || !haulerData) return { ok: false, message: '❌ Failed to create company: ' + (haulerError?.message || 'unknown') };
 
-    // Supabase Auth signup (hashed). Email confirmation ON → they must confirm before login.
+    // Supabase Auth signup (hashed password stored in auth.users.encrypted_password).
+    // Metadata (company_id + role) is passed so the on_auth_user_created trigger
+    // creates the profiles row automatically — no client-side insert needed.
     let authId: string | null = null; let needsConfirm = false;
     try {
-      const { data, error } = await supabaseAuth.signUp(input.email, input.password);
-      if (!error && data.user) { 
-        authId = data.user.id; 
-        needsConfirm = !data.session; 
-        
-        // FIX: Create profiles row immediately after auth.users is created
-        if (authId) {
-          const { error: profileError } = await supabase.from('profiles').insert([{
-            id: authId,
-            company_id: haulerData.id,
-            role: 'company',
-            created_at: new Date().toISOString(),
-          }]);
-          if (profileError) {
-            console.error('Failed to create profile:', profileError);
-            // Don't fail registration, but log it
-          }
-        }
+      const { data, error } = await supabaseAuth.signUp(input.email, input.password, {
+        companyId: haulerData.id,
+        role: 'company',
+      });
+      if (!error && data.user) {
+        authId = data.user.id;
+        needsConfirm = !data.session;
       }
     } catch { /* fall back to legacy-only row */ }
 
