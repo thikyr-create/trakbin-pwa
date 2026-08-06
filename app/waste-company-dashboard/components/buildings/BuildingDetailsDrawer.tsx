@@ -12,6 +12,7 @@ import {
 } from "@/lib/features/buildings/utils/buildingHelpers";
 import { paymentTxnStatusMeta } from "@/lib/core/building/BuildingStatus";
 import BuildingStatusBadge from "./BuildingStatusBadge";
+import BuildingLinkedPlanCard from "./BuildingLinkedPlanCard";
 import CollectionHistory from "./CollectionHistory";
 import AssignedDriverCard from "./AssignedDriverCard";
 import ServiceProviderCard from "./ServiceProviderCard";
@@ -47,6 +48,21 @@ function formatDateTime(value?: string | null): string {
   return d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function getCompanyId(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.localStorage.getItem("trakbin_company");
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    const raw = parsed?.id ?? parsed?.company_id ?? null;
+    if (raw == null) return null;
+    const num = Number(raw);
+    return Number.isFinite(num) ? num : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function BuildingDetailsDrawer({
   open,
   customId,
@@ -74,6 +90,8 @@ export default function BuildingDetailsDrawer({
         issues: detail.issues,
       })
     : [];
+
+  const companyId = getCompanyId();
 
   return (
     <AnimatePresence>
@@ -178,6 +196,14 @@ export default function BuildingDetailsDrawer({
                           driverName={detail.assigned_driver_name}
                           zoneName={detail.zone_name}
                         />
+                        {companyId != null && (
+                          <BuildingLinkedPlanCard
+                            buildingId={detail.custom_id}
+                            buildingType={detail.building_type || null}
+                            companyId={companyId}
+                            onSuccess={handleSuccess}
+                          />
+                        )}
                         <BuildingMapPreview
                           latitude={detail.latitude}
                           longitude={detail.longitude}
