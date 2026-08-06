@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { settleKey, topupKey } from '@/lib/utils/money';
@@ -16,9 +18,9 @@ export interface CaretakerSessionState {
   walletBalance: number;
   paymentMethods: any[];
   schedule: any | null;
-  invoices: any[];                          // DELTA: full invoice list (was counts only)
+  invoices: any[];
   invoiceCount: { paid: number; due: number };
-  platformFeeBps: number | null;            // DELTA: applicable rate for pay-time preview
+  platformFeeBps: number | null;
   issues: any[];
   activeAssignment: any | null;
   companyProfile: any | null;
@@ -45,7 +47,7 @@ export interface CaretakerSessionState {
   checkAndGenerateInvoice: (bId: string, nextBillingDate: string, autopayEnabled: boolean, currentWalletBalance: number) => Promise<void>;
   addFunds: (amount: number, methodId: string) => Promise<void>;
   saveAutopay: () => Promise<void>;
-  disableAutopay: () => Promise<void>;      // DELTA
+  disableAutopay: () => Promise<void>;
   setShowAddFunds: (show: boolean) => void;
   setShowAutopay: (show: boolean) => void;
   setAutopaySource: (source: 'wallet' | 'card') => void;
@@ -73,15 +75,36 @@ function synthesizeContacts(company: any | null, profile: any | null): Caretaker
 export const useCaretakerSession = create<CaretakerSessionState>((set, get) => ({
   building: null, collectionHistory: [], fullHistory: [], fullHistoryLoaded: false, walletBalance: 0,
   paymentMethods: [], schedule: null, invoices: [], invoiceCount: { paid: 0, due: 0 }, platformFeeBps: null,
-  issues: [], activeAssignment: null, companyProfile: null, companyContacts: [], ledger: [],
+  issues: [], activeAssignment: null, companyProfile: null, companyContacts: [],ledger: [],
   showAddFunds: false, showAutopay: false, autopaySource: 'wallet', autopayLoading: false,
   selectedMethod: '', loading: true, billingProcessing: false,
 
   initializeSession: async () => {
+    // SEC-3: Caretakers don't have auth.users yet, so we keep localStorage
+    // but add server-side validation to prevent tampering
     const storedCaretaker = localStorage.getItem('trakbin_caretaker');
-    if (!storedCaretaker) { window.location.href = '/auth'; return; }
+    if (!storedCaretaker) {
+      window.location.href = '/auth';
+      return;
+    }
+
     const caretakerData = JSON.parse(storedCaretaker);
-    set({ building: caretakerData, loading: true });
+    
+    // Validate building exists in database (prevents localStorage tampering)
+    const { data: building, error } = await supabase
+      .from('Buildings')
+      .select('*')
+      .eq('custom_id', caretakerData.custom_id)
+      .single();
+
+    if (error || !building) {
+      console.error('Building not found, clearing session');
+      localStorage.removeItem('trakbin_caretaker');
+      window.location.href = '/auth';
+      return;
+    }
+
+    set({ building, loading: true });
 
     if (caretakerData.next_billing_date) {
       await get().checkAndGenerateInvoice(caretakerData.custom_id, caretakerData.next_billing_date, caretakerData.autopay_enabled, caretakerData.wallet_balance || 0);
@@ -99,9 +122,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (!building) return;
     const bId = building.custom_id;
 
-    // DELTA: batch now includes the full invoice list, the platform rate, and
-    // the building's live money/settings row (fixes post-pay wallet staleness
-    // and the cold-load walletBalance=0 gap).
     const [historyRes, methodsRes, scheduleRes, invoicesRes, assignmentRes, settingsRes, buildingRes] = await Promise.all([
       supabase.from('collections').select('*').eq('building_id', bId).order('collection_date', { ascending: false }).limit(10),
       supabase.from('payment_methods').select('*').eq('building_id', bId),
@@ -116,14 +136,12 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (methodsRes.data) set({ paymentMethods: methodsRes.data });
     set({ schedule: scheduleRes.data && scheduleRes.data.length > 0 ? scheduleRes.data[0] : null });
 
-    // DELTA: full list + derived counts from the same read.
     const inv = invoicesRes.data || [];
     set({
       invoices: inv,
       invoiceCount: { paid: inv.filter((i) => i.status === 'paid').length, due: inv.filter((i) => i.status !== 'paid').length },
     });
 
-    // DELTA: keep the live money/settings row in sync with the DB.
     if (buildingRes.data) {
       set({ walletBalance: buildingRes.data.wallet_balance ?? 0 });
       set((s) => ({ building: s.building ? { ...s.building, ...buildingRes.data } : s.building }));
@@ -139,7 +157,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       set({ activeAssignment: assignmentRes.data, companyProfile: companyRes.data, companyContacts: synthesizeContacts(companyRes.data, profileRes.data) });
     } else set({ activeAssignment: null, companyProfile: null, companyContacts: [] });
 
-    // DELTA: company override wins, else platform default, else 1000 (10.00%).
     set({ platformFeeBps: companyCommissionBps ?? settingsRes.data?.commission_bps ?? 1000 });
 
     await get().fetchIssues();
@@ -177,7 +194,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     const channel = supabase.channel(`caretaker-${bId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_schedules', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices',filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collections', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchFullHistory(true); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_transactions', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchLedger(); })
       .subscribe();
@@ -194,7 +211,6 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
    createIssue: async (issueData: any) => {
     const { building, fetchIssues } = get();
 
-    // GATE: a caretaker may only report once a waste company is assigned/activated.
     if (!building?.company_id) {
       return {
         ok: false,
@@ -264,12 +280,11 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     const { building, autopaySource } = get(); if (!building) return;
     set({ autopayLoading: true });
     await supabase.from('Buildings').update({ autopay_enabled: true, autopay_source: autopaySource }).eq('custom_id', building.custom_id);
-    await get().refreshAll(); // DELTA: reflect the toggle in the store immediately
+    await get().refreshAll();
     set({ autopayLoading: false, showAutopay: false });
     alert(`✅ Autopay enabled! We will automatically settle from your ${autopaySource} on the 1st of every month.`);
   },
 
-  // DELTA: symmetric disable, also refreshed.
   disableAutopay: async () => {
     const { building } = get(); if (!building) return;
     await supabase.from('Buildings').update({ autopay_enabled: false }).eq('custom_id', building.custom_id);

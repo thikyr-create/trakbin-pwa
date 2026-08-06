@@ -1,6 +1,8 @@
+"use client";
+
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
-import { useCompanySession } from '@/lib/store/useCompanySession'; // <-- NEW IMPORT
+import { useCompanySession } from '@/lib/store/useCompanySession';
 import { DriverRoute, RouteBuilding } from '../../app/hauler-dashboard/components/types';
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from '../../app/hauler-dashboard/utils/geo';
 
@@ -87,25 +89,41 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   targetLocation: null,
 
   initializeSession: async () => {
-    const storedDriver = localStorage.getItem('trakbin_driver');
-    if (!storedDriver) { window.location.href = '/auth'; return; }
-    const driver = JSON.parse(storedDriver);
+    // SEC-3: Always read from auth.users + profiles (server-verified identity)
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      window.location.href = '/auth';
+      return;
+    }
+
+    // Read driver profile from server (RLS enforces auth.uid() = id)
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*, drivers(*)')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) {
+      console.error('Driver profile not found');
+      window.location.href = '/auth';
+      return;
+    }
+
+    const driver = profile.drivers || profile;
     set({ driver });
 
-    // Get tenant context to ensure RLS compliance
     const { tenant } = useCompanySession.getState();
     if (!tenant || !tenant.companyId) {
       console.error('Tenant context not loaded. Waiting...');
-      // Optional: Add a small delay or retry logic here if needed
     }
 
     set({ isLoading: true });
     try {
-      // FIX: Scoped to tenant.companyId
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
-        .eq('company_id', tenant.companyId) // <-- ADDED
+        .eq('company_id', tenant.companyId)
         .eq('driver_id', driver.employee_id || driver.id)
         .in('status', ['assigned', 'active', 'paused'])
         .order('created_at', { ascending: false })
@@ -119,11 +137,10 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
       
       set({ route: routeData, isRoutePaused: routeData.status === 'paused' });
 
-      // FIX: Scoped to tenant.companyId
       const { data: stopsData } = await supabase
         .from('route_stops')
         .select('*')
-        .eq('company_id', tenant.companyId) // <-- ADDED
+        .eq('company_id', tenant.companyId)
         .eq('route_id', routeData.id)
         .order('sequence', { ascending: true });
         
@@ -131,11 +148,10 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
       const buildingIds = stopsData.map((stop: any) => stop.building_id);
       
-      // FIX: Scoped to tenant.companyId
       const { data: buildingsData } = await supabase
         .from('Buildings')
         .select('custom_id, address, latitude, longitude, payment_status, waste_type, estimated_waste, occupancy')
-        .eq('company_id', tenant.companyId) // <-- ADDED
+        .eq('company_id', tenant.companyId)
         .in('custom_id', buildingIds);
 
       const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
@@ -173,7 +189,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   updateGps: (lat, lng) => {
     set({ gpsLocation: { lat, lng } });
     const { currentStop, isArrived, isRoutePaused } = get();
-    
+
     if (isRoutePaused || !currentStop || !currentStop.latitude || !currentStop.longitude) return;
 
     const distance = calculateDistanceInMeters(lat, lng, currentStop.latitude, currentStop.longitude);
@@ -192,7 +208,6 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
     set({ routeStops: newStops, currentStop: nextStop, route: newRoute, isArrived: false });
 
-    // FIX: Scoped updates
     await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
     await supabase.from('routes').update({ completed_stops: newRoute.completed_stops }).eq('id', route.id).eq('company_id', tenant.companyId);
 
@@ -213,7 +228,6 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
     set({ routeStops: newStops, currentStop: nextStop, isArrived: false, showSkipModal: false });
     
-    // FIX: Scoped update
     await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
   },
 
@@ -292,7 +306,6 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
     if (route && tenant.companyId) {
       try {
-        // FIX: Scoped update
         await supabase.from('routes').update({ status: newPauseState ? 'paused' : 'active' }).eq('id', route.id).eq('company_id', tenant.companyId);
       } catch (error) {
         console.error('Error updating route status:', error);
@@ -307,7 +320,6 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     if (!route || !tenant.companyId) return;
 
     try {
-      // FIX: Scoped update
       await supabase.from('routes').update({ 
         status: 'completed',
         ended_at: new Date().toISOString()

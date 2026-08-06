@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { type FeeRule } from '@/lib/utils/money';
@@ -9,7 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export type UserRole = 'company' | 'driver' | 'caretaker' | 'admin' | 'government' | null;
 export interface TenantContext { companyId: number | null; userId: string | null; role: UserRole; loaded: boolean; }
-export type DispatchEventType = 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' | 'route_paused' | 'route_resumed' | 'route_completed' | 'truck_full' | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added' | 'service_activated';
+export type DispatchEventType = 'route_started' | 'pickup_completed' | 'pickup_skipped' | 'issue_reported' | 'route_paused' | 'route_resumed' | 'route_completed'| 'truck_full' | 'disposal' | 'reassignment' | 'driver_added' | 'truck_added' | 'service_activated';
 export interface DispatchEvent { id: string; timestamp: string; type: DispatchEventType; truck_id: string; driver_name: string; building_id?: string; message: string; metadata?: any; }
 export interface Truck { id: string; truck_id: string; driver_name: string; status: any; current_route_id?: string; capacity_percent: number; last_location?: { lat: number; lng: number }; completed_stops: number; total_stops: number; license_plate: string; truck_type: string; }
 export interface EarningsState { available: number; pending: number; withdrawn: number; lifetime: number; rateBps: number; feeRule: FeeRule; }
@@ -25,21 +27,14 @@ export interface CompanySessionState {
   setSelectedTruck: (truck: Truck | null) => void; setCameraMode: (mode: 'overview' | 'following' | 'navigating') => void;
   subscribeToRealtime: () => () => void; unsubscribeFromRealtime: () => void;
   serviceRequests: any[]; selectedRequest: any | null; isDrawerOpen: boolean;
-  fetchServiceRequests: () => Promise<void>; setSelectedRequest: (request: any | null) => void; setIsDrawerOpen: (isOpen: boolean) => void;
+  fetchServiceRequests: () => Promise<void>; setSelectedRequest: (request: any |null) => void; setIsDrawerOpen: (isOpen: boolean) => void;
   activateService: (requestId: string, zoneId: string, scheduleData: any) => Promise<void>;
   earnings: EarningsState | null; settlements: any[]; payouts: any[]; recipients: any[];
   fetchEarnings: () => Promise<void>; fetchPayouts: () => Promise<void>; fetchRecipients: () => Promise<void>;
   requestPayout: (amount: number, recipientId: string, idempotencyKey: string) => Promise<{ ok: boolean; reason?: string; already?: boolean; minimum?: number; payout_id?: string; status?: string }>;
   executePayout: (payoutId: string) => Promise<{ ok: boolean; status?: string; already?: boolean; reason?: string }>;
-  saveRecipient: (payload: { bankCode: string; bankName?: string; accountNumber: string; accountLast4: string; accountName: string; country?: string; currency?: string }) => Promise<{ ok: boolean; error?: string }>;
+  saveRecipient: (payload: { bankCode: string; bankName?: string; accountNumber:string; accountLast4: string; accountName: string; country?: string; currency?: string }) => Promise<{ ok: boolean; error?: string }>;
 }
-
-const resolveCompanyId = (tenantCompanyId: number | null): number | null => {
-  if (tenantCompanyId) return tenantCompanyId;
-  const stored = localStorage.getItem('trakbin_company');
-  if (stored) { try { const p = JSON.parse(stored); return p.company_id ? Number(p.company_id) : null; } catch { return null; } }
-  return null;
-};
 
 export const useCompanySession = create<CompanySessionState>((set, get) => ({
   tenant: { companyId: null, userId: null, role: null, loaded: false },
@@ -47,45 +42,70 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   serviceRequests: [], selectedRequest: null, isDrawerOpen: false, earnings: null, settlements: [], payouts: [], recipients: [],
 
   loadTenantContext: async () => {
+    // SEC-3: Always read from auth.users + profiles (server-verified identity)
     const { data: { user } } = await supabase.auth.getUser();
-    let userId = user?.id || null; let companyId: number | null = null; let role: UserRole = 'company';
-    if (userId) { const { data: profile } = await supabase.from('profiles').select('company_id, role').eq('id', userId).single(); companyId = profile?.company_id ?? null; role = (profile?.role as UserRole) || 'company'; }
-    else {
-      const storedCompany = localStorage.getItem('trakbin_company'); const storedDriver = localStorage.getItem('trakbin_driver');
-      if (storedCompany) { try { const p = JSON.parse(storedCompany); userId = p.id; companyId = p.company_id; role = 'company'; } catch { localStorage.removeItem('trakbin_company'); } }
-      else if (storedDriver) { try { const p = JSON.parse(storedDriver); userId = p.id; companyId = p.company_id; role = 'driver'; } catch { localStorage.removeItem('trakbin_driver'); } }
+    
+    if (!user) {
+      set({ tenant: { companyId: null, userId: null, role: null, loaded: true } });
+      return;
     }
-    const numericCompanyId = companyId ? Number(companyId) : null;
-    set({ tenant: { companyId: numericCompanyId, userId, role, loaded: true } });
-    if (numericCompanyId) { await get().fetchFleet(); await get().fetchServiceRequests(); await get().fetchEarnings(); }
+
+    // Read profile from server (RLS enforces auth.uid() = id)
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('company_id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (error || !profile) {
+      console.error('Profile not found for authenticated user:', user.id);
+      set({ tenant: { companyId: null, userId: user.id, role: null, loaded: true } });
+      return;
+    }
+
+    const companyId = profile.company_id ? Number(profile.company_id) : null;
+    const role = profile.role as UserRole;
+
+    set({ tenant: { companyId, userId: user.id, role, loaded: true } });
+
+    if (companyId) {
+      await get().fetchFleet();
+      await get().fetchServiceRequests();
+      await get().fetchEarnings();
+    }
   },
 
   fetchFleet: async () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     try {
       const { data: routes, error } = await supabase.from('routes').select('*, drivers(name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
       if (error) throw error;
-      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0, license_plate: '', truck_type: '' })) });
+      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0,license_plate: '', truck_type: '' })) });
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
 
   fetchServiceRequests: async () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
-    const { data, error } = await supabase.from('service_requests').select(`*, buildings:building_id (address, latitude, longitude, building_type)`).eq('status', 'pending').order('submitted_at', { ascending: false });
+    const cid = get().tenant.companyId;
+    if (!cid) return;
+    const { data, error } = await supabase.from('service_requests').select(`*, buildings:building_id (address, latitude, longitude, building_type)`).eq('status','pending').order('submitted_at', { ascending: false });
     if (error) console.error('Error fetching requests:', error); else set({ serviceRequests: data || [] });
   },
 
   fetchPayouts: async () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     try { const res = await fetch(`/api/company/payouts?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ payouts: json.payouts || [] }); } catch (e) { console.error('fetchPayouts failed:', e); }
   },
   fetchRecipients: async () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     try { const res = await fetch(`/api/company/recipients?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ recipients: json.recipients || [] }); } catch (e) { console.error('fetchRecipients failed:', e); }
   },
 
   fetchEarnings: async () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     try {
       const [{ data: hauler }, { data: settings }, { data: txs }] = await Promise.all([
         supabase.from('haulers').select('available_balance, pending_balance, withdrawn_total, lifetime_earnings, commission_bps, fee_model, flat_fee, processor_bps, processor_flat, processor_cap').eq('id', cid).maybeSingle(),
@@ -117,21 +137,23 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   },
 
   requestPayout: async (amount, recipientId, idempotencyKey) => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return { ok: false, reason: 'no_company' };
+    const cid = get().tenant.companyId;
+    if (!cid) return { ok:false, reason: 'no_company' };
     try {
       const res = await fetch('/api/company/payouts/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyId: cid, amount, recipientId, idempotencyKey }) });
       const json = await res.json();
       if (json.ok) {
         await get().fetchEarnings();
         get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested — releasing…', json.already ? 'info' : 'success');
-        if (!json.already && json.payout_id) { try { await get().executePayout(json.payout_id); } catch {} } // best-effort release; reservation stands if it fails
-      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
+        if (!json.already && json.payout_id) { try { await get().executePayout(json.payout_id); } catch {} }
+      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payoutis ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
       return json;
     } catch (e: any) { get().addNotification('Could not request payout.', 'error'); return { ok: false, reason: e?.message }; }
   },
 
   saveRecipient: async (payload) => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return { ok: false, error: 'no_company' };
+    const cid = get().tenant.companyId;
+    if (!cid) return { ok:false, error: 'no_company' };
     try {
       const res = await fetch('/api/company/recipients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyId: cid, ...payload }) });
       const json = await res.json();
@@ -141,8 +163,8 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   },
 
     activateService: async (requestId, zoneId, scheduleData) => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return;
-    // verification gate — email + profile certify; documents do NOT gate.
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
@@ -154,14 +176,14 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       await supabase.from('collection_schedules').insert([{ company_id: cid, building_id: request.building_id, frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '), time_window: scheduleData.timeWindow, is_active: true }]);
       await supabase.from('Buildings').update({ company_id: cid, status: 'active' }).eq('custom_id', request.building_id);
       const { data: hauler } = await supabase.from('haulers').select('contact_number').eq('id', cid).maybeSingle();
-      await supabase.from('company_profiles').upsert({ id: cid, contact_numbers: hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
+      await supabase.from('company_profiles').upsert({ id: cid, contact_numbers:hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
       await supabase.from('environmental_issue_history').insert([{ issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${cid}`, metadata: { request_id: requestId, building_id: request.building_id } }]);
       get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
       await get().fetchServiceRequests(); get().setIsDrawerOpen(false); get().addNotification('Service activated successfully!', 'success');
     } catch (e) { console.error('Activation failed:', e); get().addNotification('Failed to activate service.', 'error'); }
   },
 
-  updateTruckStatus: (truckId, status) => set((s) => ({ trucks: s.trucks.map((t) => (t.id === truckId ? { ...t, status } : t)) })),
+  updateTruckStatus: (truckId, status) => set((s) => ({ trucks: s.trucks.map((t)=> (t.id === truckId ? { ...t, status } : t)) })),
   addDispatchEvent: (event) => { const e: DispatchEvent = { ...event, id: `event-${Date.now()}`, timestamp: new Date().toISOString() }; set((s) => ({ dispatchTimeline: [e, ...s.dispatchTimeline].slice(0, 100) })); },
   addNotification: (message, type) => { const n = { id: `notif-${Date.now()}`, message, timestamp: new Date().toISOString(), type }; set((s) => ({ activeNotifications: [n, ...s.activeNotifications].slice(0, 10) })); setTimeout(() => get().clearNotification(n.id), 5000); },
   clearNotification: (id) => set((s) => ({ activeNotifications: s.activeNotifications.filter((n) => n.id !== id) })),
@@ -169,9 +191,10 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   setSelectedRequest: (request) => set({ selectedRequest: request }), setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
   subscribeToRealtime: () => {
-    const cid = resolveCompanyId(get().tenant.companyId); if (!cid) return () => {};
-    const routeSub = supabase.channel('routes-channel').on('postgres_changes', { event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` }, (p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
-    const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter: `company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
+    const cid = get().tenant.companyId;
+    if (!cid) return () =>{};
+    const routeSub = supabase.channel('routes-channel').on('postgres_changes', {event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` },(p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
+    const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter:`company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
     const payoutSub = supabase.channel(`company-payouts-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `company_id=eq.${cid}` }, () => { get().fetchPayouts(); get().fetchEarnings(); }).subscribe();
     return () => { supabase.removeChannel(routeSub); supabase.removeChannel(ledgerSub); supabase.removeChannel(payoutSub); };
   },
