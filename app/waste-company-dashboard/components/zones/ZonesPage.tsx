@@ -5,12 +5,14 @@ import { motion } from "framer-motion";
 import { Plus, MapPin, Building2, Zap, Layers } from "lucide-react";
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { useZones } from "@/lib/features/zones/hooks/useZones";
-import type { ZoneRecord } from "@/lib/features/zones/services/zoneService";
+import type { ZoneRecord, AutoAssignResult } from "@/lib/features/zones/services/zoneService";
 import ZoneTable from "./ZoneTable";
 import ZoneDetailsDrawer from "./ZoneDetailsDrawer";
 import CreateZoneModal from "./CreateZoneModal";
 import EditZoneModal from "./EditZoneModal";
 import ZoneSearch from "./ZoneSearch";
+import ZoneAutomationCard from "./ZoneAutomationCard";
+import NeedsReviewDrawer from "./NeedsReviewDrawer";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const body = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap", variable: "--font-body" });
@@ -18,12 +20,22 @@ const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function ZonesPage() {
-  const { zones, loading, error, createZone, updateZone, deleteZone, toggleZone } = useZones();
+  const {
+    zones, loading, error,
+    createZone, updateZone, deleteZone, toggleZone,
+    autoAssignEnabled, runAutoAssign, assignBuilding, toggleAutoAssign,
+  } = useZones();
+
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editingZone, setEditingZone] = useState<ZoneRecord | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  // Automation state
+  const [running, setRunning] = useState(false);
+  const [lastResult, setLastResult] = useState<AutoAssignResult | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   const filteredZones = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -69,9 +81,16 @@ export default function ZonesPage() {
     if (selectedZoneId === zone.id) setSelectedZoneId(null);
   };
 
+  const handleRunAutoAssign = async () => {
+    setRunning(true);
+    const result = await runAutoAssign();
+    setRunning(false);
+    if (result) setLastResult(result);
+  };
+
   return (
     <div className={`${body.className} space-y-5`}>
-      {/* Header row: stats + create */}
+      {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s, i) => {
           const Icon = s.Icon;
@@ -113,6 +132,16 @@ export default function ZonesPage() {
         })}
       </div>
 
+      {/* Automation control */}
+      <ZoneAutomationCard
+        enabled={autoAssignEnabled}
+        running={running}
+        lastResult={lastResult}
+        onToggle={toggleAutoAssign}
+        onRun={handleRunAutoAssign}
+        onOpenReview={() => setReviewOpen(true)}
+      />
+
       {/* Search */}
       <ZoneSearch value={search} onChange={setSearch} />
 
@@ -148,6 +177,13 @@ export default function ZonesPage() {
         zone={editingZone}
         onClose={() => setEditingZone(null)}
         onUpdate={updateZone}
+      />
+      <NeedsReviewDrawer
+        open={reviewOpen}
+        items={lastResult?.needsReview ?? []}
+        zones={zones}
+        onAssign={assignBuilding}
+        onClose={() => setReviewOpen(false)}
       />
     </div>
   );
