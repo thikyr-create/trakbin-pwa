@@ -31,10 +31,25 @@ export const authEngine = {
       if (error) {
         if (/confirm/i.test(error.message)) return { ok: false, message: '⚠️ Please confirm your email before signing in — check your inbox.' };
       } else if (data.user) {
+        // Verified identity: profiles is the server-side source of truth
+        const { data: profile } = await supabaseAuth.client
+          .from('profiles')
+          .select('company_id, role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
         const res = await authAdapter.queryUserByAuthOrEmail(data.user.id, email);
-        const accountType = res?.accountType || 'WasteCompany';
-        const row = res?.user || { id: data.user.id, email };
-        if (data.user.email_confirmed_at && row.company_id) { await authAdapter.markEmailVerified(row.company_id).catch(() => {}); }
+        const companyId = res?.user?.company_id ?? profile?.company_id ?? null;
+        const accountType = res?.accountType || (profile?.role === 'driver' ? 'Driver' : 'WasteCompany');
+
+        // NORMALIZED row: id = company id (numeric). Never the auth UUID,
+        // never the legacy users.id. Every downstream engine reads .id
+        const row = { ...(res?.user || { email }), id: companyId, company_id: companyId };
+
+        if (data.user.email_confirmed_at && companyId) {
+          await authAdapter.markEmailVerified(companyId).catch(() => {});
+        }
+
         const role: Role = accountType === 'Driver' ? 'driver' : 'company';
         const key = accountType === 'Driver' ? KEYS.driver : KEYS.company;
         localStorage.setItem(key, JSON.stringify(row));
@@ -47,12 +62,14 @@ export const authEngine = {
     const res = await authAdapter.queryUserByCredentials(email, password);
     if (!res) return { ok: false, message: '❌ Invalid ID/Email or password' };
     if (res.accountType === 'WasteCompany') {
-      localStorage.setItem(KEYS.company, JSON.stringify(res.user));
-      useAuthStore.getState().setSession('company', res.user);
+      const row = { ...res.user, id: res.user.company_id ?? res.user.id };
+      localStorage.setItem(KEYS.company, JSON.stringify(row));
+      useAuthStore.getState().setSession('company', row);
       return { ok: true, message: '✅ Login successful! Redirecting...', role: 'company' };
     }
-    localStorage.setItem(KEYS.driver, JSON.stringify(res.user));
-    useAuthStore.getState().setSession('driver', res.user);
+    const dRow = { ...res.user, id: res.user.company_id ?? res.user.id };
+    localStorage.setItem(KEYS.driver, JSON.stringify(dRow));
+    useAuthStore.getState().setSession('driver', dRow);
     return { ok: true, message: '✅ Login successful! Redirecting...', role: 'driver' };
   },
 
@@ -102,9 +119,8 @@ export const authEngine = {
     });
     if (haulerError || !haulerData) return { ok: false, message: '❌ Failed to create company: ' + (haulerError?.message || 'unknown') };
 
-    // Supabase Auth signup (hashed password stored in auth.users.encrypted_password).
-    // Metadata (company_id + role) is passed so the on_auth_user_created trigger
-    // creates the profiles row automatically — no client-side insert needed.
+    // Supabase Auth signup. Metadata flows to the on_auth_user_created trigger,
+    // which creates the profiles row with company_id + role.
     let authId: string | null = null; let needsConfirm = false;
     try {
       const { data, error } = await supabaseAuth.signUp(input.email, input.password, {
