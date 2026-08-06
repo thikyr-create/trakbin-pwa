@@ -9,8 +9,15 @@ import {
   updateZone,
   deleteZone,
   toggleZoneActive,
+  autoAssignZones,
+  assignBuildingToZone,
+  fetchUnassignedBuildings,
+  fetchAutoAssignFlag,
+  setAutoAssignFlag,
   type ZoneRecord,
   type ZoneDetail,
+  type AutoAssignResult,
+  type UnassignedBuilding,
 } from "../services/zoneService";
 
 function getCompanyId(): number | null {
@@ -35,6 +42,7 @@ export function useZones() {
   const [zones, setZones] = useState<ZoneRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
 
   const refetch = useCallback(async () => {
     const companyId = getCompanyId();
@@ -48,8 +56,12 @@ export function useZones() {
     setLoading(true);
     setError(null);
 
-    const data = await fetchZones(companyId);
+    const [data, flag] = await Promise.all([
+      fetchZones(companyId),
+      fetchAutoAssignFlag(companyId),
+    ]);
     setZones(data);
+    setAutoAssignEnabled(flag);
     setLoading(false);
   }, []);
 
@@ -81,6 +93,7 @@ export function useZones() {
       center_lat?: number | null;
       center_lng?: number | null;
       radius_km?: number | null;
+      polygon?: number[][] | null;
       is_active?: boolean;
       estates?: string[];
       streets?: string[];
@@ -111,15 +124,54 @@ export function useZones() {
     [refetch]
   );
 
+  /** Runs the zone engine across all unassigned buildings. */
+  const runAutoAssign = useCallback(async (): Promise<AutoAssignResult | null> => {
+    const companyId = getCompanyId();
+    if (!companyId) return null;
+    const result = await autoAssignZones(companyId);
+    await refetch();
+    return result;
+  }, [refetch]);
+
+  /** Manual assignment from the needs-review flow. */
+  const assignBuilding = useCallback(
+    async (buildingId: string, zoneName: string, hasAssignment: boolean) => {
+      const companyId = getCompanyId();
+      if (!companyId) return { ok: false, error: "No company session." };
+      const result = await assignBuildingToZone(companyId, buildingId, zoneName, hasAssignment);
+      if (result.ok) await refetch();
+      return result;
+    },
+    [refetch]
+  );
+
+  const loadUnassigned = useCallback(async (): Promise<UnassignedBuilding[]> => {
+    const companyId = getCompanyId();
+    if (!companyId) return [];
+    return fetchUnassignedBuildings(companyId);
+  }, []);
+
+  const toggleAutoAssign = useCallback(async (enabled: boolean) => {
+    const companyId = getCompanyId();
+    if (!companyId) return;
+    await setAutoAssignFlag(companyId, enabled);
+    setAutoAssignEnabled(enabled);
+  }, []);
+
   return {
     zones,
     loading,
     error,
     refetch,
+    autoAssignEnabled,
     createZone: handleCreate,
     updateZone: handleUpdate,
     deleteZone: handleDelete,
     toggleZone: handleToggle,
+    runAutoAssign,
+    assignBuilding,
+    loadUnassigned,
+    toggleAutoAssign,
   };
 }
 
