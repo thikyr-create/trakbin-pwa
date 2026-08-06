@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Pencil, Loader2, AlertTriangle, Info, Lock } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { ZoneRecord } from "@/lib/features/zones/services/zoneService";
+import ZoneBoundaryEditor from "./ZoneBoundaryEditor";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -24,6 +25,7 @@ interface EditZoneModalProps {
     center_lat?: number | null;
     center_lng?: number | null;
     radius_km?: number | null;
+    polygon?: number[][] | null;
     is_active?: boolean;
     estates?: string[];
     streets?: string[];
@@ -35,11 +37,12 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
   const [centerLat, setCenterLat] = useState("");
   const [centerLng, setCenterLng] = useState("");
   const [radiusKm, setRadiusKm] = useState("");
+  const [polygon, setPolygon] = useState<number[][] | null>(null);
   const [estates, setEstates] = useState("");
   const [streets, setStreets] = useState("");
   const [addresses, setAddresses] = useState("");
   const [isActive, setIsActive] = useState(true);
-  
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,7 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
       setCenterLat(zone.center_lat != null ? String(zone.center_lat) : "");
       setCenterLng(zone.center_lng != null ? String(zone.center_lng) : "");
       setRadiusKm(zone.radius_km != null ? String(zone.radius_km) : "");
+      setPolygon(zone.polygon || null);
       setEstates((zone.estates || []).join(", "));
       setStreets((zone.streets || []).join(", "));
       setAddresses((zone.addresses || []).join(", "));
@@ -80,6 +84,7 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
       center_lat: lat,
       center_lng: lng,
       radius_km: radius,
+      polygon,
       is_active: isActive,
       estates: splitList(estates),
       streets: splitList(streets),
@@ -125,7 +130,7 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
             <form onSubmit={submit} className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-5">
               <div>
                 <label className={`${labelCls} flex items-center gap-1.5`}>Zone name <Lock size={10} /></label>
-                <input type="text" value={zone.zone_name} disabled className="w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-500 cursor-not-allowed" />
+                <input type="text" value={zone.zone_name} disabled className="w-full cursor-not-allowed rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-500" />
                 <p className="mt-1.5 flex items-start gap-1.5 text-[10px] font-medium text-amber-600">
                   <Info size={12} className="mt-0.5 shrink-0" />
                   Name is locked because buildings use it to map to this zone. Changing it would disconnect existing service assignments.
@@ -146,6 +151,9 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
                   <input type="text" value={radiusKm} onChange={(e) => setRadiusKm(e.target.value)} placeholder="2.5" className={inputCls} />
                 </div>
               </div>
+
+              {/* Polygon boundary */}
+              <ZoneBoundaryEditor key={zone.id} value={polygon} onChange={setPolygon} />
 
               <div>
                 <label className={labelCls}>Estates (comma-separated)</label>
