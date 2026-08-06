@@ -2,6 +2,12 @@ import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const KEYS = { caretaker: 'trakbin_caretaker', company: 'trakbin_company', driver: 'trakbin_driver' } as const;
 
@@ -108,6 +114,7 @@ export const authEngine = {
       const { data, error } = await supabaseAuth.signUp(input.email, input.password);
       if (!error && data.user) { authId = data.user.id; needsConfirm = !data.session; }
     } catch { /* fall back to legacy-only row */ }
+    
 
     const { error: userError } = await authAdapter.insertUser({
       email: input.email, password: authId ? null : input.password, auth_id: authId,
