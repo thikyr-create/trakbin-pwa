@@ -7,9 +7,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Default grace: overdue = due_date + 2 days passed
-const GRACE_DAYS = 2;
-
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const secret = process.env.CRON_SECRET;
@@ -18,55 +15,72 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // 1) Status maintenance — flip issued/viewed past grace to overdue
-  const graceCutoff = new Date();
-  graceCutoff.setDate(graceCutoff.getDate() - GRACE_DAYS);
-  const cutoffIso = graceCutoff.toISOString().slice(0, 10);
+  // 1) Fetch all companies with auto_invoice_generation = ON
+  const { data: companies } = await supabaseAdmin
+    .from('company_settings')
+    .select('company_id, grace_period_days')
+    .eq('auto_invoice_generation', true);
 
-  const { data: overdueRows, error: overdueError } = await supabaseAdmin
-    .from('invoices')
-    .update({ status: 'overdue' })
-    .in('status', ['issued', 'viewed'])
-    .lt('due_date', cutoffIso)
-    .select('id');
+  if (!companies || companies.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      overdueMarked: 0,
+      companiesProcessed: 0,
+      results: [],
+    });
+  }
 
-  // 2) Every company with at least one active plan
-  const { data: plans } = await supabaseAdmin
-    .from('billing_plans')
-    .select('company_id')
-    .eq('status', 'active');
+  // 2) Status maintenance — flip issued/viewed past grace to overdue
+  // Each company may have a different grace_period_days
+  const overdueResults: any[] = [];
 
-  const companyIds = [
-    ...new Set((plans || []).map((p: any) => p.company_id).filter(Boolean)),
-  ];
+  for (const company of companies) {
+    const graceDays = company.grace_period_days ?? 2;
+    const graceCutoff = new Date();
+    graceCutoff.setDate(graceCutoff.getDate() - graceDays);
+    const cutoffIso = graceCutoff.toISOString().slice(0, 10);
+
+    const { data: overdueRows, error: overdueError } = await supabaseAdmin
+      .from('invoices')
+      .update({ status: 'overdue' })
+      .eq('company_id', company.company_id)
+      .in('status', ['issued', 'viewed'])
+      .lt('due_date', cutoffIso)
+      .select('id');
+
+    overdueResults.push({
+      company_id: company.company_id,
+      marked: overdueError ? overdueError.message : (overdueRows || []).length,
+    });
+  }
 
   // 3) Bulk generation per company via the billing API (rules live there)
   const origin = req.nextUrl.origin;
   const results: any[] = [];
 
-  for (const cid of companyIds) {
+  for (const company of companies) {
     try {
       const res = await fetch(`${origin}/api/company/billing`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate_bulk', company_id: cid }),
+        body: JSON.stringify({ action: 'generate_bulk', company_id: company.company_id }),
       });
       const data = await res.json().catch(() => null);
       results.push({
-        company_id: cid,
+        company_id: company.company_id,
         ok: res.ok,
         generated: data?.generated ?? 0,
         skipped: data?.skipped ?? {},
       });
     } catch (err) {
-      results.push({ company_id: cid, ok: false, error: String(err) });
+      results.push({ company_id: company.company_id, ok: false, error: String(err) });
     }
   }
 
   return NextResponse.json({
     ok: true,
-    overdueMarked: overdueError ? overdueError.message : (overdueRows || []).length,
-    companiesProcessed: companyIds.length,
+    overdueResults,
+    companiesProcessed: companies.length,
     results,
   });
 }
