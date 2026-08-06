@@ -50,14 +50,6 @@ export const TRUCK_STATUSES = [
   { value: "maintenance", label: "Maintenance" },
 ];
 
-const EMPTY_VALUES: TruckFormValues = {
-  license_plate: "",
-  truck_type: "Compactor",
-  capacity: "",
-  status: "active",
-  driver_employee_id: null,
-};
-
 function normalizeDefaultValues(
   defaultValues?: Partial<TruckFormValues>
 ): TruckFormValues {
@@ -72,15 +64,8 @@ function normalizeDefaultValues(
 
 function validateValues(values: TruckFormValues): TruckFormErrors {
   const errors: TruckFormErrors = {};
-
-  if (!values.license_plate.trim()) {
-    errors.license_plate = "License plate is required.";
-  }
-
-  if (!values.truck_type) {
-    errors.truck_type = "Truck type is required.";
-  }
-
+  if (!values.license_plate.trim()) errors.license_plate = "License plate is required.";
+  if (!values.truck_type) errors.truck_type = "Truck type is required.";
   return errors;
 }
 
@@ -93,9 +78,7 @@ export default function TruckForm({
   onSubmit,
 }: TruckFormProps) {
   const idPrefix = useId();
-  const [values, setValues] = useState<TruckFormValues>(() =>
-    normalizeDefaultValues(defaultValues)
-  );
+  const [values, setValues] = useState<TruckFormValues>(() => normalizeDefaultValues(defaultValues));
   const [errors, setErrors] = useState<TruckFormErrors>({});
 
   useEffect(() => {
@@ -111,18 +94,10 @@ export default function TruckForm({
     return [...drivers].sort((a, b) => a.label.localeCompare(b.label));
   }, [drivers]);
 
-  function setField<K extends keyof TruckFormValues>(
-    field: K,
-    value: TruckFormValues[K]
-  ) {
-    setValues((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
+  function setField<K extends keyof TruckFormValues>(field: K, value: TruckFormValues[K]) {
+    setValues((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
       if (!prev[field] && !prev.form) return prev;
-
       const next = { ...prev };
       delete next[field];
       delete next.form;
@@ -132,9 +107,7 @@ export default function TruckForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const nextErrors = validateValues(values);
-
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -151,20 +124,14 @@ export default function TruckForm({
     try {
       await onSubmit(payload);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while saving this truck.";
-
+      const message = error instanceof Error ? error.message : "Something went wrong while saving this truck.";
       setErrors({ form: message });
     }
   }
 
-  const inputClasses =
-    "w-full rounded-xl border bg-emerald-950/60 px-4 py-3 text-sm text-emerald-50 outline-none transition placeholder:text-emerald-200/35 focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-400/20";
-
-  const labelClasses =
-    "mb-2 block font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-200/70";
+  // FIX: Light mode contrast classes
+  const inputClasses = "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100";
+  const labelClasses = "mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500";
 
   return (
     <motion.form
@@ -176,15 +143,13 @@ export default function TruckForm({
       noValidate
     >
       {errors.form ? (
-        <div className="rounded-xl border border-red-400/30 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errors.form}
         </div>
       ) : null}
 
       <div>
-        <label htmlFor={`${idPrefix}-truck-plate`} className={labelClasses}>
-          License plate
-        </label>
+        <label htmlFor={`${idPrefix}-truck-plate`} className={labelClasses}>License plate</label>
         <input
           id={`${idPrefix}-truck-plate`}
           type="text"
@@ -194,16 +159,12 @@ export default function TruckForm({
           disabled={submitting}
           className={`${inputClasses} uppercase`}
         />
-        {errors.license_plate ? (
-          <p className="mt-2 text-xs text-red-200">{errors.license_plate}</p>
-        ) : null}
+        {errors.license_plate ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.license_plate}</p> : null}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label htmlFor={`${idPrefix}-truck-type`} className={labelClasses}>
-            Type
-          </label>
+          <label htmlFor={`${idPrefix}-truck-type`} className={labelClasses}>Type</label>
           <select
             id={`${idPrefix}-truck-type`}
             value={values.truck_type}
@@ -211,21 +172,13 @@ export default function TruckForm({
             disabled={submitting}
             className={inputClasses}
           >
-            {TRUCK_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
+            {TRUCK_TYPES.map((type) => (<option key={type} value={type}>{type}</option>))}
           </select>
-          {errors.truck_type ? (
-            <p className="mt-2 text-xs text-red-200">{errors.truck_type}</p>
-          ) : null}
+          {errors.truck_type ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.truck_type}</p> : null}
         </div>
 
         <div>
-          <label htmlFor={`${idPrefix}-truck-status`} className={labelClasses}>
-            Status
-          </label>
+          <label htmlFor={`${idPrefix}-truck-status`} className={labelClasses}>Status</label>
           <select
             id={`${idPrefix}-truck-status`}
             value={values.status}
@@ -233,19 +186,13 @@ export default function TruckForm({
             disabled={submitting}
             className={inputClasses}
           >
-            {TRUCK_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
+            {TRUCK_STATUSES.map((status) => (<option key={status.value} value={status.value}>{status.label}</option>))}
           </select>
         </div>
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-truck-capacity`} className={labelClasses}>
-          Capacity
-        </label>
+        <label htmlFor={`${idPrefix}-truck-capacity`} className={labelClasses}>Capacity</label>
         <input
           id={`${idPrefix}-truck-capacity`}
           type="text"
@@ -255,29 +202,21 @@ export default function TruckForm({
           disabled={submitting}
           className={inputClasses}
         />
-        {errors.capacity ? (
-          <p className="mt-2 text-xs text-red-200">{errors.capacity}</p>
-        ) : null}
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-truck-driver`} className={labelClasses}>
-          Assigned driver
-        </label>
+        <label htmlFor={`${idPrefix}-truck-driver`} className={labelClasses}>Assigned driver</label>
         <select
           id={`${idPrefix}-truck-driver`}
           value={values.driver_employee_id ?? ""}
-          onChange={(event) =>
-            setField("driver_employee_id", event.target.value || null)
-          }
+          onChange={(event) => setField("driver_employee_id", event.target.value || null)}
           disabled={submitting}
           className={inputClasses}
         >
           <option value="">No driver assigned</option>
           {sortedDrivers.map((driver) => (
             <option key={driver.id} value={driver.id}>
-              {driver.label}
-              {driver.helper ? ` — ${driver.helper}` : ""}
+              {driver.label}{driver.helper ? ` — ${driver.helper}` : ""}
             </option>
           ))}
         </select>
@@ -287,29 +226,13 @@ export default function TruckForm({
         whileTap={{ scale: submitting ? 1 : 0.98 }}
         type="submit"
         disabled={submitting}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
         {submitting ? (
           <>
-            <svg
-              className="mr-2 h-4 w-4 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-90"
-                fill="currentColor"
-                d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-              />
+            <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
             </svg>
             Saving...
           </>

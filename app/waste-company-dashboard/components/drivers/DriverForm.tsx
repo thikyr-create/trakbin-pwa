@@ -41,16 +41,7 @@ export interface DriverFormProps {
   onSubmit: (values: DriverFormValues) => Promise<void> | void;
 }
 
-const EMPTY_VALUES: DriverFormValues = {
-  name: "",
-  email: "",
-  phone: "",
-  truck_id: null,
-};
-
-function normalizeDefaultValues(
-  defaultValues?: Partial<DriverFormValues>
-): DriverFormValues {
+function normalizeDefaultValues(defaultValues?: Partial<DriverFormValues>): DriverFormValues {
   return {
     name: defaultValues?.name ?? "",
     email: defaultValues?.email ?? "",
@@ -61,21 +52,10 @@ function normalizeDefaultValues(
 
 function validateValues(values: DriverFormValues): DriverFormErrors {
   const errors: DriverFormErrors = {};
-
-  if (!values.name.trim()) {
-    errors.name = "Driver name is required.";
-  }
-
-  if (!values.email.trim()) {
-    errors.email = "Driver email is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
-    errors.email = "Enter a valid email address.";
-  }
-
-  if (values.phone && values.phone.trim().length < 7) {
-    errors.phone = "Phone number looks too short.";
-  }
-
+  if (!values.name.trim()) errors.name = "Driver name is required.";
+  if (!values.email.trim()) errors.email = "Driver email is required.";
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
+  if (values.phone && values.phone.trim().length < 7) errors.phone = "Phone number looks too short.";
   return errors;
 }
 
@@ -88,9 +68,7 @@ export default function DriverForm({
   onSubmit,
 }: DriverFormProps) {
   const idPrefix = useId();
-  const [values, setValues] = useState<DriverFormValues>(() =>
-    normalizeDefaultValues(defaultValues)
-  );
+  const [values, setValues] = useState<DriverFormValues>(() => normalizeDefaultValues(defaultValues));
   const [errors, setErrors] = useState<DriverFormErrors>({});
 
   useEffect(() => {
@@ -106,18 +84,10 @@ export default function DriverForm({
     return [...trucks].sort((a, b) => a.label.localeCompare(b.label));
   }, [trucks]);
 
-  function setField<K extends keyof DriverFormValues>(
-    field: K,
-    value: DriverFormValues[K]
-  ) {
-    setValues((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-
+  function setField<K extends keyof DriverFormValues>(field: K, value: DriverFormValues[K]) {
+    setValues((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => {
       if (!prev[field] && !prev.form) return prev;
-
       const next = { ...prev };
       delete next[field];
       delete next.form;
@@ -127,9 +97,7 @@ export default function DriverForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const nextErrors = validateValues(values);
-
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -145,20 +113,14 @@ export default function DriverForm({
     try {
       await onSubmit(payload);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while saving this driver.";
-
+      const message = error instanceof Error ? error.message : "Something went wrong while saving this driver.";
       setErrors({ form: message });
     }
   }
 
-  const inputClasses =
-    "w-full rounded-xl border bg-emerald-950/60 px-4 py-3 text-sm text-emerald-50 outline-none transition placeholder:text-emerald-200/35 focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-400/20";
-
-  const labelClasses =
-    "mb-2 block font-mono text-[11px] uppercase tracking-[0.22em] text-emerald-200/70";
+  // FIX: Light mode contrast classes
+  const inputClasses = "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100";
+  const labelClasses = "mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500";
 
   return (
     <motion.form
@@ -170,15 +132,13 @@ export default function DriverForm({
       noValidate
     >
       {errors.form ? (
-        <div className="rounded-xl border border-red-400/30 bg-red-950/30 px-4 py-3 text-sm text-red-100">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           {errors.form}
         </div>
       ) : null}
 
       <div>
-        <label htmlFor={`${idPrefix}-driver-name`} className={labelClasses}>
-          Driver name
-        </label>
+        <label htmlFor={`${idPrefix}-driver-name`} className={labelClasses}>Driver name</label>
         <input
           id={`${idPrefix}-driver-name`}
           type="text"
@@ -188,15 +148,11 @@ export default function DriverForm({
           disabled={submitting}
           className={inputClasses}
         />
-        {errors.name ? (
-          <p className="mt-2 text-xs text-red-200">{errors.name}</p>
-        ) : null}
+        {errors.name ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.name}</p> : null}
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-driver-email`} className={labelClasses}>
-          Driver email
-        </label>
+        <label htmlFor={`${idPrefix}-driver-email`} className={labelClasses}>Driver email</label>
         <input
           id={`${idPrefix}-driver-email`}
           type="email"
@@ -206,15 +162,11 @@ export default function DriverForm({
           disabled={submitting}
           className={inputClasses}
         />
-        {errors.email ? (
-          <p className="mt-2 text-xs text-red-200">{errors.email}</p>
-        ) : null}
+        {errors.email ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.email}</p> : null}
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-driver-phone`} className={labelClasses}>
-          Phone number
-        </label>
+        <label htmlFor={`${idPrefix}-driver-phone`} className={labelClasses}>Phone number</label>
         <input
           id={`${idPrefix}-driver-phone`}
           type="tel"
@@ -224,64 +176,39 @@ export default function DriverForm({
           disabled={submitting}
           className={inputClasses}
         />
-        {errors.phone ? (
-          <p className="mt-2 text-xs text-red-200">{errors.phone}</p>
-        ) : null}
+        {errors.phone ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.phone}</p> : null}
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-driver-truck`} className={labelClasses}>
-          Assigned truck
-        </label>
+        <label htmlFor={`${idPrefix}-driver-truck`} className={labelClasses}>Assigned truck</label>
         <select
           id={`${idPrefix}-driver-truck`}
           value={values.truck_id ?? ""}
-          onChange={(event) =>
-            setField("truck_id", event.target.value || null)
-          }
+          onChange={(event) => setField("truck_id", event.target.value || null)}
           disabled={submitting}
           className={inputClasses}
         >
           <option value="">No truck assigned</option>
           {sortedTrucks.map((truck) => (
             <option key={truck.id} value={truck.id}>
-              {truck.label}
-              {truck.helper ? ` — ${truck.helper}` : ""}
+              {truck.label}{truck.helper ? ` — ${truck.helper}` : ""}
             </option>
           ))}
         </select>
-        {errors.truck_id ? (
-          <p className="mt-2 text-xs text-red-200">{errors.truck_id}</p>
-        ) : null}
+        {errors.truck_id ? <p className="mt-1.5 text-xs font-semibold text-red-600">{errors.truck_id}</p> : null}
       </div>
 
       <motion.button
         whileTap={{ scale: submitting ? 1 : 0.98 }}
         type="submit"
         disabled={submitting}
-        className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
         {submitting ? (
           <>
-            <svg
-              className="mr-2 h-4 w-4 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-90"
-                fill="currentColor"
-                d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-              />
+            <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
             </svg>
             Saving...
           </>
