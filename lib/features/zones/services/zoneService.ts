@@ -1,5 +1,9 @@
 // lib/features/zones/services/zoneService.ts
 import { createClient } from '@supabase/supabase-js';
+import {
+  resolveBuildingZone,
+  type ZoneResolution,
+} from '../utils/zoneAssignment';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -11,6 +15,7 @@ export interface ZoneRecord {
   center_lat: number | null;
   center_lng: number | null;
   radius_km: number | null;
+  polygon: number[][] | null;
   is_active: boolean | null;
   created_at: string;
   estates: string[] | null;
@@ -46,6 +51,21 @@ export interface ZoneDetail {
   zone: ZoneRecord;
   buildings: ZoneBuildingRow[];
   stats: ZoneStats;
+}
+
+export interface UnassignedBuilding {
+  custom_id: string;
+  address: string | null;
+  estate: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  has_assignment: boolean;
+  resolution: ZoneResolution | null;
+}
+
+export interface AutoAssignResult {
+  assigned: number;
+  needsReview: UnassignedBuilding[];
 }
 
 export async function fetchZones(company_id: number): Promise<ZoneRecord[]> {
@@ -165,6 +185,120 @@ export async function fetchZoneDetail(
   };
 }
 
+/** Buildings with no service assignment, or an assignment missing a zone. */
+export async function fetchUnassignedBuildings(
+  company_id: number
+): Promise<UnassignedBuilding[]> {
+  const [{ data: buildings }, { data: assignments }] = await Promise.all([
+    supabase
+      .from('Buildings')
+      .select('custom_id, address, estate, latitude, longitude')
+      .eq('company_id', company_id),
+    supabase
+      .from('service_assignments')
+      .select('building_id, zone_id')
+      .eq('company_id', company_id),
+  ]);
+
+  const zoneByBuilding = new Map<string, string | null>();
+  (assignments || []).forEach((a: any) => {
+    zoneByBuilding.set(a.building_id, a.zone_id || null);
+  });
+
+  return (buildings || [])
+    .filter((b: any) => !zoneByBuilding.get(b.custom_id))
+    .map((b: any) => ({
+      custom_id: b.custom_id,
+      address: b.address || null,
+      estate: b.estate || null,
+      latitude: b.latitude != null ? Number(b.latitude) : null,
+      longitude: b.longitude != null ? Number(b.longitude) : null,
+      has_assignment: zoneByBuilding.has(b.custom_id),
+      resolution: null,
+    }));
+}
+
+/**
+ * Bulk auto-assignment.
+ * High + medium confidence → written to service_assignments.
+ * Low confidence + unmatched → returned for manual review (never auto-applied).
+ */
+export async function autoAssignZones(company_id: number): Promise<AutoAssignResult> {
+  const zones = await fetchZones(company_id);
+  const unassigned = await fetchUnassignedBuildings(company_id);
+
+  const toWrite: Array<{ b: UnassignedBuilding; res: ZoneResolution }> = [];
+  const needsReview: UnassignedBuilding[] = [];
+
+  for (const b of unassigned) {
+    const res = resolveBuildingZone(b, zones);
+    if (res && (res.confidence === 'high' || res.confidence === 'medium')) {
+      toWrite.push({ b, res });
+    } else {
+      needsReview.push({ ...b, resolution: res });
+    }
+  }
+
+  // New assignment rows in one batch
+  const inserts = toWrite
+    .filter(({ b }) => !b.has_assignment)
+    .map(({ b, res }) => ({
+      id: crypto.randomUUID(),
+      building_id: b.custom_id,
+      company_id,
+      zone_id: res.zone_name,
+      service_status: 'pending',
+      activated_at: new Date().toISOString(),
+    }));
+
+  if (inserts.length > 0) {
+    await supabase.from('service_assignments').insert(inserts);
+  }
+
+  // Existing rows get their zone filled in
+  const updates = toWrite.filter(({ b }) => b.has_assignment);
+  for (const { b, res } of updates) {
+    await supabase
+      .from('service_assignments')
+      .update({ zone_id: res.zone_name })
+      .eq('building_id', b.custom_id)
+      .eq('company_id', company_id);
+  }
+
+  return { assigned: toWrite.length, needsReview };
+}
+
+/** Manual assignment — used by the needs-review flow. */
+export async function assignBuildingToZone(
+  company_id: number,
+  building_id: string,
+  zone_name: string,
+  has_assignment: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  if (has_assignment) {
+    const { error } = await supabase
+      .from('service_assignments')
+      .update({ zone_id: zone_name })
+      .eq('building_id', building_id)
+      .eq('company_id', company_id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from('service_assignments').insert([
+    {
+      id: crypto.randomUUID(),
+      building_id,
+      company_id,
+      zone_id: zone_name,
+      service_status: 'pending',
+      activated_at: new Date().toISOString(),
+    },
+  ]);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function createZone(
   company_id: number,
   payload: {
@@ -197,7 +331,7 @@ export async function createZone(
 
 /**
  * Updates only the SAFE fields of a zone.
- * zone_name is deliberately NOT editable here: under Option A it is the
+ * zone_name is deliberately NOT editable: under Option A it is the
  * join key to service_assignments.zone_id — renaming would orphan buildings.
  */
 export async function updateZone(
@@ -206,6 +340,7 @@ export async function updateZone(
     center_lat?: number | null;
     center_lng?: number | null;
     radius_km?: number | null;
+    polygon?: number[][] | null;
     is_active?: boolean;
     estates?: string[];
     streets?: string[];
@@ -217,6 +352,7 @@ export async function updateZone(
   if (payload.center_lat !== undefined) patch.center_lat = payload.center_lat;
   if (payload.center_lng !== undefined) patch.center_lng = payload.center_lng;
   if (payload.radius_km !== undefined) patch.radius_km = payload.radius_km;
+  if (payload.polygon !== undefined) patch.polygon = payload.polygon;
   if (payload.is_active !== undefined) patch.is_active = payload.is_active;
   if (payload.estates !== undefined) patch.estates = payload.estates;
   if (payload.streets !== undefined) patch.streets = payload.streets;
@@ -246,5 +382,34 @@ export async function toggleZoneActive(
     .update({ is_active })
     .eq('id', zone_id);
   if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/** Auto-assignment flag — defaults ON when no settings row exists. */
+export async function fetchAutoAssignFlag(company_id: number): Promise<boolean> {
+  const { data } = await supabase
+    .from('company_settings')
+    .select('auto_zone_assignment')
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  return data?.auto_zone_assignment !== false;
+}
+
+export async function setAutoAssignFlag(
+  company_id: number,
+  enabled: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const { data } = await supabase
+    .from('company_settings')
+    .update({ auto_zone_assignment: enabled })
+    .eq('company_id', company_id)
+    .select('id');
+
+  if (!data || data.length === 0) {
+    await supabase
+      .from('company_settings')
+      .insert([{ company_id, auto_zone_assignment: enabled }]);
+  }
   return { ok: true };
 }
