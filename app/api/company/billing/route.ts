@@ -53,15 +53,28 @@ async function fetchSettings(company_id: number): Promise<BillingSettings> {
 
 /**
  * Resolve amount for a building.
- * Priority: billing_plan (explicit) → pricing_plan (by building_type) → null (skip)
+ * Priority: pricing_plan_id (direct link) → billing_plan (legacy) → pricing_plan (by building_type) → null (skip)
  */
 async function resolveAmount(
   building_id: string,
   company_id: number,
-  buildingType: string | null
+  buildingType: string | null,
+  pricing_plan_id: string | null
 ): Promise<number | null> {
-  // 1) Explicit billing_plan
-  const { data: plan } = await supabaseAdmin
+  // 1) Direct link via pricing_plan_id (preferred)
+  if (pricing_plan_id) {
+    const { data: plan } = await supabaseAdmin
+      .from('pricing_plans')
+      .select('monthly_fee')
+      .eq('id', pricing_plan_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+
+    if (plan) return Number(plan.monthly_fee) || null;
+  }
+
+  // 2) Explicit billing_plan (legacy per-building plans)
+  const { data: billingPlan } = await supabaseAdmin
     .from('billing_plans')
     .select('amount')
     .eq('building_id', building_id)
@@ -69,9 +82,9 @@ async function resolveAmount(
     .eq('status', 'active')
     .maybeSingle();
 
-  if (plan) return Number(plan.amount) || null;
+  if (billingPlan) return Number(billingPlan.amount) || null;
 
-  // 2) Fallback to pricing_plan by building_type
+  // 3) Fallback to pricing_plan by building_type
   if (!buildingType) return null;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -113,7 +126,7 @@ async function runGeneration(
   // Rule 1+2+6: only active buildings of this company
   let buildingsQuery = supabaseAdmin
     .from('Buildings')
-    .select('custom_id, status, building_type')
+    .select('custom_id, status, building_type, pricing_plan_id')
     .eq('company_id', company_id)
     .eq('status', 'active');
   if (onlyCustomId) buildingsQuery = buildingsQuery.eq('custom_id', onlyCustomId);
@@ -140,8 +153,13 @@ async function runGeneration(
   for (const b of buildings) {
     const dueDate = invoiceDueDate(cycle, dueDay);
 
-    // Resolve amount: billing_plan → pricing_plan → skip
-    const amount = await resolveAmount(b.custom_id, company_id, b.building_type || null);
+    // Resolve amount: direct link → billing_plan → pricing_plan by type → skip
+    const amount = await resolveAmount(
+      b.custom_id,
+      company_id,
+      b.building_type || null,
+      b.pricing_plan_id || null
+    );
     if (amount === null) {
       bump(result.skipped, 'no_pricing_plan');
       continue;
@@ -207,7 +225,7 @@ export async function PATCH(req: NextRequest) {
     switch (action) {
       case 'generate': {
         if (!body.custom_id) {
-          return NextResponse.json({ error: 'custom_id is required' }, { status:400 });
+          return NextResponse.json({ error: 'custom_id is required' }, { status: 400 });
         }
         const result = await runGeneration(Number(company_id), cycle, body.custom_id);
         return NextResponse.json({ ok: true, ...result });
@@ -227,7 +245,7 @@ export async function PATCH(req: NextRequest) {
           .maybeSingle();
 
         if (!invoice) {
-          return NextResponse.json({ error: 'Invoice not found' }, { status: 404});
+          return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
         }
         if (invoice.status === 'paid') {
           return NextResponse.json(
@@ -236,10 +254,10 @@ export async function PATCH(req: NextRequest) {
           );
         }
 
-        // Fetch building type for pricing lookup
+        // Fetch building type and pricing_plan_id for amount resolution
         const { data: building } = await supabaseAdmin
           .from('Buildings')
-          .select('building_type')
+          .select('building_type, pricing_plan_id')
           .eq('custom_id', invoice.building_id)
           .eq('company_id', Number(company_id))
           .maybeSingle();
@@ -248,7 +266,8 @@ export async function PATCH(req: NextRequest) {
         const amount = await resolveAmount(
           invoice.building_id,
           Number(company_id),
-          building?.building_type || null
+          building?.building_type || null,
+          building?.pricing_plan_id || null
         );
 
         const { data: updated, error } = await supabaseAdmin
