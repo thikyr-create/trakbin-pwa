@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
-import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
+import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Mail, UserCheck, FileCheck2, CheckCircle2, Loader2, Upload, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { getCompanyVerification } from '@/lib/auth/companyVerification';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
+const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 interface Props { companyId: string | number; }
@@ -64,6 +65,24 @@ export default function CompanyVerificationCard({ companyId }: Props) {
     </div>
   );
 
+  // COMPACT MODE: When cleared to operate, show minimal chip
+  if (v.canOperate) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.3, ease: EASE }}
+        className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 ring-1 ring-emerald-200"
+      >
+        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+        <span className={`${mono.className} text-[11px] font-bold uppercase tracking-wider text-emerald-700`}>
+          Cleared to operate
+        </span>
+      </motion.div>
+    );
+  }
+
+  // FULL MODE: When action is needed, show the full verification card
   return (
     <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="relative overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
@@ -71,20 +90,14 @@ export default function CompanyVerificationCard({ companyId }: Props) {
           <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-600/80">Account verification</p>
           <h3 className={`${display.className} mt-1 text-xl font-extrabold tracking-tight text-gray-900`}>Your operator status</h3>
         </div>
-        {v.canOperate
-          ? <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"><ShieldCheck className="h-3.5 w-3.5" /> Cleared to operate</span>
-          : <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200"><AlertTriangle className="h-3.5 w-3.5" /> Action needed</span>}
+        <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
+          <AlertTriangle className="h-3.5 w-3.5" /> Action needed
+        </span>
       </div>
 
-      {v.canOperate ? (
-        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800">
-          Email and profile verified — you can accept buildings and assign drivers. Document verification below is optional and reviewed when available.
-        </p>
-      ) : (
-        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
-          Confirm your email and complete your profile to be cleared for accepting buildings and assigning drivers.
-        </p>
-      )}
+      <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+        Confirm your email and complete your profile to be cleared for accepting buildings and assigning drivers.
+      </p>
 
       <div className="space-y-3">
         <Row Icon={Mail} label="Email verification" done={v.email}>
