@@ -6,8 +6,7 @@ import { settleKey, topupKey } from '@/lib/utils/money';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
-
+let supabase = createClient(supabaseUrl, supabaseKey);
 export interface CaretakerContact { type: 'call' | 'whatsapp' | 'emergency' | 'office' | 'email'; label: string; value: string; }
 
 export interface CaretakerSessionState {
@@ -79,18 +78,18 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
   showAddFunds: false, showAutopay: false, autopaySource: 'wallet', autopayLoading: false,
   selectedMethod: '', loading: true, billingProcessing: false,
 
-  initializeSession: async () => {
-    // SEC-3: Caretakers don't have auth.users yet, so we keep localStorage
-    // but add server-side validation to prevent tampering
+    initializeSession: async () => {
     const storedCaretaker = localStorage.getItem('trakbin_caretaker');
-    if (!storedCaretaker) {
-      window.location.href = '/auth';
-      return;
-    }
+    if (!storedCaretaker) { window.location.href = '/auth'; return; }
 
     const caretakerData = JSON.parse(storedCaretaker);
-    
-    // Validate building exists in database (prevents localStorage tampering)
+
+    // CARETAKER BRIDGE: every query now carries the passcode capability header
+    supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { 'x-trakbin-passcode': String(caretakerData.passcode || '') } },
+    });
+
+    // Validate building exists (works pre- AND post-assignment via caretaker_ok)
     const { data: building, error } = await supabase
       .from('Buildings')
       .select('*')
@@ -105,6 +104,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     }
 
     set({ building, loading: true });
+    // ...rest of the function unchanged
 
     if (caretakerData.next_billing_date) {
       await get().checkAndGenerateInvoice(caretakerData.custom_id, caretakerData.next_billing_date, caretakerData.autopay_enabled, caretakerData.wallet_balance || 0);
