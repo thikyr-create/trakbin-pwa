@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Tags, Plus, Pencil, History, Loader2, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { Tags, Plus, Pencil, History, Loader2, CheckCircle2, AlertTriangle, X, Link2 } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 import type { PricingPlan } from "@/lib/features/settings/services/settingsService";
+import { autoLinkBuildingsToPlans } from "@/lib/features/finance/services/billingService";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -46,8 +47,13 @@ export default function PricingSettings({ bundle, loading, addPlan, changeFee }:
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Auto-link state
+  const [linking, setLinking] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ linked: number; skipped: number } | null>(null);
+
   const plans = bundle?.plans ?? [];
   const history = bundle?.history ?? [];
+  const companyId = bundle?.profile?.id ?? null;
 
   const resetForms = () => {
     setPlanName("");
@@ -106,6 +112,15 @@ export default function PricingSettings({ bundle, loading, addPlan, changeFee }:
     }
     resetForms();
     setEditingPlan(null);
+  };
+
+  const handleAutoLink = async () => {
+    if (!companyId) return;
+    setLinking(true);
+    setLinkResult(null);
+    const result = await autoLinkBuildingsToPlans(companyId);
+    setLinking(false);
+    setLinkResult(result);
   };
 
   if (loading && !bundle) {
@@ -288,6 +303,50 @@ export default function PricingSettings({ bundle, loading, addPlan, changeFee }:
           {feedback.text}
         </div>
       )}
+
+      {/* Building linkage */}
+      <div className="rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+              <Link2 size={18} />
+            </span>
+            <div>
+              <p className={`${display.className} text-sm font-extrabold text-gray-900`}>Building linkage</p>
+              <p className="mt-0.5 max-w-md text-[11px] font-medium text-gray-400">
+                Links every unlinked building to the matching plan by its building type.
+                Existing invoices keep their amounts — linkage affects future generation.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleAutoLink}
+            disabled={linking || plans.length === 0 || !companyId}
+            className="flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-200 transition hover:bg-sky-700 disabled:opacity-50"
+          >
+            {linking ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+            {linking ? "Linking…" : "Auto-link all buildings"}
+          </button>
+        </div>
+
+        {linkResult && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-gray-50/60 px-4 py-3">
+            <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-gray-500`}>
+              result:
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+              {linkResult.linked} linked
+            </span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${
+              linkResult.skipped > 0
+                ? "bg-amber-50 text-amber-700 ring-amber-200"
+                : "bg-gray-100 text-gray-500 ring-gray-200"
+            }`}>
+              {linkResult.skipped} skipped (no matching plan or already linked)
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Pricing history */}
       <div className="rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm">
