@@ -84,22 +84,29 @@ export const authAdapter = {
     return supabase.from('haulers').update({ documents_urls: urls, documents_status: status }).eq('id', companyId);
   },
 
-  async matchBuilding(opts: { officialAddress: string; estate?: string; coords: { lat: number; lon: number } }): Promise<number | null> {
-  const { officialAddress, estate, coords } = opts;
-  const geocoded = await geocodeAddress(officialAddress);
-  const lat = geocoded ? geocoded.lat : coords.lat;
-  const lng = geocoded ? geocoded.lon : coords.lon;
+    async matchBuilding(opts: { officialAddress: string; estate?: string; coords: { lat: number; lon: number } }): Promise<number | null> {
+    const { officialAddress, estate, coords } = opts;
+    const geocoded = await geocodeAddress(officialAddress);
+    const lat = geocoded ? geocoded.lat : coords.lat;
+    const lng = geocoded ? geocoded.lon : coords.lon;
 
-  const zones = await fetchActiveZones();
-  if (!zones || zones.length === 0) return null;
+    // Fetch ALL active zones (cross-company read is intentional here:
+    // registration matching must discover WHICH company covers the address)
+    const { data: zones } = await supabase
+      .from('company_zones')
+      .select('id, company_id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active')
+      .neq('is_active', false);
 
-  // Polygon → radius → text → (nearest is low confidence, rejected)
-  const res = resolveBuildingZone(
-    { custom_id: 'registration', latitude: lat, longitude: lng, estate: estate || null, address: officialAddress },
-    zones as any
-  );
+    if (!zones || zones.length === 0) return null;
 
-  if (!res || res.confidence === 'low') return null; // never auto-assign on guesses
-  const zone = zones.find((z: any) => z.zone_name === res.zone_name);
-  return zone?.company_id ?? null;
-}}
+    // Polygon → radius → text hierarchy (nearest = low confidence, rejected)
+    const res = resolveBuildingZone(
+      { custom_id: 'registration', latitude: lat, longitude: lng, estate: estate || null, address: officialAddress },
+      zones as any
+    );
+
+    if (!res || res.confidence === 'low') return null;
+    const zone = zones.find((z: any) => z.zone_name === res.zone_name);
+    return zone?.company_id ?? null;
+  },         
+};            

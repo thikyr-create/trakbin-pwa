@@ -86,11 +86,17 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
     
-  fetchServiceRequests: async () => {
+    fetchServiceRequests: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
-    const { data, error } = await supabase.from('service_requests').select(`*, buildings:building_id (address, latitude, longitude, building_type)`).eq('status','pending').order('submitted_at', { ascending: false });
-    if (error) console.error('Error fetching requests:', error); else set({ serviceRequests: data || [] });
+    const { data, error } = await supabase
+      .from('service_requests')
+      .select(`*, buildings:building_id (address, latitude, longitude, building_type)`)
+      .in('status', ['pending', 'auto_assigned'])
+      .or(`company_id.eq.${cid},company_id.is.null`)
+      .order('submitted_at', { ascending: false });
+    if (error) console.error('Error fetching requests:', error);
+    else set({ serviceRequests: data || [] });
   },
 
   fetchPayouts: async () => {
