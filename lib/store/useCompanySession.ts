@@ -4,6 +4,8 @@ import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { type FeeRule } from '@/lib/utils/money';
 import { canOperate } from '@/lib/auth/companyVerification';
+import { resolveBuildingZone } from '@/lib/features/zones/utils/zoneAssignment';
+import { ServicePublisher, BuildingPublisher, ZonePublisher, AssignmentPublisher } from '@/lib/core/event-bus';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -44,13 +46,12 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   loadTenantContext: async () => {
     // SEC-3: Always read from auth.users + profiles (server-verified identity)
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       set({ tenant: { companyId: null, userId: null, role: null, loaded: true } });
       return;
     }
 
-    // Read profile from server (RLS enforces auth.uid() = id)
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('company_id, role')
@@ -75,18 +76,17 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     }
   },
 
-    fetchFleet: async () => {
+  fetchFleet: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     try {
-      // FIX: drivers(full_name) not drivers(name)
       const { data: routes, error } = await supabase.from('routes').select('*, drivers(full_name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
       if (error) throw error;
       set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.full_name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0,license_plate: '', truck_type: '' })) });
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
-    
-    fetchServiceRequests: async () => {
+
+  fetchServiceRequests: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     const { data, error } = await supabase
@@ -110,11 +110,10 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     try { const res = await fetch(`/api/company/recipients?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ recipients: json.recipients || [] }); } catch (e) { console.error('fetchRecipients failed:', e); }
   },
 
-    fetchEarnings: async () => {
+  fetchEarnings: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     try {
-      // FIX: Only select columns that exist in haulers table
       const [{ data: hauler }, { data: settings }, { data: txs }] = await Promise.all([
         supabase.from('haulers').select('available_balance, pending_balance, withdrawn_total, lifetime_earnings, commission_bps').eq('id', cid).maybeSingle(),
         supabase.from('platform_settings').select('commission_bps, fee_model, flat_fee, processor_bps, processor_flat, processor_cap').maybeSingle(),
@@ -122,10 +121,8 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       ]);
       const feeRule: FeeRule = {
         model: (settings?.fee_model ?? 'percent') as FeeRule['model'],
-        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000, 
-        flatFee: settings?.flat_fee ?? 0,
-        processorBps: settings?.processor_bps ?? 0, 
-        processorFlat: settings?.processor_flat ?? 0,
+        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000, flatFee: settings?.flat_fee ?? 0,
+        processorBps: settings?.processor_bps ?? 0, processorFlat: settings?.processor_flat ?? 0,
         processorCap: settings?.processor_cap ?? null,
       };
       set({ earnings: { available: hauler?.available_balance ?? 0, pending: hauler?.pending_balance ?? 0, withdrawn: hauler?.withdrawn_total ?? 0, lifetime: hauler?.lifetime_earnings ?? 0, rateBps: feeRule.commissionBps, feeRule }, settlements: txs || [] });
@@ -135,6 +132,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       set({ earnings: { available: 0, pending: 0, withdrawn: 0, lifetime: 0, rateBps: 1000, feeRule: { model: 'percent', commissionBps: 1000, flatFee: 0, processorBps: 0, processorFlat: 0, processorCap: null } }, settlements: [] });
     }
   },
+
   executePayout: async (payoutId) => {
     try {
       const res = await fetch('/api/company/payouts/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payoutId }) });
@@ -155,7 +153,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         await get().fetchEarnings();
         get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested — releasing…', json.already ? 'info' : 'success');
         if (!json.already && json.payout_id) { try { await get().executePayout(json.payout_id); } catch {} }
-      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payoutis ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
+      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
       return json;
     } catch (e: any) { get().addNotification('Could not request payout.', 'error'); return { ok: false, reason: e?.message }; }
   },
@@ -171,42 +169,41 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e: any) { return { ok: false, error: e?.message }; }
   },
 
-     activateService: async (requestId, zoneId, scheduleData) => {
-    const cid = get().tenant.companyId; if (!cid) return;
+  activateService: async (requestId, zoneId, scheduleData) => {
+    const cid = get().tenant.companyId;
+    if (!cid) return;
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
       const { data: request } = await supabase.from('service_requests').select('building_id').eq('id', requestId).single();
       if (!request) throw new Error('Request not found');
-      
-      // FIX: Look up zone_name from the UUID before inserting
-      const { data: zone } = await supabase
-        .from('company_zones')
-        .select('zone_name')
-        .eq('id', zoneId)
-        .eq('company_id', cid)
-        .single();
-      
-      if (!zone) throw new Error('Zone not found');
-      
+
+      // ZONE GATE: a company may only accept buildings inside its defined coverage
+      const [{ data: buildingRow }, { data: myZones }] = await Promise.all([
+        supabase.from('Buildings').select('custom_id, latitude, longitude, estate, address').eq('custom_id', request.building_id).maybeSingle(),
+        supabase.from('company_zones').select('id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active').eq('company_id', cid).neq('is_active', false),
+      ]);
+
+      const coverage = buildingRow ? resolveBuildingZone(buildingRow as any, (myZones || []) as any) : null;
+      if (!coverage || coverage.confidence === 'low') {
+        get().addNotification('❌ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
+        return;
+      }
+
       const now = new Date().toISOString();
       await supabase.from('service_requests').update({ status: 'activated', company_id: cid, activated_at: now }).eq('id', requestId);
-      await supabase.from('service_assignments').insert([{ 
-        building_id: request.building_id, 
-        company_id: cid, 
-        zone_id: zone.zone_name,  // ← Store zone_name, not UUID
-        schedule_template: scheduleData.frequency, 
-        pickup_days: scheduleData.days, 
-        time_window: scheduleData.timeWindow, 
-        service_status: 'active', 
-        activated_at: now 
-      }]);
+      await supabase.from('service_assignments').insert([{ building_id: request.building_id, company_id: cid, zone_id: zoneId, schedule_template: scheduleData.frequency, pickup_days: scheduleData.days, time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now }]);
       await supabase.from('collection_schedules').insert([{ company_id: cid, building_id: request.building_id, frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '), time_window: scheduleData.timeWindow, is_active: true }]);
       await supabase.from('Buildings').update({ company_id: cid, status: 'active' }).eq('custom_id', request.building_id);
       const { data: hauler } = await supabase.from('haulers').select('contact_number').eq('id', cid).maybeSingle();
       await supabase.from('company_profiles').upsert({ id: cid, contact_numbers:hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
       await supabase.from('environmental_issue_history').insert([{ issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${cid}`, metadata: { request_id: requestId, building_id: request.building_id } }]);
       get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
+
+      // EVENT BUS: broadcast activation to all engines
+      ServicePublisher.publish('SERVICE_ACTIVATED', { buildingId: request.building_id, companyId: cid });
+      BuildingPublisher.publish('BUILDING_UPDATED', { buildingId: request.building_id });
+
       await get().fetchServiceRequests(); get().setIsDrawerOpen(false); get().addNotification('Service activated successfully!', 'success');
     } catch (e) { console.error('Activation failed:', e); get().addNotification('Failed to activate service.', 'error'); }
   },
@@ -218,31 +215,17 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   setSelectedTruck: (truck) => set({ selectedTruck: truck }), setCameraMode: (mode) => set({ cameraMode: mode }),
   setSelectedRequest: (request) => set({ selectedRequest: request }), setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
-  
-    subscribeToRealtime: () => {
+  subscribeToRealtime: () => {
     const cid = get().tenant.companyId;
     if (!cid) return () =>{};
-    
     const routeSub = supabase.channel('routes-channel').on('postgres_changes', {event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` },(p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
-    
     const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter:`company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
-    
     const payoutSub = supabase.channel(`company-payouts-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `company_id=eq.${cid}` }, () => { get().fetchPayouts(); get().fetchEarnings(); }).subscribe();
-    
-    // FIX: Subscribe to Buildings table changes so newly-accepted buildings appear live
-    const buildingsSub = supabase.channel(`company-buildings-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `company_id=eq.${cid}` }, () => {
-      // Trigger a refetch of the parent's buildings data
-      // The parent page.tsx has a fetchData function that we need to call
-      // Since we can't call it directly, we'll use a custom event
-      window.dispatchEvent(new CustomEvent('trakbin-buildings-changed'));
-    }).subscribe();
-    
-    return () => { 
-      supabase.removeChannel(routeSub); 
-      supabase.removeChannel(ledgerSub); 
-      supabase.removeChannel(payoutSub);
-      supabase.removeChannel(buildingsSub);
-    };
+    // EVENT BUS bridges: DB changes (any tab/user) → semantic events
+    const buildingsSub = supabase.channel(`company-buildings-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `company_id=eq.${cid}` }, () => { BuildingPublisher.publish('BUILDING_UPDATED', {}); }).subscribe();
+    const zonesSub = supabase.channel(`company-zones-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'company_zones', filter: `company_id=eq.${cid}` }, () => { ZonePublisher.publish('ZONE_UPDATED', {}); }).subscribe();
+    const assignSub = supabase.channel(`company-assignments-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `company_id=eq.${cid}` }, () => { AssignmentPublisher.publish('ASSIGNMENT_UPDATED', {}); }).subscribe();
+    return () => { supabase.removeChannel(routeSub); supabase.removeChannel(ledgerSub); supabase.removeChannel(payoutSub); supabase.removeChannel(buildingsSub); supabase.removeChannel(zonesSub); supabase.removeChannel(assignSub); };
   },
   unsubscribeFromRealtime: () => { supabase.removeAllChannels(); },
 }));

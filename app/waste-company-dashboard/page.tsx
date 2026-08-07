@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
+import { bootstrapEventBus, bus } from '@/lib/core/event-bus';
 import AuthGate from './components/AuthGate';
 import NotificationsPanel from './components/NotificationsPanel';
 import OverviewPage from './components/OverviewPage';
@@ -62,7 +63,7 @@ export default function WasteCompanyDashboard() {
   const [companyId, setCompanyId] = useState<string>('');
   const [activePage, setActivePage] = useState<PageView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
 
   const [trucks, setTrucks] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
@@ -78,32 +79,6 @@ export default function WasteCompanyDashboard() {
     trucks: liveFleet, serviceRequests, earnings,
   } = useCompanySession();
 
-    useEffect(() => {
-    const storedCompany = localStorage.getItem('trakbin_company');
-    if (!storedCompany) { router.push('/auth'); return; }
-
-    const userData = JSON.parse(storedCompany);
-    setCompanyName(userData.company_name || 'Waste Company');
-    setCompanyId(userData.id || '');
-
-    loadTenantContext();
-
-    if (tenant.role === 'driver') { router.push('/hauler-dashboard'); return; }
-
-    const t = setTimeout(() => { fetchData(); }, 400);
-    const cleanup = subscribeToRealtime();
-    
-    // FIX: Listen for buildings-changed event and refetch
-    const handleBuildingsChanged = () => { fetchData(); };
-    window.addEventListener('trakbin-buildings-changed', handleBuildingsChanged);
-    
-    return () => { 
-      clearTimeout(t); 
-      if (typeof cleanup === 'function') cleanup(); 
-      else unsubscribeFromRealtime();
-      window.removeEventListener('trakbin-buildings-changed', handleBuildingsChanged);
-    };
-  }, [router]);
   const fetchData = async () => {
     let currentCompanyId = tenant.companyId;
     if (!currentCompanyId) {
@@ -129,6 +104,31 @@ export default function WasteCompanyDashboard() {
     } catch (error) { console.error('Error fetching data:', error); }
     finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    const storedCompany = localStorage.getItem('trakbin_company');
+    if (!storedCompany) { router.push('/auth'); return; }
+
+    const userData = JSON.parse(storedCompany);
+    setCompanyName(userData.company_name || 'Waste Company');
+    setCompanyId(userData.id || '');
+
+    loadTenantContext();
+
+    if (tenant.role === 'driver') { router.push('/hauler-dashboard'); return; }
+
+    // EVENT BUS: boot subscribers once, then refetch the deck on relevant events
+    bootstrapEventBus();
+    const offBus = bus.subscribe(['BUILDING_UPDATED', 'SERVICE_ACTIVATED'], 'company-deck', () => fetchData());
+
+    const t = setTimeout(() => { fetchData(); }, 400);
+    const cleanup = subscribeToRealtime();
+    return () => {
+      clearTimeout(t);
+      offBus();
+      if (typeof cleanup === 'function') cleanup(); else unsubscribeFromRealtime();
+    };
+  }, [router]);
 
   const onRoad = useMemo(() => liveFleet.filter((t) => t.status === 'on_route' || t.status === 'active').length, [liveFleet]);
   const pendingRequests = serviceRequests.length;
@@ -183,7 +183,7 @@ export default function WasteCompanyDashboard() {
     { Icon: Truck, label: 'On the road', value: onRoad, accent: 'text-emerald-300', live: onRoad > 0 },
     { Icon: Users, label: 'Crew', value: drivers.length, accent: 'text-emerald-100' },
     { Icon: Building2, label: 'Buildings served', value: served, accent: 'text-emerald-100' },
-    { Icon: Inbox, label: 'Pending requests', value: pendingRequests, accent: pendingRequests > 0 ? 'text-amber-300' : 'text-emerald-100', pulse: pendingRequests > 0 },
+    { Icon: Inbox, label: 'Pending requests', value: pendingRequests, accent: pendingRequests > 0 ? 'text-amber-300' : 'text-emerald-100', pulse: pendingRequests> 0 },
   ];
 
   return (
@@ -197,7 +197,7 @@ export default function WasteCompanyDashboard() {
 
         <NotificationsPanel />
 
-        {sidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
+        {sidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity:1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
 
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
           <div className="flex items-center justify-between border-b border-gray-100 p-4">
@@ -232,12 +232,12 @@ export default function WasteCompanyDashboard() {
           </nav>
 
           <div className="absolute bottom-0 left-0 right-0 border-t border-gray-100 bg-white p-3">
-            <button onClick={() => { localStorage.removeItem('trakbin_company'); router.push('/'); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-red-600 transition-all hover:bg-red-50"><LogOut size={18} /> Logout</button>
+            <button onClick={() => { localStorage.removeItem('trakbin_company');router.push('/'); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-red-600 transition-all hover:bg-red-50"><LogOut size={18} /> Logout</button>
           </div>
         </aside>
 
         <main className="relative z-10 flex min-w-0 flex-col lg:pl-64">
-          <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-30 border-b border-gray-200/70 bg-[#f6f7f6]/85 px-4 py-3 backdrop-blur-md">
+          <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1,y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-30 border-b border-gray-200/70 bg-[#f6f7f6]/85 px-4 py-3 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 lg:hidden"><Menu size={22} /></button>

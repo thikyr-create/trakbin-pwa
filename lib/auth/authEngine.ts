@@ -1,6 +1,7 @@
 import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
+import { BuildingPublisher } from '@/lib/core/event-bus';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
 
 const KEYS = { caretaker: 'trakbin_caretaker', company: 'trakbin_company', driver: 'trakbin_driver' } as const;
@@ -125,6 +126,9 @@ export const authEngine = {
 
     const matchedCompanyId = await authAdapter.matchBuilding({ officialAddress: input.officialAddress, estate: input.estate, coords: { lat: input.latitude, lon: input.longitude } });
     if (matchedCompanyId) await authAdapter.assignServiceRequest(generatedId, matchedCompanyId);
+
+    // EVENT BUS: notify engines a new building entered the platform
+    BuildingPublisher.publish('BUILDING_REGISTERED', { buildingId: generatedId });
 
     return { ok: true, message: '✅ Building registered successfully!', buildingId: generatedId };
   },

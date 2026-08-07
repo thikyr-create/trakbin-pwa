@@ -1,0 +1,1 @@
+export const ROUTE_EVENTS = ['ROUTE_GENERATED', 'ROUTE_COMPLETED'] as const;

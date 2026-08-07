@@ -4,6 +4,7 @@ import {
   resolveBuildingZone,
   type ZoneResolution,
 } from '../utils/zoneAssignment';
+import { ZonePublisher, AssignmentPublisher } from '@/lib/core/event-bus';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -265,6 +266,7 @@ export async function autoAssignZones(company_id: number): Promise<AutoAssignRes
       .eq('company_id', company_id);
   }
 
+  AssignmentPublisher.publish('ASSIGNMENT_UPDATED', { companyId: company_id });
   return { assigned: toWrite.length, needsReview };
 }
 
@@ -282,6 +284,7 @@ export async function assignBuildingToZone(
       .eq('building_id', building_id)
       .eq('company_id', company_id);
     if (error) return { ok: false, error: error.message };
+    AssignmentPublisher.publish('ASSIGNMENT_UPDATED', { buildingId: building_id, companyId: company_id });
     return { ok: true };
   }
 
@@ -296,6 +299,7 @@ export async function assignBuildingToZone(
     },
   ]);
   if (error) return { ok: false, error: error.message };
+  AssignmentPublisher.publish('ASSIGNMENT_UPDATED', { buildingId: building_id, companyId: company_id });
   return { ok: true };
 }
 
@@ -326,13 +330,14 @@ export async function createZone(
   ]);
 
   if (error) return { ok: false, error: error.message };
+  ZonePublisher.publish('ZONE_CREATED', { companyId: company_id });
   return { ok: true };
 }
 
 /**
  * Updates only the SAFE fields of a zone.
- * zone_name is deliberately NOT editable: under Option A it is the
- * join key to service_assignments.zone_id — renaming would orphan buildings.
+ * zone_name is deliberately NOT editable: it is the join key to
+ * service_assignments.zone_id — renaming would orphan buildings.
  */
 export async function updateZone(
   zone_id: string,
@@ -364,12 +369,14 @@ export async function updateZone(
     .eq('id', zone_id);
 
   if (error) return { ok: false, error: error.message };
+  ZonePublisher.publish('ZONE_UPDATED', { zoneId: zone_id });
   return { ok: true };
 }
 
 export async function deleteZone(zone_id: string): Promise<{ ok: boolean; error?: string }> {
   const { error } = await supabase.from('company_zones').delete().eq('id', zone_id);
   if (error) return { ok: false, error: error.message };
+  ZonePublisher.publish('ZONE_DELETED', { zoneId: zone_id });
   return { ok: true };
 }
 
@@ -382,6 +389,7 @@ export async function toggleZoneActive(
     .update({ is_active })
     .eq('id', zone_id);
   if (error) return { ok: false, error: error.message };
+  ZonePublisher.publish('ZONE_UPDATED', { zoneId: zone_id });
   return { ok: true };
 }
 

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Plus, MapPin, Building2, Zap, Layers } from "lucide-react";
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { useZones } from "@/lib/features/zones/hooks/useZones";
+import { useEventRefetch } from "@/lib/hooks/useEventRefetch";
 import type { ZoneRecord, AutoAssignResult } from "@/lib/features/zones/services/zoneService";
 import ZoneTable from "./ZoneTable";
 import ZoneDetailsDrawer from "./ZoneDetailsDrawer";
@@ -21,10 +22,16 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function ZonesPage() {
   const {
-    zones, loading, error,
+    zones, loading, error, refetch,
     createZone, updateZone, deleteZone, toggleZone,
     autoAssignEnabled, runAutoAssign, assignBuilding, toggleAutoAssign,
   } = useZones();
+
+  // EVENT BUS: live-refresh on any zone/assignment/service change
+  useEventRefetch(
+    ['ZONE_CREATED', 'ZONE_UPDATED', 'ZONE_DELETED', 'ASSIGNMENT_UPDATED', 'SERVICE_ACTIVATED', 'BUILDING_UPDATED'],
+    refetch
+  );
 
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);

@@ -6,6 +6,7 @@ import { Building2, LayoutGrid, List } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { useBuildings } from "@/lib/features/buildings/hooks/useBuildings";
 import { useBuildingFilters } from "@/lib/features/buildings/hooks/useBuildingFilters";
+import { useEventRefetch } from "@/lib/hooks/useEventRefetch";
 import BuildingStatsStrip from "./BuildingStatsStrip";
 import BuildingSearch from "./BuildingSearch";
 import BuildingFilters from "./BuildingFilters";
@@ -29,6 +30,9 @@ export default function BuildingsPage() {
     activeCount,
     reset,
   } = useBuildingFilters(buildings);
+
+  // EVENT BUS: live-refresh when buildings/services/assignments change
+  useEventRefetch(['BUILDING_UPDATED', 'SERVICE_ACTIVATED', 'ASSIGNMENT_UPDATED'], refetch);
 
   const [view, setView] = useState<"table" | "cards">("table");
   const [drawerOpen, setDrawerOpen] = useState(false);

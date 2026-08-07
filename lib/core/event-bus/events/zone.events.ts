@@ -1,0 +1,1 @@
+export const ZONE_EVENTS = ['ZONE_CREATED', 'ZONE_UPDATED', 'ZONE_DELETED'] as const;

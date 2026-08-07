@@ -1,0 +1,1 @@
+export const BUILDING_EVENTS = ['BUILDING_REGISTERED', 'BUILDING_UPDATED'] as const;

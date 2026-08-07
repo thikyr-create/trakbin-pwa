@@ -1,0 +1,1 @@
+export const AUTH_EVENTS = ['USER_REGISTERED', 'CARETAKER_AUTHENTICATED'] as const;
