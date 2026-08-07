@@ -75,16 +75,17 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     }
   },
 
-  fetchFleet: async () => {
+    fetchFleet: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     try {
-      const { data: routes, error } = await supabase.from('routes').select('*, drivers(name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
+      // FIX: drivers(full_name) not drivers(name)
+      const { data: routes, error } = await supabase.from('routes').select('*, drivers(full_name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
       if (error) throw error;
-      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0,license_plate: '', truck_type: '' })) });
+      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.full_name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0,license_plate: '', truck_type: '' })) });
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
-
+    
   fetchServiceRequests: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
@@ -103,20 +104,23 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     try { const res = await fetch(`/api/company/recipients?companyId=${cid}`); const json = await res.json(); if (json.ok) set({ recipients: json.recipients || [] }); } catch (e) { console.error('fetchRecipients failed:', e); }
   },
 
-  fetchEarnings: async () => {
+    fetchEarnings: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     try {
+      // FIX: Only select columns that exist in haulers table
       const [{ data: hauler }, { data: settings }, { data: txs }] = await Promise.all([
-        supabase.from('haulers').select('available_balance, pending_balance, withdrawn_total, lifetime_earnings, commission_bps, fee_model, flat_fee, processor_bps, processor_flat, processor_cap').eq('id', cid).maybeSingle(),
+        supabase.from('haulers').select('available_balance, pending_balance, withdrawn_total, lifetime_earnings, commission_bps').eq('id', cid).maybeSingle(),
         supabase.from('platform_settings').select('commission_bps, fee_model, flat_fee, processor_bps, processor_flat, processor_cap').maybeSingle(),
         supabase.from('ledger_transactions').select('*').eq('company_id', cid).eq('type', 'settlement').order('created_at', { ascending: false }).limit(40),
       ]);
       const feeRule: FeeRule = {
-        model: (hauler?.fee_model ?? settings?.fee_model ?? 'percent') as FeeRule['model'],
-        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000, flatFee: hauler?.flat_fee ?? settings?.flat_fee ?? 0,
-        processorBps: hauler?.processor_bps ?? settings?.processor_bps ?? 0, processorFlat: hauler?.processor_flat ?? settings?.processor_flat ?? 0,
-        processorCap: hauler?.processor_cap ?? settings?.processor_cap ?? null,
+        model: (settings?.fee_model ?? 'percent') as FeeRule['model'],
+        commissionBps: hauler?.commission_bps ?? settings?.commission_bps ?? 1000, 
+        flatFee: settings?.flat_fee ?? 0,
+        processorBps: settings?.processor_bps ?? 0, 
+        processorFlat: settings?.processor_flat ?? 0,
+        processorCap: settings?.processor_cap ?? null,
       };
       set({ earnings: { available: hauler?.available_balance ?? 0, pending: hauler?.pending_balance ?? 0, withdrawn: hauler?.withdrawn_total ?? 0, lifetime: hauler?.lifetime_earnings ?? 0, rateBps: feeRule.commissionBps, feeRule }, settlements: txs || [] });
       await get().fetchPayouts(); await get().fetchRecipients();
@@ -125,7 +129,6 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       set({ earnings: { available: 0, pending: 0, withdrawn: 0, lifetime: 0, rateBps: 1000, feeRule: { model: 'percent', commissionBps: 1000, flatFee: 0, processorBps: 0, processorFlat: 0, processorCap: null } }, settlements: [] });
     }
   },
-
   executePayout: async (payoutId) => {
     try {
       const res = await fetch('/api/company/payouts/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payoutId }) });
