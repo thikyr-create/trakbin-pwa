@@ -1,23 +1,65 @@
+// app/api/company/recipients/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { listRecipients, saveRecipient } from '@/lib/server/payments/payouts';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(req: NextRequest) {
-  const companyId = req.nextUrl.searchParams.get('companyId');
-  if (!companyId) return NextResponse.json({ ok: false, error: 'companyId_required' }, { status: 400 });
-  try { return NextResponse.json({ ok: true, recipients: await listRecipients(Number(companyId)) }); }
-  catch (e: any) { return NextResponse.json({ ok: false, error: e?.message || 'list_failed' }, { status: 500 }); }
+  const { searchParams } = new URL(req.url);
+  const companyId = searchParams.get('companyId');
+
+  if (!companyId) {
+    return NextResponse.json({ ok: false, reason: 'missing_company_id' }, { status: 400 });
+  }
+
+  try {
+    const { data: recipients, error } = await supabaseAdmin
+      .from('company_recipients')
+      .select('*')
+      .eq('company_id', Number(companyId))
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, recipients: recipients || [] });
+  } catch (e: any) {
+    console.error('[RecipientsAPI] GET error:', e);
+    return NextResponse.json({ ok: false, reason: e?.message || 'fetch_failed' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const b = await req.json();
-    const full = String(b.accountNumber || '').replace(/[^\d]/g, '');
-    if (!b.companyId || !b.bankCode || !full || full.length < 8 || !b.accountName)
-      return NextResponse.json({ ok: false, error: 'invalid_request' }, { status: 400 });
-    const result = await saveRecipient({
-      companyId: Number(b.companyId), bankCode: b.bankCode, bankName: b.bankName,
-      accountNumber: full, accountLast4: full.slice(-4), accountName: b.accountName, country: b.country, currency: b.currency,
-    });
-    return NextResponse.json(result);
-  } catch (e: any) { return NextResponse.json({ ok: false, error: e?.message || 'save_failed' }, { status: 400 }); }
+    const body = await req.json();
+    const { companyId, bankCode, bankName, accountNumber, accountLast4, accountName, country, currency } = body;
+
+    if (!companyId || !bankCode || !accountNumber || !accountName) {
+      return NextResponse.json({ ok: false, error: 'missing_params' }, { status: 400 });
+    }
+
+    const { data: recipient, error } = await supabaseAdmin
+      .from('company_recipients')
+      .insert([{
+        company_id: companyId,
+        bank_code: bankCode,
+        bank_name: bankName || null,
+        account_number: accountNumber,
+        account_last4: accountLast4 || accountNumber.slice(-4),
+        account_name: accountName,
+        country: country || 'NG',
+        currency: currency || 'NGN',
+      }])
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ ok: true, recipient_id: recipient.id });
+  } catch (e: any) {
+    console.error('[RecipientsAPI] POST error:', e);
+    return NextResponse.json({ ok: false, error: e?.message || 'insert_failed' }, { status: 500 });
+  }
 }
