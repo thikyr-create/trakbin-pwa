@@ -208,16 +208,21 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (data) set({ issues: data });
   },
 
-   createIssue: async (issueData: any) => {
+     createIssue: async (issueData: any) => {
     const { building, fetchIssues } = get();
 
+    // GATE: a caretaker may only report once a waste company is assigned/activated.
     if (!building?.company_id) {
       return {
         ok: false,
         error: 'unassigned',
-        message: 'Reports can only be submitted after a waste company has been assigned to your building.',
+        message: 'Your building has not been assigned to a waste company yet. Please wait for a company to accept your service request, then refresh this page.',
       };
     }
+
+    // ... rest unchanged
+      
+  
 
     try {
       const issue_number = `ENV-${Date.now().toString().slice(-6)}`;

@@ -212,13 +212,31 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
   setSelectedTruck: (truck) => set({ selectedTruck: truck }), setCameraMode: (mode) => set({ cameraMode: mode }),
   setSelectedRequest: (request) => set({ selectedRequest: request }), setIsDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
-  subscribeToRealtime: () => {
+  
+    subscribeToRealtime: () => {
     const cid = get().tenant.companyId;
     if (!cid) return () =>{};
+    
     const routeSub = supabase.channel('routes-channel').on('postgres_changes', {event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` },(p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
+    
     const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter:`company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
+    
     const payoutSub = supabase.channel(`company-payouts-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `company_id=eq.${cid}` }, () => { get().fetchPayouts(); get().fetchEarnings(); }).subscribe();
-    return () => { supabase.removeChannel(routeSub); supabase.removeChannel(ledgerSub); supabase.removeChannel(payoutSub); };
+    
+    // FIX: Subscribe to Buildings table changes so newly-accepted buildings appear live
+    const buildingsSub = supabase.channel(`company-buildings-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `company_id=eq.${cid}` }, () => {
+      // Trigger a refetch of the parent's buildings data
+      // The parent page.tsx has a fetchData function that we need to call
+      // Since we can't call it directly, we'll use a custom event
+      window.dispatchEvent(new CustomEvent('trakbin-buildings-changed'));
+    }).subscribe();
+    
+    return () => { 
+      supabase.removeChannel(routeSub); 
+      supabase.removeChannel(ledgerSub); 
+      supabase.removeChannel(payoutSub);
+      supabase.removeChannel(buildingsSub);
+    };
   },
   unsubscribeFromRealtime: () => { supabase.removeAllChannels(); },
 }));

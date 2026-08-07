@@ -9,28 +9,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Load the tenant context immediately
     loadTenantContext();
   }, [loadTenantContext]);
 
-  // 1. Show loading spinner while fetching auth state
-  if (!tenant.loaded) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-semibold uppercase tracking-wider">Initializing Tenant Context...</p>
-        </div>
-      </div>
-    );
-  }
+  // No loading screen — dashboard renders immediately with skeleton states
+  // If not authenticated, redirect after first render
+  useEffect(() => {
+    if (tenant.loaded && !tenant.userId) {
+      router.push('/auth');
+    }
+  }, [tenant.loaded, tenant.userId, router]);
 
-  // 2. If loaded but no user ID, redirect to login
-  if (!tenant.userId) {
-    router.push('/auth');
-    return null;
-  }
-
-  // 3. If loaded and user exists, render the dashboard
   return <>{children}</>;
 }

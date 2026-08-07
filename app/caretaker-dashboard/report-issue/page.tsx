@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from 'react';
+import { useState, useRef,useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2, Camera, MapPin, CheckCircle2, Upload, X } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
@@ -11,10 +11,15 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ReportIssuePage() {
   const router = useRouter();
-  const { building, createIssue } = useCaretakerSession();
+  const { building, createIssue,refreshAll } = useCaretakerSession();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
 
   // Form State
   const [issueType, setIssueType] = useState('');

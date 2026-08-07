@@ -78,7 +78,7 @@ export default function WasteCompanyDashboard() {
     trucks: liveFleet, serviceRequests, earnings,
   } = useCompanySession();
 
-  useEffect(() => {
+    useEffect(() => {
     const storedCompany = localStorage.getItem('trakbin_company');
     if (!storedCompany) { router.push('/auth'); return; }
 
@@ -92,9 +92,18 @@ export default function WasteCompanyDashboard() {
 
     const t = setTimeout(() => { fetchData(); }, 400);
     const cleanup = subscribeToRealtime();
-    return () => { clearTimeout(t); if (typeof cleanup === 'function') cleanup(); else unsubscribeFromRealtime(); };
+    
+    // FIX: Listen for buildings-changed event and refetch
+    const handleBuildingsChanged = () => { fetchData(); };
+    window.addEventListener('trakbin-buildings-changed', handleBuildingsChanged);
+    
+    return () => { 
+      clearTimeout(t); 
+      if (typeof cleanup === 'function') cleanup(); 
+      else unsubscribeFromRealtime();
+      window.removeEventListener('trakbin-buildings-changed', handleBuildingsChanged);
+    };
   }, [router]);
-
   const fetchData = async () => {
     let currentCompanyId = tenant.companyId;
     if (!currentCompanyId) {
