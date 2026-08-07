@@ -165,17 +165,36 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e: any) { return { ok: false, error: e?.message }; }
   },
 
-    activateService: async (requestId, zoneId, scheduleData) => {
-    const cid = get().tenant.companyId;
-    if (!cid) return;
+     activateService: async (requestId, zoneId, scheduleData) => {
+    const cid = get().tenant.companyId; if (!cid) return;
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
       const { data: request } = await supabase.from('service_requests').select('building_id').eq('id', requestId).single();
       if (!request) throw new Error('Request not found');
+      
+      // FIX: Look up zone_name from the UUID before inserting
+      const { data: zone } = await supabase
+        .from('company_zones')
+        .select('zone_name')
+        .eq('id', zoneId)
+        .eq('company_id', cid)
+        .single();
+      
+      if (!zone) throw new Error('Zone not found');
+      
       const now = new Date().toISOString();
       await supabase.from('service_requests').update({ status: 'activated', company_id: cid, activated_at: now }).eq('id', requestId);
-      await supabase.from('service_assignments').insert([{ building_id: request.building_id, company_id: cid, zone_id: zoneId, schedule_template: scheduleData.frequency, pickup_days: scheduleData.days, time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now }]);
+      await supabase.from('service_assignments').insert([{ 
+        building_id: request.building_id, 
+        company_id: cid, 
+        zone_id: zone.zone_name,  // ← Store zone_name, not UUID
+        schedule_template: scheduleData.frequency, 
+        pickup_days: scheduleData.days, 
+        time_window: scheduleData.timeWindow, 
+        service_status: 'active', 
+        activated_at: now 
+      }]);
       await supabase.from('collection_schedules').insert([{ company_id: cid, building_id: request.building_id, frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '), time_window: scheduleData.timeWindow, is_active: true }]);
       await supabase.from('Buildings').update({ company_id: cid, status: 'active' }).eq('custom_id', request.building_id);
       const { data: hauler } = await supabase.from('haulers').select('contact_number').eq('id', cid).maybeSingle();

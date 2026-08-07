@@ -184,7 +184,7 @@ export default function CaretakerDashboard() {
                               <p className={`${display.className} mt-0.5 truncate text-lg font-extrabold leading-tight tracking-tight`}>{companyProfile?.business_name || '—'}</p>
                               <p className="mt-0.5 flex items-center gap-2 text-[11px] font-semibold text-emerald-100/70">
                                 <span className="inline-flex items-center gap-1"><span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" /></span> Online</span>
-                                {activeAssignment?.zone_id && <><span className="text-emerald-200/40">·</span> {/^zone\s/i.test(String(activeAssignment.zone_id)) ? activeAssignment.zone_id : 'Zone ' + activeAssignment.zone_id}</>}
+                                {activeAssignment?.zone_id && <><span className="text-emerald-200/40">·</span> {activeAssignment.zone_id}</>}
                               </p>
                             </div>
                             <button onClick={() => setActiveTab('service')} className="relative z-10 hidden shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold ring-1 ring-white/15 transition-colors hover:bg-white/20 sm:flex">Details <ArrowRight className="h-3 w-3" /></button>
