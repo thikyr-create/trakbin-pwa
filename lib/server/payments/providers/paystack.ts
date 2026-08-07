@@ -1,4 +1,5 @@
 import 'server-only';
+import crypto from 'crypto';
 import type {
   PaymentProvider, InitializeInput, InitializeResult, VerifyResult, RefundResult,
   PaymentStatus, PaymentMethod, BankInfo, ListBanksOptions, ResolveAccountOptions, ResolvedAccount,
@@ -30,7 +31,7 @@ export const paystackProvider: PaymentProvider & {
   name: 'paystack',
 
   async initialize(input: InitializeInput): Promise<InitializeResult> {
-    const reference = `trk_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const reference = `trk_${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
     const body = { email: input.email, amount: input.amount * 100, currency: input.currency || 'NGN', reference, channels: channelsFor(input.method), callback_url: input.metadata?.callback_url, metadata: { purpose: input.purpose, invoiceId: input.invoiceId ?? null, buildingId: input.buildingId } };
     const json = await psFetch('/transaction/initialize', { method: 'POST', body: JSON.stringify(body) });
     return { provider: 'paystack', reference: json.data.reference, authorizationUrl: json.data.authorization_url };

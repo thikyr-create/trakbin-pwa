@@ -1,8 +1,10 @@
+// lib/server/payments/payouts.ts
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { getProvider, DEFAULT_PROVIDER } from './providers';
 import { supportsPayoutRecipient, supportsPayoutTransfer } from '@/lib/payments/types';
 import { recordTransferEvent } from './reconcile';
+import { BillingPublisher } from '@/lib/core/event-bus';
 
 const admin = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
@@ -16,7 +18,7 @@ async function transition(payoutId: string, outcome: Outcome, pspReference?: str
   return data as any;
 }
 
-async function ensureRecipient(companyId: number, recipientId: string): Promise<string> {
+async function ensureRecipient(companyId: number, recipientId:string): Promise<string> {
   const { data: rec } = await admin().from('company_recipients').select('*').eq('id', recipientId).eq('company_id', companyId).maybeSingle();
   if (!rec) throw new Error('recipient_not_found');
   if (rec.recipient_code) return rec.recipient_code;
@@ -39,13 +41,19 @@ export async function executePayout(payoutId: string) {
   const provider = getProvider(DEFAULT_PROVIDER);
   if (!supportsPayoutTransfer(provider)) { await transition(payoutId, 'failed').catch(() => {}); return { ok: false, reason: 'provider_cannot_transfer' }; }
   let tr;
-  try { tr = await provider.transfer({ amountKobo: po.amount * 100, recipientCode: code, reference: `po-${payoutId}`, reason: 'Trakbin payout' }); }
+  try { tr = await provider.transfer({ amountKobo: po.amount *100, recipientCode: code, reference: `po-${payoutId}`, reason:'Trakbin payout' }); }
   catch (e: any) { await transition(payoutId, 'failed').catch(() => {}); return { ok: false, reason: e?.message || 'transfer_failed' }; }
   const ref = tr.transferCode;
   const fee = tr.raw?.fees != null ? Math.round(tr.raw.fees / 100) : null;
   const st = String(tr.status || '').toLowerCase();
-  const outcome: Outcome = st === 'success' ? 'paid' : (st === 'pending' || st === 'processing') ? 'processing' : 'failed';
+  const outcome: Outcome = st === 'success' ? 'paid' : (st ==='pending' || st === 'processing') ? 'processing' : 'failed';
   const res = await transition(payoutId, outcome, ref, fee);
+
+  // EVENT BUS: broadcast payout released if successfully paid
+  if (outcome === 'paid') {
+    BillingPublisher.publish('PAYOUT_RELEASED', { companyId: po.company_id, amount: po.amount });
+  }
+
   return { ok: true, already: false, status: res?.status || outcome, psp_reference: ref };
 }
 
@@ -55,32 +63,40 @@ export async function finalizeByReference(
   transferCode: string, outcome: 'paid' | 'failed' | 'reversed',
   opts?: { pspFee?: number | null; amount?: number | null; currency?: string | null; raw?: any }
 ) {
-  const { data: po } = await admin().from('payouts').select('id').eq('psp_reference', transferCode).maybeSingle();
+  // Expanded select to include company_id and amount for the event bus broadcast
+  const { data: po } = await admin().from('payouts').select('id, company_id, amount').eq('psp_reference', transferCode).maybeSingle();
   const matched = !!po;
   let status: string | undefined;
   if (po) {
     const res = await transition(po.id, outcome, transferCode, opts?.pspFee ?? null);
     status = res?.status;
+    
+    // EVENT BUS: broadcast payout released if webhook confirms paid
+    if (outcome === 'paid') {
+      BillingPublisher.publish('PAYOUT_RELEASED', { companyId: po.company_id, amount: po.amount });
+    }
   }
   try {
     await recordTransferEvent({
       transferCode, status: outcome, amount: opts?.amount ?? null, currency: opts?.currency ?? null,
-      matched, matchedPayoutId: po?.id ?? null, raw: opts?.raw ?? null,
+      matched, matchedPayoutId: po?.id ?? null, raw: opts?.raw?? null,
     });
   } catch (e) { console.warn('recordTransferEvent failed:', e); }
-  return matched ? { ok: true, matched: true, status } : { ok: true, unmatched: true };
+  return matched ? { ok: true, matched: true, status } : { ok:true, unmatched: true };
 }
 
-export async function requestPayout(args: { companyId: number; amount: number; recipientId: string; idempotencyKey: string }) {
+export async function requestPayout(args: { companyId: number;amount: number; recipientId: string; idempotencyKey: string }){
   const { data, error } = await admin().rpc('request_payout', { p_company_id: args.companyId, p_amount: Math.trunc(args.amount), p_recipient_id: args.recipientId, p_idempotency_key: args.idempotencyKey });
   if (error) throw error;
   return data as any;
 }
+
 export async function listPayouts(companyId: number) {
   const { data, error } = await admin().from('payouts').select('*').eq('company_id', companyId).order('created_at', { ascending: false });
   if (error) throw error; return data || [];
 }
-export async function saveRecipient(args: { companyId: number; bankCode: string; bankName?: string; accountNumber: string; accountLast4: string; accountName: string; country?: string; currency?: string; }) {
+
+export async function saveRecipient(args: { companyId: number;bankCode: string; bankName?: string; accountNumber: string; accountLast4: string; accountName: string; country?: string; currency?: string; }) {
   const { data: existing } = await admin().from('company_recipients').select('id').eq('company_id', args.companyId);
   const isDefault = !existing || existing.length === 0;
   const { error } = await admin().from('company_recipients').insert([{
@@ -90,6 +106,7 @@ export async function saveRecipient(args: { companyId: number; bankCode: string;
   }]);
   if (error) throw error; return { ok: true };
 }
+
 export async function listRecipients(companyId: number) {
   const { data, error } = await admin().from('company_recipients')
     .select('id,company_id,bank_code,bank_name,account_last4,account_name,recipient_code,country,currency,is_default,verified_at,created_at')

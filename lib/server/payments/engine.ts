@@ -1,8 +1,10 @@
+// lib/server/payments/engine.ts
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { getProvider, DEFAULT_PROVIDER } from './providers';
 import { creditWalletForTopup, settleInvoiceFromWallet } from './ledger';
 import { mintReceipt } from './receipts';
+import { BillingPublisher } from '@/lib/core/event-bus';
 import type { PaymentProviderName, VerifyResult } from '@/lib/payments/types';
 
 const admin = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -34,7 +36,7 @@ export async function initializePayment(args: InitializeArgs) {
   }
   const init = await provider.initialize({
     amount: args.amount, currency: 'NGN', email: args.email, method: args.method as any,
-    purpose: args.purpose, invoiceId: args.invoiceId, buildingId: args.buildingId, metadata: { callback_url: args.callbackUrl },
+    purpose: args.purpose, invoiceId: args.invoiceId, buildingId: args.buildingId, metadata: { callback_url: args.callbackUrl},
   });
   await admin().from('payments').insert({
     provider: providerName, reference: init.reference, building_id: args.buildingId,
@@ -55,7 +57,7 @@ export async function chargeLinkedBank(args: { buildingId: string; methodId: str
   });
   await admin().from('payments').insert({
     provider: provider.name, reference: init.reference, building_id: args.buildingId, payer_email: args.email,
-    purpose: 'topup', method: 'bank', channel: 'bank', amount: args.amount, currency: 'NGN', status: 'pending',
+    purpose: 'topup', method: 'bank', channel: 'bank', amount:args.amount, currency: 'NGN', status: 'pending',
   });
   const verify = await provider.verify(init.reference);
   if (verify.status !== 'success') {
@@ -68,6 +70,10 @@ export async function chargeLinkedBank(args: { buildingId: string; methodId: str
     ledger_topup_tx: topup?.transaction_id ?? null, updated_at: new Date().toISOString(),
   }).eq('reference', verify.reference);
   await tryMint(topup?.transaction_id);
+  
+  // EVENT BUS
+  BillingPublisher.publish('PAYMENT_RECEIVED', { buildingId: args.buildingId, companyId: null });
+  
   return { ok: true, reference: verify.reference, amount: verify.amount };
 }
 
@@ -81,6 +87,10 @@ export async function handleSuccessfulPayment(verify: VerifyResult, meta: { purp
       ledger_topup_tx: topup?.transaction_id ?? null, raw: verify.raw ?? null, updated_at: new Date().toISOString(),
     }).eq('reference', ref);
     await tryMint(topup?.transaction_id);
+    
+    // EVENT BUS: broadcast payment received
+    BillingPublisher.publish('PAYMENT_RECEIVED', { buildingId: meta.buildingId, companyId: null });
+    
     return { ok: true, action: 'topup', transaction_id: topup?.transaction_id };
   }
   if (meta.purpose === 'invoice' && meta.invoiceId) {
@@ -92,6 +102,11 @@ export async function handleSuccessfulPayment(verify: VerifyResult, meta: { purp
       raw: verify.raw ?? null, updated_at: new Date().toISOString(),
     }).eq('reference', ref);
     await tryMint(settle?.transaction_id);
+    
+    // EVENT BUS: broadcast payment received with company context
+    const { data: bld } = await admin().from('Buildings').select('company_id').eq('custom_id', meta.buildingId).maybeSingle();
+    BillingPublisher.publish('PAYMENT_RECEIVED', { buildingId: meta.buildingId, companyId: bld?.company_id ?? null });
+    
     return { ok: true, action: 'invoice', topup_tx: topup?.transaction_id, settle_tx: settle?.transaction_id };
   }
   throw new Error('unknown_purpose');
