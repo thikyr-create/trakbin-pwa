@@ -6,7 +6,8 @@ import { settleKey, topupKey } from '@/lib/utils/money';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-let supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export interface CaretakerContact { type: 'call' | 'whatsapp' | 'emergency' | 'office' | 'email'; label: string; value: string; }
 
 export interface CaretakerSessionState {
@@ -42,7 +43,7 @@ export interface CaretakerSessionState {
   subscribeRealtime: () => void;
   teardownRealtime: () => void;
   fetchIssues: () => Promise<void>;
-    createIssue: (issueData: any) => Promise<{ ok: boolean; error?: string; message?: string }>;
+  createIssue: (issueData: any) => Promise<{ ok: boolean; error?: string; message?: string }>;
   checkAndGenerateInvoice: (bId: string, nextBillingDate: string, autopayEnabled: boolean, currentWalletBalance: number) => Promise<void>;
   addFunds: (amount: number, methodId: string) => Promise<void>;
   saveAutopay: () => Promise<void>;
@@ -74,40 +75,40 @@ function synthesizeContacts(company: any | null, profile: any | null): Caretaker
 export const useCaretakerSession = create<CaretakerSessionState>((set, get) => ({
   building: null, collectionHistory: [], fullHistory: [], fullHistoryLoaded: false, walletBalance: 0,
   paymentMethods: [], schedule: null, invoices: [], invoiceCount: { paid: 0, due: 0 }, platformFeeBps: null,
-  issues: [], activeAssignment: null, companyProfile: null, companyContacts: [],ledger: [],
+  issues: [], activeAssignment: null, companyProfile: null, companyContacts: [], ledger: [],
   showAddFunds: false, showAutopay: false, autopaySource: 'wallet', autopayLoading: false,
   selectedMethod: '', loading: true, billingProcessing: false,
 
-    initializeSession: async () => {
-    const storedCaretaker = localStorage.getItem('trakbin_caretaker');
-    if (!storedCaretaker) { window.location.href = '/auth'; return; }
+  initializeSession: async () => {
+    // Caretakers now have REAL Supabase sessions (Building ID identity)
+    const { data: { user } } = await supabase.auth.getUser();
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('trakbin_caretaker') : null;
 
-    const caretakerData = JSON.parse(storedCaretaker);
+    const buildingId = user?.user_metadata?.building_id ||
+      (stored ? (JSON.parse(stored) as any)?.custom_id : null);
 
-    // CARETAKER BRIDGE: every query now carries the passcode capability header
-    supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { 'x-trakbin-passcode': String(caretakerData.passcode || '') } },
-    });
+    if (!buildingId) {
+      window.location.href = '/auth';
+      return;
+    }
 
-    // Validate building exists (works pre- AND post-assignment via caretaker_ok)
+    // RLS scopes this read to the caretaker's own building via get_caretaker_building()
     const { data: building, error } = await supabase
       .from('Buildings')
       .select('*')
-      .eq('custom_id', caretakerData.custom_id)
-      .single();
+      .eq('custom_id', buildingId)
+      .maybeSingle();
 
     if (error || !building) {
-      console.error('Building not found, clearing session');
       localStorage.removeItem('trakbin_caretaker');
       window.location.href = '/auth';
       return;
     }
 
     set({ building, loading: true });
-    // ...rest of the function unchanged
 
-    if (caretakerData.next_billing_date) {
-      await get().checkAndGenerateInvoice(caretakerData.custom_id, caretakerData.next_billing_date, caretakerData.autopay_enabled, caretakerData.wallet_balance || 0);
+    if (building.next_billing_date) {
+      await get().checkAndGenerateInvoice(building.custom_id, building.next_billing_date, building.autopay_enabled, building.wallet_balance || 0);
     }
     await get().refreshAll();
     await get().fetchFullHistory();
@@ -194,7 +195,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     const channel = supabase.channel(`caretaker-${bId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collection_schedules', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices',filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collections', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchFullHistory(true); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_transactions', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchLedger(); })
       .subscribe();
@@ -208,21 +209,16 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (data) set({ issues: data });
   },
 
-     createIssue: async (issueData: any) => {
+  createIssue: async (issueData: any) => {
     const { building, fetchIssues } = get();
 
-    // GATE: a caretaker may only report once a waste company is assigned/activated.
     if (!building?.company_id) {
       return {
         ok: false,
         error: 'unassigned',
-        message: 'Your building has not been assigned to a waste company yet. Please wait for a company to accept your service request, then refresh this page.',
+        message: 'Reports can only be submitted after a waste company has been assigned to your building.',
       };
     }
-
-    // ... rest unchanged
-      
-  
 
     try {
       const issue_number = `ENV-${Date.now().toString().slice(-6)}`;
@@ -300,5 +296,10 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
   setShowAutopay: (show) => set({ showAutopay: show }),
   setAutopaySource: (source) => set({ autopaySource: source }),
   setSelectedMethod: (method) => set({ selectedMethod: method }),
-  logout: () => { get().teardownRealtime(); localStorage.removeItem('trakbin_caretaker'); window.location.href = '/'; },
+  logout: () => {
+    get().teardownRealtime();
+    localStorage.removeItem('trakbin_caretaker');
+    supabase.auth.signOut().catch(() => {});
+    window.location.href = '/';
+  },
 }));

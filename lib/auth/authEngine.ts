@@ -14,14 +14,34 @@ function generateBuildingId() {
 
 export const authEngine = {
   async login(input: LoginInput): Promise<AuthResult> {
+    // ── CARETAKER: Building ID + passcode → real Supabase session ──
     if (input.accountType === 'Caretaker') {
-      const building = await authAdapter.queryBuildingByIdPasscode((input.buildingId || '').trim(), (input.passcode || '').trim());
-      if (!building) return { ok: false, message: '❌ Invalid Building ID or Passcode' };
-      localStorage.setItem(KEYS.caretaker, JSON.stringify(building));
-      useAuthStore.getState().setSession('caretaker', building);
+      const res = await fetch('/api/auth/caretaker-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          buildingId: (input.buildingId || '').trim(),
+          passcode: (input.passcode || '').trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        return { ok: false, message: '❌ Invalid Building ID or Passcode' };
+      }
+
+      // Mint a REAL Supabase session from the synthetic identity
+      const { error } = await supabaseAuth.signInWithPassword(data.email, data.password);
+      if (error) {
+        return { ok: false, message: '❌ Session error: ' + error.message };
+      }
+
+      localStorage.setItem(KEYS.caretaker, JSON.stringify(data.building));
+      useAuthStore.getState().setSession('caretaker', data.building);
       return { ok: true, message: '✅ Login successful! Redirecting...', role: 'caretaker' };
     }
 
+    // ── COMPANY / DRIVER: email + password ──
     const email = (input.email || '').trim();
     const password = (input.password || '').trim();
 
@@ -167,6 +187,7 @@ export const authEngine = {
   signOut(): void {
     localStorage.removeItem(KEYS.caretaker); localStorage.removeItem(KEYS.company); localStorage.removeItem(KEYS.driver);
     useAuthStore.getState().clearSession();
+    supabaseAuth.signOut().catch(() => {});
   },
 
   getRole(): Role | null { return useAuthStore.getState().role; },
