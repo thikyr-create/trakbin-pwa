@@ -122,8 +122,8 @@ export default function AuthPage() {
             </div>
 
             {isLogin
-              ? <LoginForm accountType={accountType} />
-              : <RegisterForm accountType={accountType} onRegistered={(id, passcode, address) => { setGenerated({ id, passcode, address }); setShowIdCard(true); }} onSwitchToLogin={() => setIsLogin(true)} />}
+  ? <LoginForm accountType={accountType} onSwitchAccountType={setAccountType} />
+  : <RegisterForm accountType={accountType} onRegistered={(id, passcode, address) => { setGenerated({ id, passcode, address }); setShowIdCard(true); }} onSwitchToLogin={() => setIsLogin(true)} />}
           </motion.div>
         </div>
       </div>

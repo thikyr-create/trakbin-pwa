@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
-import { Building2, LogIn, CheckCircle2, AlertCircle, KeyRound, ArrowLeft } from 'lucide-react';
+import { Building2, LogIn, CheckCircle2, AlertCircle, KeyRound, ArrowLeft, ArrowRight } from 'lucide-react';
 import { authEngine } from '@/lib/auth/authEngine';
 import { supabaseAuth } from '@/lib/auth/supabaseAuth';
 import { ROLE_HOME } from '@/lib/auth/permissions';
@@ -17,7 +17,12 @@ const inputCls = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 
 
 type View = 'login' | 'forgot' | 'reset' | 'caretaker-recover';
 
-export default function LoginForm({ accountType }: { accountType: AccountType }) {
+interface Props {
+  accountType: AccountType;
+  onSwitchAccountType?: (type: AccountType) => void;
+}
+
+export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>('login');
   const [email, setEmail] = useState('');
@@ -31,8 +36,23 @@ export default function LoginForm({ accountType }: { accountType: AccountType })
   const [recAddress, setRecAddress] = useState('');
   const [recovered, setRecovered] = useState<any>(null);
 
+  // Detect if user typed an email in the caretaker Building ID field
+  const isEmailInBuildingField = accountType === 'Caretaker' && buildingId.includes('@');
+  
+  // Validate Building ID format: TRK-XXXXXX (6 alphanumeric chars)
+  const buildingIdValid = buildingId.length === 0 || /^TRK-[A-Z0-9]{6}$/.test(buildingId.toUpperCase());
+
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true); setMessage('');
+    e.preventDefault();
+    
+    // Block submission if Building ID format is invalid
+    if (accountType === 'Caretaker' && !buildingIdValid) {
+      setMessage('❌ Building ID must be in format TRK-XXXXXX (e.g., TRK-ABC123)');
+      return;
+    }
+    
+    setLoading(true);
+    setMessage('');
     const res = await authEngine.login({ accountType, buildingId, passcode, email, password });
     setMessage(res.message);
     if (res.ok && res.role) router.push(ROLE_HOME[res.role]);
@@ -78,8 +98,45 @@ export default function LoginForm({ accountType }: { accountType: AccountType })
             <>
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-                <input type="text" placeholder="Building ID (e.g., TRK-ABC123)" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} required className={`${inputCls} pl-10`} />
+                <input
+                  type="text"
+                  placeholder="Building ID (e.g., TRK-ABC123)"
+                  value={buildingId}
+                  onChange={(e) => setBuildingId(e.target.value.toUpperCase())}
+                  required
+                  className={`${inputCls} pl-10 ${!buildingIdValid ? 'border-red-300 bg-red-50' : ''}`}
+                />
+                {!buildingIdValid && buildingId.length > 0 && (
+                  <p className="mt-1 text-[11px] font-semibold text-red-600">
+                    Format: TRK-XXXXXX (6 characters after the dash)
+                  </p>
+                )}
               </div>
+              
+              {/* Smart hint: user typed an email in the Building ID field */}
+              {isEmailInBuildingField && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-amber-200 bg-amber-50 p-3"
+                >
+                  <p className="mb-2 text-xs font-bold text-amber-800">
+                    👋 Looks like you're trying to log in with an email
+                  </p>
+                  <p className="mb-3 text-[11px] text-amber-700">
+                    This form is for caretakers using a Building ID (TRK-XXXXXX). If you're a waste company or driver, switch below:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onSwitchAccountType?.('Operations')}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-amber-700"
+                  >
+                    Switch to Waste Company / Driver
+                    <ArrowRight size={14} />
+                  </button>
+                </motion.div>
+              )}
+              
               <input type="password" placeholder="Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} required className={inputCls} />
               <button type="button" onClick={() => { setView('caretaker-recover'); setMessage(''); }} className="text-xs font-bold text-emerald-600 underline hover:text-emerald-800">Forgot passcode?</button>
             </>
@@ -102,7 +159,7 @@ export default function LoginForm({ accountType }: { accountType: AccountType })
           <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-gray-900"><KeyRound className="h-5 w-5 text-emerald-600" /> Reset caretaker passcode</h2>
           <div className="relative">
             <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder="Building ID" value={buildingId} onChange={(e) => setBuildingId(e.target.value)} required className={`${inputCls} pl-10`} />
+            <input type="text" placeholder="Building ID" value={buildingId} onChange={(e) => setBuildingId(e.target.value.toUpperCase())} required className={`${inputCls} pl-10`} />
           </div>
           <input type="text" placeholder="Official building address (as registered)" value={recAddress} onChange={(e) => setRecAddress(e.target.value)} required className={inputCls} />
           <input type="password" placeholder="New passcode" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputCls} />
