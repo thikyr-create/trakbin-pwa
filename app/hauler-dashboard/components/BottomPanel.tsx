@@ -1,17 +1,18 @@
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Package, DollarSign, Users, Navigation, AlertTriangle, Search, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { MapPin, Package, DollarSign, Users, Navigation, AlertTriangle, Search, ChevronUp, ChevronDown, X, SkipForward, Flag } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import SwipeButton from './SwipeButton';
 import { useState } from 'react';
 
 export default function BottomPanel() {
-  const { 
-    currentStop, 
-    isArrived, 
-    completePickup, 
+  const {
+    currentStop,
+    isArrived,
+    completePickup,
     setShowSkipModal,
+    setShowReportModal,
     searchQuery,
     geocodeResults,
     setSearchQuery,
@@ -19,7 +20,7 @@ export default function BottomPanel() {
     selectGeocodeResult,
     setIsSearchFocused
   } = useDriverSession();
-  
+
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -41,16 +42,18 @@ export default function BottomPanel() {
     setIsSearchFocused(false);
   };
 
+  const stop: any = currentStop;
+
   return (
-    <motion.div 
-      initial={{ y: "100%" }} 
-      animate={{ y: 0 }} 
+    <motion.div
+      initial={{ y: "100%" }}
+      animate={{ y: 0 }}
       transition={{ type: "spring", damping: 25, stiffness: 200 }}
       className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl shadow-2xl border-t border-slate-800 z-20 max-h-[70vh]"
       style={{ touchAction: 'none' }}
     >
       {/* Drag Handle */}
-      <div 
+      <div
         className="w-full flex justify-center pt-3 pb-2 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -60,7 +63,6 @@ export default function BottomPanel() {
       <div className="px-5 pb-5 overflow-y-auto">
         <AnimatePresence mode="wait">
           {showSearch ? (
-            // 🔍 SEARCH VIEW
             <motion.div
               key="search"
               initial={{ opacity: 0, y: 10 }}
@@ -72,8 +74,8 @@ export default function BottomPanel() {
                 <button onClick={closeSearch} className="p-2 hover:bg-slate-800 rounded-full">
                   <X size={20} className="text-gray-400" />
                 </button>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={searchQuery}
                   onChange={handleSearchChange}
                   placeholder="Search buildings, streets, landmarks..."
@@ -82,16 +84,12 @@ export default function BottomPanel() {
                 />
               </div>
 
-              {/* Search Results */}
               <div className="max-h-64 overflow-y-auto space-y-2">
                 {geocodeResults && geocodeResults.length > 0 ? (
                   geocodeResults.map((result, index) => (
                     <button
                       key={result.id || index}
-                      onClick={() => {
-                        selectGeocodeResult(result);
-                        closeSearch();
-                      }}
+                      onClick={() => { selectGeocodeResult(result); closeSearch(); }}
                       className="w-full flex items-start gap-3 p-3 hover:bg-slate-800 rounded-xl transition-colors text-left border border-slate-800 hover:border-slate-700"
                     >
                       {result.type === 'building' ? (
@@ -105,7 +103,7 @@ export default function BottomPanel() {
                       </div>
                     </button>
                   ))
-                                ) : (
+                ) : (
                   <div className="text-center py-8">
                     <Search size={32} className="text-gray-600 mx-auto mb-2" />
                     <p className="text-gray-500 text-sm">
@@ -116,7 +114,6 @@ export default function BottomPanel() {
               </div>
             </motion.div>
           ) : (
-            //  MINIMAL VIEW (Default)
             <motion.div
               key="minimal"
               initial={{ opacity: 0, y: 10 }}
@@ -126,7 +123,7 @@ export default function BottomPanel() {
             >
               {/* Search Bar */}
               <div className="relative">
-                <button 
+                <button
                   onClick={() => setShowSearch(true)}
                   className="w-full bg-slate-800/80 hover:bg-slate-800 rounded-2xl flex items-center gap-3 px-5 py-4 border border-slate-700 transition-all shadow-lg"
                 >
@@ -138,21 +135,25 @@ export default function BottomPanel() {
                 </button>
               </div>
 
-              {/* Show Current Stop Info */}
+              {/* Current Stop Info */}
               {currentStop && (
-                <motion.div 
+                <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="flex items-center justify-between bg-slate-800/50 rounded-xl p-4 border border-slate-700"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <div className={`w-3 h-3 rounded-full ${isArrived ? 'bg-emerald-500' : 'bg-blue-500'}`}></div>
+                    <motion.div
+                      className={`w-3 h-3 rounded-full ${isArrived ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      animate={isArrived ? { scale: [1, 1.3, 1] } : {}}
+                      transition={isArrived ? { duration: 1.2, repeat: Infinity } : {}}
+                    />
                     <div className="flex-1">
                       <p className="text-xs text-gray-400 font-bold uppercase">{isArrived ? 'Arrived at' : 'Next Stop'}</p>
                       <p className="text-sm font-black text-white">{currentStop.building_id}</p>
                     </div>
                   </div>
-                  <button 
+                  <button
                     onClick={() => setIsExpanded(true)}
                     className="p-2 bg-slate-700 hover:bg-slate-600 rounded-full transition-colors"
                   >
@@ -161,22 +162,25 @@ export default function BottomPanel() {
                 </motion.div>
               )}
 
-              {/* Quick Actions when Arrived */}
+              {/* Pickup confirmation (own control) + secondary actions */}
               {currentStop && isArrived && (
                 <div className="space-y-2">
                   <SwipeButton onSwipe={completePickup} />
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={handleNavigate} className="flex items-center justify-center gap-2 py-3 bg-blue-600/20 text-blue-400 font-bold rounded-xl text-xs uppercase hover:bg-blue-600/30 transition-colors border border-blue-600/50">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button onClick={handleNavigate} className="flex items-center justify-center gap-1.5 py-3 bg-blue-600/20 text-blue-400 font-bold rounded-xl text-[10px] uppercase hover:bg-blue-600/30 transition-colors border border-blue-600/50">
                       <Navigation size={14} /> Navigate
                     </button>
-                    <button onClick={() => setShowSkipModal(true)} className="flex items-center justify-center gap-2 py-3 bg-red-600/20 text-red-400 font-bold rounded-xl text-xs uppercase hover:bg-red-600/30 transition-colors border border-red-600/50">
-                      <AlertTriangle size={14} /> Report
+                    <button onClick={() => setShowSkipModal(true)} className="flex items-center justify-center gap-1.5 py-3 bg-amber-600/20 text-amber-400 font-bold rounded-xl text-[10px] uppercase hover:bg-amber-600/30 transition-colors border border-amber-600/50">
+                      <SkipForward size={14} /> Skip
+                    </button>
+                    <button onClick={() => setShowReportModal(true)} className="flex items-center justify-center gap-1.5 py-3 bg-red-600/20 text-red-400 font-bold rounded-xl text-[10px] uppercase hover:bg-red-600/30 transition-colors border border-red-600/50">
+                      <Flag size={14} /> Report
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* Expanded Details */}
+              {/* Expanded Details — REAL data only */}
               {isExpanded && currentStop && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -184,25 +188,29 @@ export default function BottomPanel() {
                   className="pt-4 border-t border-slate-800"
                 >
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Users size={10} /> Occupancy</p>
-                      <p className="text-sm font-black text-white mt-1">{currentStop.occupancy || 'N/A'}</p>
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 col-span-2">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><MapPin size={10} /> Address</p>
+                      <p className="text-sm font-black text-white mt-1">{stop?.address || 'N/A'}</p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Package size={10} /> Est. Waste</p>
-                      <p className="text-sm font-black text-white mt-1">{currentStop.estimated_waste || 'N/A'}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase">Estate</p>
+                      <p className="text-sm font-black text-white mt-1">{stop?.estate || 'N/A'}</p>
+                    </div>
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Users size={10} /> Type</p>
+                      <p className="text-sm font-black text-white mt-1">{stop?.building_type || 'N/A'}</p>
+                    </div>
+                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Package size={10} /> Units</p>
+                      <p className="text-sm font-black text-white mt-1">{stop?.number_of_units ?? 'N/A'} {stop?.unit_type || ''}</p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
                       <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><DollarSign size={10} /> Payment</p>
-                      <p className={`text-sm font-black mt-1 ${currentStop.payment_status === 'paid' ? 'text-emerald-400' : 'text-red-400'}`}>{currentStop.payment_status?.toUpperCase() || 'N/A'}</p>
-                    </div>
-                    <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase">Waste Type</p>
-                      <p className="text-sm font-black text-white mt-1">{currentStop.waste_type || 'N/A'}</p>
+                      <p className={`text-sm font-black mt-1 ${stop?.payment_status === 'paid' ? 'text-emerald-400' : 'text-red-400'}`}>{stop?.payment_status?.toUpperCase() || 'N/A'}</p>
                     </div>
                   </div>
-                  
-                  <button 
+
+                  <button
                     onClick={() => setIsExpanded(false)}
                     className="w-full py-3 bg-slate-800 text-gray-400 font-bold rounded-xl text-sm uppercase hover:bg-slate-700 transition-colors"
                   >

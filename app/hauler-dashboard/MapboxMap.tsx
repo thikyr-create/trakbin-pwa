@@ -12,10 +12,9 @@ export default function MapboxMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
-  
-  const { routeStops, currentStop, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
 
-  // 1. Initialize Map Once
+  const { routeStops, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
+
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
@@ -24,26 +23,23 @@ export default function MapboxMap() {
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
       center: DEFAULT_CENTER,
-      zoom: 15, 
-      pitch: 0, 
-      bearing: 0, 
+      zoom: 15,
+      pitch: 0,
+      bearing: 0,
       antialias: true,
-      // ✅ Disable default Mapbox controls
       attributionControl: false,
       logoPosition: 'bottom-right'
     });
 
-    // ✅ Add only scale control (no zoom buttons)
     mapRef.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
     const el = document.createElement('div');
-    el.innerHTML = `<div style="width: 20px; height: 20px; background-color: #3B82F6; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>`;
+    el.innerHTML = `<div style="width: 20px; height: 20px; background-color: #3B82F6; border: 3px solid white; border-radius:50%; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);"></div>`;
     markerRef.current = new mapboxgl.Marker({ element: el }).setLngLat(DEFAULT_CENTER).addTo(mapRef.current);
 
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, []);
 
-  // 2. Draw Route Line and Nodes
   useEffect(() => {
     if (!mapRef.current || routeStops.length === 0) return;
     const map = mapRef.current;
@@ -56,25 +52,33 @@ export default function MapboxMap() {
 
       const sortedStops = [...routeStops].sort((a, b) => a.sequence - b.sequence);
       const lineCoordinates: [number, number][] = sortedStops.filter(s => s.latitude && s.longitude).map(stop => [stop.longitude!, stop.latitude!]);
-      
+
       if (lineCoordinates.length > 0) {
         map.addSource('route-line', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: lineCoordinates } } });
         map.addLayer({ id: 'route-line-layer', type: 'line', source: 'route-line', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#16A34A', 'line-width': 6, 'line-opacity': 0.8 } });
       }
 
-      const nodesGeoJSON: any = { type: 'FeatureCollection', features: sortedStops.filter(s => s.latitude && s.longitude).map(stop => ({ type: 'Feature', properties: { id: stop.building_id, status: stop.status, payment: stop.payment_status }, geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] } })) };
+      // Status-only coloring. Payment filtering happens at dispatch, not on the map.
+      const nodesGeoJSON: any = {
+        type: 'FeatureCollection',
+        features: sortedStops.filter(s => s.latitude && s.longitude).map(stop => ({
+          type: 'Feature',
+          properties: { id: stop.building_id, status: stop.status },
+          geometry: { type: 'Point', coordinates: [stop.longitude!, stop.latitude!] }
+        }))
+      };
       map.addSource('route-nodes', { type: 'geojson', data: nodesGeoJSON });
-      
-      map.addLayer({ 
-        id: 'route-nodes-layer', 
-        type: 'circle', 
-        source: 'route-nodes', 
-        paint: { 
+
+      map.addLayer({
+        id: 'route-nodes-layer',
+        type: 'circle',
+        source: 'route-nodes',
+        paint: {
           'circle-radius': ['case', ['==', ['get', 'id'], highlightedNodeId || ''], 15, 10],
-          'circle-color': ['match', ['get', 'status'], 'completed', '#9CA3AF', 'skipped', '#F59E0B', 'pending', ['match', ['get', 'payment'], 'unpaid', '#EF4444', '#10B981'], '#3B82F6'], 
-          'circle-stroke-width': 3, 
-          'circle-stroke-color': '#FFFFFF' 
-        } 
+          'circle-color': ['match', ['get', 'status'], 'completed', '#9CA3AF', 'skipped', '#F59E0B', '#10B981'],
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#FFFFFF'
+        }
       });
 
       const firstPending = sortedStops.find(s => s.status === 'pending');
@@ -86,7 +90,6 @@ export default function MapboxMap() {
     if (map.isStyleLoaded()) drawRoute(); else map.on('load', drawRoute);
   }, [routeStops, highlightedNodeId, cameraMode]);
 
-  // 3. Execute FlyTo based on Target Location
   useEffect(() => {
     if (targetLocation && mapRef.current) {
       mapRef.current.flyTo({
@@ -98,7 +101,6 @@ export default function MapboxMap() {
     }
   }, [targetLocation]);
 
-  // 4. Execute Follow Driver
   useEffect(() => {
     if (cameraMode === 'following' && gpsLocation && mapRef.current) {
       mapRef.current.flyTo({

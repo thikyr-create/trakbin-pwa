@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { useCompanySession } from '@/lib/store/useCompanySession';
+import { recordActivity, type DriverEventType } from '@/lib/features/driver/activity';
 import { DriverRoute, RouteBuilding } from '../../app/hauler-dashboard/components/types';
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from '../../app/hauler-dashboard/utils/geo';
 
@@ -47,7 +48,7 @@ export interface DriverSessionState {
   updateGps: (lat: number, lng: number) => void;
   completePickup: () => Promise<void>;
   skipStop: (reason: string) => Promise<void>;
-  reportIssue: (issue: string) => void;
+  reportIssue: (issueType: string, description: string) => Promise<void>;
   setSearchQuery: (query: string) => void;
   setIsSearchFocused: (focused: boolean) => void;
   selectSearchResult: (stop: RouteBuilding) => void;
@@ -66,8 +67,28 @@ export interface DriverSessionState {
 }
 
 let gpsWatchId: number | null = null;
+let routeStartRecorded = false;
+let approachedFor: string | null = null;
 
-export const useDriverSession = create<DriverSessionState>((set, get) => ({
+export const useDriverSession = create<DriverSessionState>((set, get) => {
+  // Activity recorder helper: real driver context on every event
+  const act = (eventType: DriverEventType, extra?: { buildingId?: string | null; metadata?: Record<string, unknown> }) => {
+    const { driver, route, gpsLocation } = get();
+    const { tenant } = useCompanySession.getState();
+    if (!tenant.companyId) return;
+    recordActivity({
+      eventType,
+      driverId: driver?.employee_id || driver?.id || 'unknown',
+      companyId: tenant.companyId,
+      routeId: route?.id ?? null,
+      buildingId: extra?.buildingId ?? null,
+      latitude: gpsLocation?.lat ?? null,
+      longitude: gpsLocation?.lng ?? null,
+      metadata: extra?.metadata ?? {},
+    }).catch(() => {});
+  };
+
+  return ({
   driver: null,
   route: null,
   routeStops: [],
@@ -89,15 +110,13 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   targetLocation: null,
 
   initializeSession: async () => {
-    // SEC-3: Always read from auth.users + profiles (server-verified identity)
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       window.location.href = '/auth';
       return;
     }
 
-    // Read driver profile from server (RLS enforces auth.uid() = id)
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('*, drivers(*)')
@@ -114,9 +133,6 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     set({ driver });
 
     const { tenant } = useCompanySession.getState();
-    if (!tenant || !tenant.companyId) {
-      console.error('Tenant context not loaded. Waiting...');
-    }
 
     set({ isLoading: true });
     try {
@@ -130,11 +146,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
         .limit(1)
         .single();
 
-      if (routeError || !routeData) { 
-        set({ route: null, routeStops: [], isLoading: false }); 
-        return; 
+      if (routeError || !routeData) {
+        set({ route: null, routeStops: [], isLoading: false });
+        return;
       }
-      
+
       set({ route: routeData, isRoutePaused: routeData.status === 'paused' });
 
       const { data: stopsData } = await supabase
@@ -143,30 +159,38 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
         .eq('company_id', tenant.companyId)
         .eq('route_id', routeData.id)
         .order('sequence', { ascending: true });
-        
+
       if (!stopsData) { set({ routeStops: [], isLoading: false }); return; }
 
       const buildingIds = stopsData.map((stop: any) => stop.building_id);
-      
-      const { data: buildingsData } = await supabase
+
+      // FIX: only real columns that exist on Buildings
+            const { data: buildingsData } = await supabase
         .from('Buildings')
-        .select('custom_id, address, latitude, longitude, payment_status, waste_type, estimated_waste, occupancy')
+        .select('custom_id, address, estate, building_type, number_of_units, unit_type, payment_status, latitude, longitude')
         .eq('company_id', tenant.companyId)
         .in('custom_id', buildingIds);
 
       const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
         const building = buildingsData?.find((b: any) => b.custom_id === stop.building_id);
-        return { 
-          ...stop, status: stop.status as RouteBuilding['status'], address: building?.address, 
-          latitude: building?.latitude, longitude: building?.longitude, payment_status: building?.payment_status, 
-          waste_type: building?.waste_type, estimated_waste: building?.estimated_waste, occupancy: building?.occupancy 
-        };
+        return {
+          ...stop,
+          status: stop.status as RouteBuilding['status'],
+          address: building?.address,
+          estate: building?.estate,
+          building_type: building?.building_type,
+          number_of_units: building?.number_of_units,
+          unit_type: building?.unit_type,
+          latitude: building?.latitude,
+          longitude: building?.longitude,
+          payment_status: building?.payment_status,
+        } as any;
       });
 
       set({ routeStops: mergedStops, currentStop: mergedStops.find((s: any) => s.status === 'pending') || null, isLoading: false });
-    } catch (error) { 
-      console.error(error); 
-      set({ isLoading: false }); 
+    } catch (error) {
+      console.error(error);
+      set({ isLoading: false });
     }
   },
 
@@ -188,13 +212,37 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
 
   updateGps: (lat, lng) => {
     set({ gpsLocation: { lat, lng } });
-    const { currentStop, isArrived, isRoutePaused } = get();
+    const { currentStop, isArrived, isRoutePaused, route } = get();
+    const { tenant } = useCompanySession.getState();
+
+        // Route start: first GPS lock on an assigned route
+    if (route && route.status === 'assigned' && tenant.companyId && !routeStartRecorded) {
+      routeStartRecorded = true;
+      (async () => {
+        try {
+          await supabase.from('routes').update({ status: 'active' }).eq('id', route.id);
+          set({ route: { ...route, status: 'active' as any } });
+          act('DRIVER_ROUTE_STARTED', {});
+        } catch {}
+      })();
+    }
 
     if (isRoutePaused || !currentStop || !currentStop.latitude || !currentStop.longitude) return;
 
     const distance = calculateDistanceInMeters(lat, lng, currentStop.latitude, currentStop.longitude);
-    if (distance <= 25 && !isArrived) set({ isArrived: true });
-    else if (distance > 50 && isArrived) set({ isArrived: false });
+
+    // Approaching band (150m → 25m), once per stop
+    if (distance <= 150 && distance > 25 && approachedFor !== currentStop.id) {
+      approachedFor = currentStop.id;
+      act('DRIVER_STOP_APPROACHED', { buildingId: currentStop.building_id, metadata: { distanceM: Math.round(distance) } });
+    }
+
+    if (distance <= 25 && !isArrived) {
+      set({ isArrived: true });
+      act('DRIVER_STOP_ARRIVED', { buildingId: currentStop.building_id, metadata: { distanceM: Math.round(distance) } });
+    } else if (distance > 50 && isArrived) {
+      set({ isArrived: false });
+    }
   },
 
   completePickup: async () => {
@@ -202,11 +250,14 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     const { tenant } = useCompanySession.getState();
     if (!currentStop || !route || !tenant.companyId) return;
 
+    act('DRIVER_PICKUP_CONFIRMED', { buildingId: currentStop.building_id });
+
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'completed' as RouteBuilding['status'] } : s);
     const nextStop = newStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending') || null;
     const newRoute = { ...route, completed_stops: route.completed_stops + 1 };
 
     set({ routeStops: newStops, currentStop: nextStop, route: newRoute, isArrived: false });
+    approachedFor = null;
 
     await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
     await supabase.from('routes').update({ completed_stops: newRoute.completed_stops }).eq('id', route.id).eq('company_id', tenant.companyId);
@@ -218,23 +269,42 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   },
 
   skipStop: async (reason: string) => {
-    const { currentStop } = get();
+    const { currentStop, routeStops } = get();
     const { tenant } = useCompanySession.getState();
     if (!currentStop || !tenant.companyId) return;
 
-    const { routeStops } = get();
+    act('DRIVER_PICKUP_SKIPPED', { buildingId: currentStop.building_id, metadata: { reason } });
+
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'skipped' as RouteBuilding['status'], skip_reason: reason } : s);
     const nextStop = newStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending') || null;
 
     set({ routeStops: newStops, currentStop: nextStop, isArrived: false, showSkipModal: false });
-    
+    approachedFor = null;
+
     await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
   },
 
-  reportIssue: (issue: string) => {
-    console.log(`Reported: ${issue}`);
+  reportIssue: async (issueType: string, description: string) => {
+    const { currentStop, driver, gpsLocation } = get();
+    const { tenant } = useCompanySession.getState();
+    if (!tenant.companyId) return;
+
+    const { error } = await supabase.from('environmental_issues').insert([{
+      issue_type: issueType,
+      severity: 'Medium',
+      description: description || null,
+      status: 'pending',
+      building_id: currentStop?.building_id ?? null,
+      reported_by: driver?.employee_id || driver?.id || 'driver',
+      company_id: tenant.companyId,
+      latitude: gpsLocation?.lat ?? null,
+      longitude: gpsLocation?.lng ?? null,
+    }]);
+
+    if (!error) {
+      act('DRIVER_FEEDBACK_SUBMITTED', { buildingId: currentStop?.building_id ?? null, metadata: { category: issueType } });
+    }
     set({ showReportModal: false });
-    alert("Issue reported to dispatch!");
   },
 
   setSearchQuery: (query) => {
@@ -263,8 +333,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     const { routeStops } = get();
     const results: GeocodeResult[] = [];
 
-    const buildingMatches = routeStops.filter(stop => 
-      stop.building_id.toLowerCase().includes(query.toLowerCase()) || 
+    const buildingMatches = routeStops.filter(stop =>
+      stop.building_id.toLowerCase().includes(query.toLowerCase()) ||
       (stop.address || '').toLowerCase().includes(query.toLowerCase())
     );
 
@@ -301,8 +371,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
     const { isRoutePaused, route } = get();
     const { tenant } = useCompanySession.getState();
     const newPauseState = !isRoutePaused;
-    
+
     set({ isRoutePaused: newPauseState });
+    act(newPauseState ? 'DRIVER_ROUTE_PAUSED' : 'DRIVER_ROUTE_RESUMED', {});
 
     if (route && tenant.companyId) {
       try {
@@ -316,28 +387,28 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   endShift: async () => {
     const { route, stopGpsTracking } = get();
     const { tenant } = useCompanySession.getState();
-    
+
     if (!route || !tenant.companyId) return;
 
+    act('DRIVER_ROUTE_COMPLETED', {});
+
     try {
-      await supabase.from('routes').update({ 
+      await supabase.from('routes').update({
         status: 'completed',
         ended_at: new Date().toISOString()
       }).eq('id', route.id).eq('company_id', tenant.companyId);
 
       stopGpsTracking();
 
-      set({ 
-        route: null, 
-        routeStops: [], 
-        currentStop: null, 
+      set({
+        route: null,
+        routeStops: [],
+        currentStop: null,
         isArrived: false,
         isRoutePaused: false,
         showEndShiftModal: false,
         progressStats: { distance: 0, eta: 0 }
       });
-
-      alert('Shift ended successfully! Great work today.');
     } catch (error) {
       console.error('Error ending shift:', error);
       alert('Error ending shift. Please try again.');
@@ -348,4 +419,4 @@ export const useDriverSession = create<DriverSessionState>((set, get) => ({
   highlightNode: (id) => set({ highlightedNodeId: id }),
   flyToLocation: (lat, lng, zoom) => set({ targetLocation: { lat, lng, zoom }, cameraMode: 'navigating' }),
   centerOnDriver: () => set({ cameraMode: 'following' }),
-}));
+});});

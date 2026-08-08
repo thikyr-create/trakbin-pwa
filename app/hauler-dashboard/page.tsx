@@ -12,6 +12,7 @@ import SkipReasonModal from './components/SkipReasonModal';
 import BottomPanel from './components/BottomPanel';
 import MapboxMap from './MapboxMap';
 import { calculateTotalDistanceKm } from './utils/geo';
+import DriverReportModal from './components/DriverReportModal';
 
 export default function HaulerDashboard() {
   const router = useRouter();
@@ -101,7 +102,8 @@ export default function HaulerDashboard() {
       {/* Bottom Panel */}
       <BottomPanel />
 
-        <SkipReasonModal />
+              <SkipReasonModal />
+      <DriverReportModal />
       
       <EndShiftModal /> {/* ✅ Add this line */}
     </div>

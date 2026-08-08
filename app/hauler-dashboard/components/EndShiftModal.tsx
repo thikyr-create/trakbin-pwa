@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 
 export default function EndShiftModal() {
@@ -12,27 +12,31 @@ export default function EndShiftModal() {
   return (
     <AnimatePresence>
       {showEndShiftModal && (
-        <motion.div 
-          initial={{ opacity: 0 }} 
-          animate={{ opacity: 1 }} 
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={() => setShowEndShiftModal(false)}
         >
-          <motion.div 
-            initial={{ scale: 0.9, y: 20 }} 
-            animate={{ scale: 1, y: 0 }} 
+          <motion.div
+            initial={{ scale: 0.9, y: 20 }}
+            animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
+            transition={{ type: 'spring', damping: 24, stiffness: 300 }}
             className="bg-slate-900 rounded-2xl w-full max-w-sm shadow-2xl border border-slate-800 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-5 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white uppercase">End Shift</h3>
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/15 text-red-400"><LogOut size={16} /></span>
+                <h3 className="text-lg font-black text-white uppercase">End Shift</h3>
+              </div>
               <button onClick={() => setShowEndShiftModal(false)} className="p-1 hover:bg-slate-800 rounded-full">
                 <X size={20} className="text-gray-400" />
               </button>
             </div>
-            
+
             <div className="p-5">
               {remainingStops > 0 ? (
                 <div className="flex items-start gap-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
@@ -70,12 +74,13 @@ export default function EndShiftModal() {
 
               <p className="text-xs text-gray-500 mb-4">Are you sure you want to end your shift?</p>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 onClick={endShift}
                 className="w-full py-3 bg-red-600 text-white font-black rounded-xl uppercase hover:bg-red-500 transition-all shadow-lg shadow-red-900/20"
               >
                 Yes, End Shift
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>
