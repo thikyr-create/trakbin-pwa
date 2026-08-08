@@ -1,30 +1,53 @@
 import { createClient } from '@supabase/supabase-js';
-import { optimizeStops, estimateDurationMin, type Stop } from './RouteOptimizer';
+import { previewRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 import { validateAssignment } from './AssignmentValidator';
 import { createRoute } from './RouteEngine';
 import { emit } from './AssignmentEvents';
+
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
+// Legacy stop shape (passed by the UI from preview.ordered)
+interface LegacyStop { building_id: string; lat: number; lng: number; }
+
 export const AssignmentEngine = {
-  async assign(args: { companyId: number; driver: any; truck: any; stops: Stop[]; assignedBy: string }) {
+  async assign(args: { companyId: number; driver: any; truck: any; stops: LegacyStop[]; assignedBy: string }) {
     const v = validateAssignment(args);
     if (!v.ok) return { ok: false, errors: v.errors };
-    const { ordered, distanceKm } = optimizeStops(args.stops);
-    const durationMin = estimateDurationMin(distanceKm, ordered.length);
+
+    // The UI already ordered these stops via previewRoute (haversine, instant).
+    // We trust that order — re-ordering would silently change what the dispatcher approved.
+    // Recompute distance/duration server-side for consistency.
+    const orderedStops: OptimizationStop[] = args.stops.map((s) => ({
+      buildingId: s.building_id,
+      latitude: s.lat,
+      longitude: s.lng,
+    }));
+
+    const preview = await previewRoute(orderedStops);
+    const distanceKm = preview.distanceKm;
+    const durationMin = preview.durationMinutes;
+
+    const geometry = args.stops.map((s, i) => ({
+      stop: i + 1, building_id: s.building_id, lat: s.lat, lng: s.lng,
+    }));
+
     const route = await createRoute({
       companyId: args.companyId, truckId: args.truck.id, driverId: args.driver.id,
-      geometry: ordered.map((s, i) => ({ stop: i + 1, building_id: s.building_id, lat: s.lat, lng: s.lng })),
-      distanceKm, durationMin, totalStops: ordered.length,
+      geometry, distanceKm, durationMin, totalStops: args.stops.length,
     });
+
     const { data: assignment, error } = await supabase.from('assignments').insert([{
       company_id: args.companyId, driver_id: args.driver.id, truck_id: args.truck.id, route_id: route.id,
       status: 'assigned', assigned_by: args.assignedBy,
     }]).select().single();
     if (error) throw error;
-    await supabase.from('assignment_buildings').insert(ordered.map((s, i) => ({ assignment_id: assignment.id, building_id: s.building_id, stop_order: i + 1 })));
+
+    await supabase.from('assignment_buildings').insert(
+      args.stops.map((s, i) => ({ assignment_id: assignment.id, building_id: s.building_id, stop_order: i + 1 }))
+    );
     await supabase.from('trucks').update({ status: 'assigned', current_driver: args.driver.full_name }).eq('id', args.truck.id);
     await supabase.from('drivers').update({ status: 'busy', current_assignment_id: assignment.id }).eq('id', args.driver.id);
-    await emit(args.companyId, assignment.id, 'route_assigned', `Route assigned to ${args.driver.full_name} (${args.truck.truck_id}) · ${ordered.length} stops`);
+    await emit(args.companyId, assignment.id, 'route_assigned', `Route assigned to ${args.driver.full_name} (${args.truck.truck_id}) · ${args.stops.length} stops`);
     return { ok: true, assignment };
   },
 
