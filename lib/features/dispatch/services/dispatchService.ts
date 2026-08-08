@@ -1,7 +1,8 @@
 // lib/features/dispatch/services/dispatchService.ts
 import { createClient } from '@supabase/supabase-js';
-import { optimizeStops, estimateDurationMin, type Stop } from '@/lib/core/assignment/RouteOptimizer';
+import { optimizeRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 import { optimizeDispatch, enrichDriverContext, type ScoredResource } from '../utils/dispatchOptimizer';
+import { RoutePublisher } from '@/lib/core/event-bus';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -26,6 +27,7 @@ export interface DispatchResult {
   routesCreated: number;
   stopsMaterialized: number;
   unassignedRoutes: number;
+  matrixSource: 'mapbox' | 'haversine';
 }
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -36,16 +38,16 @@ function getTargetDateInfo(date: Date) {
   return { iso, dayName };
 }
 
-/**
- * Emits a platform event for downstream consumers (analytics, notifications, etc.)
- */
-async function emitPlatformEvent(
-  company_id: number,
-  event_type: string,
-  payload: Record<string, any>
-) {
-  // For now, log to console. Future: write to a platform_events table or push to a message queue.
-  console.log(`[Platform Event] ${event_type}`, { company_id, ...payload });
+// Legacy stop shape (still used by zoneGroups Map construction)
+interface Stop { building_id: string; lat: number; lng: number; }
+
+// Map legacy shape → new OptimizationStop shape
+function toOptimizationStops(stops: Stop[]): OptimizationStop[] {
+  return stops.map((s) => ({
+    buildingId: s.building_id,
+    latitude: s.lat,
+    longitude: s.lng,
+  }));
 }
 
 export async function previewDispatch(
@@ -74,13 +76,8 @@ export async function previewDispatch(
 
   if (scheduledBuildingIds.length === 0) {
     return {
-      targetDate: iso,
-      dayName,
-      totalBuildings: 0,
-      zones: [],
-      availableDrivers: 0,
-      availableTrucks: 0,
-      canExecute: false,
+      targetDate: iso, dayName, totalBuildings: 0, zones: [],
+      availableDrivers: 0, availableTrucks: 0, canExecute: false,
       blockReason: 'No buildings scheduled for this day.',
     };
   }
@@ -94,10 +91,8 @@ export async function previewDispatch(
     .eq('status', 'active');
 
   const validBuildings = (buildings || []).filter(
-    (b: any) =>
-      b.payment_status !== 'suspended' &&
-      b.latitude != null &&
-      b.longitude != null &&
+    (b: any) => b.payment_status !== 'suspended' &&
+      b.latitude != null && b.longitude != null &&
       !(b.latitude === 0 && b.longitude === 0)
   );
 
@@ -111,43 +106,29 @@ export async function previewDispatch(
   });
 
   const zones = Array.from(zoneMap.entries()).map(([zone_name, count]) => ({
-    zone_name,
-    buildingCount: count,
-    requiredRoutes: Math.ceil(count / maxStops),
+    zone_name, buildingCount: count, requiredRoutes: Math.ceil(count / maxStops),
   }));
 
   const totalRequiredRoutes = zones.reduce((sum, z) => sum + z.requiredRoutes, 0);
 
   const [{ count: driverCount }, { count: truckCount }] = await Promise.all([
-    supabase
-      .from('drivers')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', company_id)
-      .eq('status', 'available'),
-    supabase
-      .from('trucks')
-      .select('*', { count: 'exact', head: true })
-      .eq('company_id', company_id)
-      .eq('status', 'available'),
+    supabase.from('drivers').select('*', { count: 'exact', head: true })
+      .eq('company_id', company_id).eq('status', 'available'),
+    supabase.from('trucks').select('*', { count: 'exact', head: true })
+      .eq('company_id', company_id).eq('status', 'available'),
   ]);
 
   const availDrivers = driverCount || 0;
   const availTrucks = truckCount || 0;
-
   const canExecute = availDrivers >= totalRequiredRoutes && availTrucks >= totalRequiredRoutes;
   const blockReason = !canExecute
     ? `Need ${totalRequiredRoutes} drivers/trucks, but only ${availDrivers} drivers and ${availTrucks} trucks are available.`
     : undefined;
 
   return {
-    targetDate: iso,
-    dayName,
-    totalBuildings: validBuildings.length,
-    zones,
-    availableDrivers: availDrivers,
-    availableTrucks: availTrucks,
-    canExecute,
-    blockReason,
+    targetDate: iso, dayName, totalBuildings: validBuildings.length,
+    zones, availableDrivers: availDrivers, availableTrucks: availTrucks,
+    canExecute, blockReason,
   };
 }
 
@@ -156,7 +137,7 @@ export async function executeDispatch(
   targetDate: Date
 ): Promise<DispatchResult> {
   const { iso, dayName } = getTargetDateInfo(targetDate);
-  const result: DispatchResult = { routesCreated: 0, stopsMaterialized: 0, unassignedRoutes: 0 };
+  const result: DispatchResult = { routesCreated: 0, stopsMaterialized: 0, unassignedRoutes: 0, matrixSource: 'haversine' };
 
   // Idempotency check
   const startOfDay = `${iso}T00:00:00.000Z`;
@@ -205,12 +186,7 @@ export async function executeDispatch(
 
   const buildingMap = new Map(
     (buildings || [])
-      .filter(
-        (b: any) =>
-          b.payment_status !== 'suspended' &&
-          b.latitude != null &&
-          b.longitude != null
-      )
+      .filter((b: any) => b.payment_status !== 'suspended' && b.latitude != null && b.longitude != null)
       .map((b: any) => [b.custom_id, b])
   );
 
@@ -220,14 +196,11 @@ export async function executeDispatch(
     if (b) {
       if (!zoneGroups.has(s.zone_id)) zoneGroups.set(s.zone_id, []);
       zoneGroups.get(s.zone_id)!.push({
-        building_id: b.custom_id,
-        lat: Number(b.latitude),
-        lng: Number(b.longitude),
+        building_id: b.custom_id, lat: Number(b.latitude), lng: Number(b.longitude),
       });
     }
   });
 
-  // Fetch available resources
   const [{ data: drivers }, { data: trucks }] = await Promise.all([
     supabase.from('drivers').select('*').eq('company_id', company_id).eq('status', 'available'),
     supabase.from('trucks').select('*').eq('company_id', company_id).eq('status', 'available'),
@@ -236,61 +209,62 @@ export async function executeDispatch(
   const driverPool = [...(drivers || [])];
   const truckPool = [...(trucks || [])];
 
-  // Materialize routes
   for (const [zoneName, stops] of zoneGroups.entries()) {
-    // Enrich driver context for optimizer
     const enrichedDrivers = await enrichDriverContext(company_id, driverPool, zoneName, iso);
 
-    for (let i = 0; i < stops.length; i += maxStops) {
-      const chunk = stops.slice(i, i + maxStops);
-      const { ordered, distanceKm } = optimizeStops(chunk);
-      const durationMin = estimateDurationMin(distanceKm, ordered.length);
+    // ── NEW: delegate stop ordering to the core route-optimization engine ──
+    // The core handles sub-chunking via maxStopsPerRoute and returns road-network
+    // distances/times when MAPBOX_TOKEN is present.
+    const optimizationResult = await optimizeRoute({
+      stops: toOptimizationStops(stops),
+      constraints: { maxStopsPerRoute: maxStops, averageSpeedKmh: 25 },
+    });
 
-      // Run Dispatch Optimizer
+    // Track which routing provider was used (for transparency in preview)
+    result.matrixSource = optimizationResult.matrixSource;
+
+    // The core returns one OptimizedRoute per chunk
+    for (const [chunkIdx, chunkRoute] of optimizationResult.routes.entries()) {
+      const orderedStops = chunkRoute.orderedStops;
+      const distanceKm = chunkRoute.metrics.totalDistanceKm;
+      const durationMin = chunkRoute.metrics.estimatedDurationMin;
+
+      // Resource matching: which driver/truck should take this route?
       const scoredResources = optimizeDispatch(enrichedDrivers, truckPool, {
-        zone_name: zoneName,
-        required_stops: ordered.length,
-        target_date: iso,
+        zone_name: zoneName, required_stops: orderedStops.length, target_date: iso,
       });
 
-      // Pick the best match (or null if none available)
       const bestMatch: ScoredResource | null = autoAssign && scoredResources.length > 0
-        ? scoredResources[0]
-        : null;
+        ? scoredResources[0] : null;
 
       const driver = bestMatch?.driver || null;
       const truck = bestMatch?.truck || null;
-
-      // Driver ID format: prefer employee_id, fallback to String(id)
-      const driverId = driver
-        ? (driver.employee_id || driver.id)
-        : '__unassigned__';
+      const driverId = driver ? (driver.employee_id || driver.id) : '__unassigned__';
       const truckId = truck ? String(truck.id) : '__unassigned__';
 
-      const geometry = ordered.map((s, idx) => ({
-        stop: idx + 1,
-        building_id: s.building_id,
-        lat: s.lat,
-        lng: s.lng,
+      // Geometry stored as stop-points (parity with existing schema)
+      const geometry = orderedStops.map((s, idx) => ({
+        stop: idx + 1, building_id: s.buildingId, lat: s.latitude, lng: s.longitude,
       }));
 
-      // Create Route (NOT NULL fix: use placeholder IDs when unassigned)
       const { data: route, error: routeErr } = await supabase
         .from('routes')
         .insert([{
           company_id,
           zone_id: zoneName,
-          route_name: `${zoneName} - ${dayName} ${i / maxStops + 1}`,
+          route_name: `${zoneName} - ${dayName} ${chunkIdx + 1}`,
           driver_id: driverId,
           truck_id: truckId,
           geometry,
           distance_km: distanceKm,
           duration_min: durationMin,
-          total_stops: ordered.length,
+          total_stops: orderedStops.length,
           completed_stops: 0,
           status: driver && truck ? 'assigned' : 'unassigned',
           optimized: true,
           scheduled_start_time: scheduledStart,
+          algorithm: chunkRoute.algorithm,
+          matrix_source: chunkRoute.matrixSource,
         }])
         .select('id')
         .single();
@@ -300,24 +274,16 @@ export async function executeDispatch(
       result.routesCreated += 1;
       if (!driver || !truck) result.unassignedRoutes += 1;
 
-      // Create Stops
-      const stopInserts = ordered.map((s, idx) => ({
-        route_id: route.id,
-        building_id: s.building_id,
-        sequence: idx + 1,
-        status: 'pending',
-        company_id,
+      const stopInserts = orderedStops.map((s, idx) => ({
+        route_id: route.id, building_id: s.buildingId,
+        sequence: idx + 1, status: 'pending', company_id,
       }));
 
       const { error: stopsErr } = await supabase.from('route_stops').insert(stopInserts);
-      if (!stopsErr) {
-        result.stopsMaterialized += ordered.length;
-      }
+      if (!stopsErr) result.stopsMaterialized += orderedStops.length;
 
-      // Update resource status if assigned
       if (driver) {
         await supabase.from('drivers').update({ status: 'busy' }).eq('id', driver.id);
-        // Remove from pool so it's not reused
         const idx = driverPool.findIndex((d) => d.id === driver.id);
         if (idx >= 0) driverPool.splice(idx, 1);
       }
@@ -327,15 +293,8 @@ export async function executeDispatch(
         if (idx >= 0) truckPool.splice(idx, 1);
       }
 
-      // Emit platform event
-      await emitPlatformEvent(company_id, 'route_materialized', {
-        route_id: route.id,
-        zone_name: zoneName,
-        stops: ordered.length,
-        driver_id: driverId,
-        truck_id: truckId,
-        target_date: iso,
-      });
+      // EVENT BUS: downstream engines (analytics, notifications, driver app) react
+      RoutePublisher.publish('ROUTE_GENERATED', { routeId: String(route.id), companyId: company_id });
     }
   }
 

@@ -7,9 +7,9 @@ import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Building2, Users, Truck, Route, CheckCircle2, Loader2, RefreshCw, MapPin, Clock, Navigation } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { AssignmentEngine } from '@/lib/core/assignment/AssignmentEngine';
-import { optimizeStops, estimateDurationMin, type Stop } from '@/lib/core/assignment/RouteOptimizer';
 import { availableDrivers } from '@/lib/core/assignment/DriverAllocator';
 import { availableTrucks } from '@/lib/core/assignment/TruckAllocator';
+import { previewRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -33,6 +33,9 @@ export default function AssignmentsPage() {
   const [saving, setSaving] = useState(false);
   const [reTruck, setReTruck] = useState<Record<string, string>>({});
   const [reDriver, setReDriver] = useState<Record<string, string>>({});
+
+  // Client-safe live route preview (haversine, no network calls)
+  const [preview, setPreview] = useState<{ ordered: OptimizationStop[]; distanceKm: number; durationMin: number }>({ ordered: [], distanceKm: 0, durationMin: 0 });
 
   const load = async () => {
     if (!cid) return;
@@ -59,9 +62,27 @@ export default function AssignmentsPage() {
   const drvAvail = availableDrivers(drivers);
   const trkAvail = availableTrucks(trucks);
 
-  const selectedStops: Stop[] = useMemo(() => eligible.filter((b) => selected.includes(b.custom_id)).map((b) => ({ building_id: b.custom_id, lat: b.latitude, lng: b.longitude })), [eligible, selected]);
-  const route = useMemo(() => optimizeStops(selectedStops), [selectedStops]);
-  const durationMin = estimateDurationMin(route.distanceKm, route.ordered.length);
+  // Live preview: recompute ordering + distance + duration as selection changes
+  useEffect(() => {
+    let active = true;
+    const stops: OptimizationStop[] = eligible
+      .filter((b) => selected.includes(b.custom_id))
+      .map((b) => ({
+        buildingId: b.custom_id,
+        latitude: Number(b.latitude),
+        longitude: Number(b.longitude),
+      }));
+
+    if (stops.length === 0) {
+      setPreview({ ordered: [], distanceKm: 0, durationMin: 0 });
+      return;
+    }
+
+    previewRoute(stops).then((r) => {
+      if (active) setPreview({ ordered: r.orderedStops, distanceKm: r.distanceKm, durationMin: r.durationMinutes });
+    });
+    return () => { active = false; };
+  }, [eligible, selected]);
 
   const toggle = (id: string) => setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
   const driver = drivers.find((d) => d.id === driverId);
@@ -70,6 +91,12 @@ export default function AssignmentsPage() {
   const assign = async () => {
     if (!cid) return;
     setSaving(true);
+    // Use the preview's optimized ordering (legacy shape for AssignmentEngine)
+    const selectedStops = preview.ordered.map((s) => ({
+      building_id: s.buildingId,
+      lat: s.latitude,
+      lng: s.longitude,
+    }));
     const res = await AssignmentEngine.assign({ companyId: cid, driver, truck, stops: selectedStops, assignedBy: 'dispatcher' });
     setSaving(false);
     if (!res.ok) { addNotification(res.errors?.join(' ') || 'Could not assign.', 'error'); return; }
@@ -122,11 +149,11 @@ export default function AssignmentsPage() {
             </select>
           </div>
           <div className="grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 ring-1 ring-gray-100">
-            <div><p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-gray-400`}>Stops</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{route.ordered.length}</p></div>
-            <div><p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-gray-400`}><MapPin className="h-3 w-3" /> Distance</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{route.distanceKm}<span className="text-xs"> km</span></p></div>
-            <div><p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-gray-400`}><Clock className="h-3 w-3" /> Duration</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{Math.floor(durationMin / 60)}h {durationMin % 60}m</p></div>
+            <div><p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-gray-400`}>Stops</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{preview.ordered.length}</p></div>
+            <div><p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-gray-400`}><MapPin className="h-3 w-3" /> Distance</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{preview.distanceKm}<span className="text-xs"> km</span></p></div>
+            <div><p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-gray-400`}><Clock className="h-3 w-3" /> Duration</p><p className={`${display.className} text-xl font-extrabold tabular-nums`}>{Math.floor(preview.durationMin / 60)}h {preview.durationMin % 60}m</p></div>
           </div>
-          <motion.button whileTap={{ scale: 0.98 }} onClick={assign} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
+          <motion.button whileTap={{ scale: 0.98 }} onClick={assign} disabled={saving || preview.ordered.length === 0} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
             {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Navigation className="h-5 w-5" />} Assign route
           </motion.button>
         </motion.section>
