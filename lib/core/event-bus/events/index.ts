@@ -12,6 +12,13 @@ export interface PlatformEventMap {
   BUILDING_STATUS_CHANGED: { buildingId: string; companyId: number; status: string };
   BUILDING_ARCHIVED: { buildingId: string; companyId: number };
 
+   // Service lifecycle
+  SERVICE_ACTIVATED: { buildingId: string; companyId: number };
+  SERVICE_DEACTIVATED: { buildingId: string; companyId: number };
+
+  // Assignment events
+  ASSIGNMENT_UPDATED: { buildingId: string; companyId: number };
+
   // ── Caretaker auth ──
   CARETAKER_LOGGED_IN: { buildingId: string; companyId: number };
   CARETAKER_LOGGED_OUT: { buildingId: string; companyId: number };
