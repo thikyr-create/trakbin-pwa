@@ -56,5 +56,6 @@ export interface PlatformEventMap {
   FIELD_INTELLIGENCE_LEARNED: { companyId: number; source: string; sampleCount: number };
 }
 
-export type PlatformEventName = keyof PlatformEventMap;
-export type PlatformEventPayload<K extends PlatformEventName> = PlatformEventMap[K];
+export type PlatformEventType = keyof PlatformEventMap;
+export type PlatformEventName = PlatformEventType;
+export type PlatformEventPayload<K extends PlatformEventType> = PlatformEventMap[K];
