@@ -1,0 +1,7 @@
+// lib/core/communications/events/billingEvents.ts
+export const BILLING_EMAIL_EVENTS = {
+  INVOICE_CREATED: 'INVOICE_CREATED',
+  PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  BILLING_REMINDER_DUE: 'BILLING_REMINDER_DUE',
+} as const;

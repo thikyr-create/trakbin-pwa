@@ -1,9 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Package, DollarSign, Users, Navigation, AlertTriangle, Search, ChevronUp, ChevronDown, X, SkipForward, Flag } from 'lucide-react';
+import {
+  MapPin, Package, DollarSign, Users, Navigation, Search,
+  ChevronUp, ChevronDown, X, SkipForward, Flag, Camera, Building2,
+} from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import SwipeButton from './SwipeButton';
+import EvidenceCapture from './EvidenceCapture';
 import { useState } from 'react';
 
 export default function BottomPanel() {
@@ -18,11 +22,16 @@ export default function BottomPanel() {
     setSearchQuery,
     searchGeocode,
     selectGeocodeResult,
-    setIsSearchFocused
+    setIsSearchFocused,
   } = useDriverSession();
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const [evidenceContext, setEvidenceContext] = useState<{
+    type: 'pickup' | 'skip' | 'report' | 'deviation';
+    label: string;
+  } | null>(null);
 
   const handleNavigate = () => {
     if (!currentStop || !currentStop.latitude || !currentStop.longitude) return;
@@ -42,13 +51,18 @@ export default function BottomPanel() {
     setIsSearchFocused(false);
   };
 
+  const openEvidence = (type: 'pickup' | 'skip' | 'report' | 'deviation', label: string) => {
+    setEvidenceContext({ type, label });
+    setEvidenceOpen(true);
+  };
+
   const stop: any = currentStop;
 
   return (
     <motion.div
-      initial={{ y: "100%" }}
+      initial={{ y: '100%' }}
       animate={{ y: 0 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       className="absolute bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-xl shadow-2xl border-t border-slate-800 z-20 max-h-[70vh]"
       style={{ touchAction: 'none' }}
     >
@@ -57,7 +71,7 @@ export default function BottomPanel() {
         className="w-full flex justify-center pt-3 pb-2 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full"></div>
+        <div className="w-12 h-1.5 bg-slate-700 rounded-full" />
       </div>
 
       <div className="px-5 pb-5 overflow-y-auto">
@@ -99,7 +113,9 @@ export default function BottomPanel() {
                       )}
                       <div className="flex-1">
                         <p className="text-sm font-bold text-white">{result.place_name}</p>
-                        <p className="text-xs text-gray-400">{result.type === 'building' ? 'Assigned Building' : 'Location on Map'}</p>
+                        <p className="text-xs text-gray-400">
+                          {result.type === 'building' ? 'Assigned Building' : 'Location on Map'}
+                        </p>
                       </div>
                     </button>
                   ))
@@ -149,7 +165,9 @@ export default function BottomPanel() {
                       transition={isArrived ? { duration: 1.2, repeat: Infinity } : {}}
                     />
                     <div className="flex-1">
-                      <p className="text-xs text-gray-400 font-bold uppercase">{isArrived ? 'Arrived at' : 'Next Stop'}</p>
+                      <p className="text-xs text-gray-400 font-bold uppercase">
+                        {isArrived ? 'Arrived at' : 'Next Stop'}
+                      </p>
                       <p className="text-sm font-black text-white">{currentStop.building_id}</p>
                     </div>
                   </div>
@@ -162,18 +180,38 @@ export default function BottomPanel() {
                 </motion.div>
               )}
 
-              {/* Pickup confirmation (own control) + secondary actions */}
+              {/* Primary + secondary actions when arrived */}
               {currentStop && isArrived && (
                 <div className="space-y-2">
-                  <SwipeButton onSwipe={completePickup} />
-                  <div className="grid grid-cols-3 gap-2">
-                    <button onClick={handleNavigate} className="flex items-center justify-center gap-1.5 py-3 bg-blue-600/20 text-blue-400 font-bold rounded-xl text-[10px] uppercase hover:bg-blue-600/30 transition-colors border border-blue-600/50">
+                  <SwipeButton
+                    onSwipe={async () => {
+                      await completePickup();
+                      openEvidence('pickup', `Pickup at ${currentStop.building_id}`);
+                    }}
+                  />
+                  <div className="grid grid-cols-4 gap-2">
+                    <button
+                      onClick={handleNavigate}
+                      className="flex flex-col items-center justify-center gap-1 py-3 bg-blue-600/20 text-blue-400 font-bold rounded-xl text-[10px] uppercase hover:bg-blue-600/30 transition-colors border border-blue-600/50"
+                    >
                       <Navigation size={14} /> Navigate
                     </button>
-                    <button onClick={() => setShowSkipModal(true)} className="flex items-center justify-center gap-1.5 py-3 bg-amber-600/20 text-amber-400 font-bold rounded-xl text-[10px] uppercase hover:bg-amber-600/30 transition-colors border border-amber-600/50">
+                    <button
+                      onClick={() => openEvidence('pickup', `Evidence for ${currentStop.building_id}`)}
+                      className="flex flex-col items-center justify-center gap-1 py-3 bg-emerald-600/20 text-emerald-400 font-bold rounded-xl text-[10px] uppercase hover:bg-emerald-600/30 transition-colors border border-emerald-600/50"
+                    >
+                      <Camera size={14} /> Evidence
+                    </button>
+                    <button
+                      onClick={() => setShowSkipModal(true)}
+                      className="flex flex-col items-center justify-center gap-1 py-3 bg-amber-600/20 text-amber-400 font-bold rounded-xl text-[10px] uppercase hover:bg-amber-600/30 transition-colors border border-amber-600/50"
+                    >
                       <SkipForward size={14} /> Skip
                     </button>
-                    <button onClick={() => setShowReportModal(true)} className="flex items-center justify-center gap-1.5 py-3 bg-red-600/20 text-red-400 font-bold rounded-xl text-[10px] uppercase hover:bg-red-600/30 transition-colors border border-red-600/50">
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="flex flex-col items-center justify-center gap-1 py-3 bg-red-600/20 text-red-400 font-bold rounded-xl text-[10px] uppercase hover:bg-red-600/30 transition-colors border border-red-600/50"
+                    >
                       <Flag size={14} /> Report
                     </button>
                   </div>
@@ -189,7 +227,9 @@ export default function BottomPanel() {
                 >
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50 col-span-2">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><MapPin size={10} /> Address</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
+                        <MapPin size={10} /> Address
+                      </p>
                       <p className="text-sm font-black text-white mt-1">{stop?.address || 'N/A'}</p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
@@ -197,16 +237,26 @@ export default function BottomPanel() {
                       <p className="text-sm font-black text-white mt-1">{stop?.estate || 'N/A'}</p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Users size={10} /> Type</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
+                        <Building2 size={10} /> Type
+                      </p>
                       <p className="text-sm font-black text-white mt-1">{stop?.building_type || 'N/A'}</p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><Package size={10} /> Units</p>
-                      <p className="text-sm font-black text-white mt-1">{stop?.number_of_units ?? 'N/A'} {stop?.unit_type || ''}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
+                        <Package size={10} /> Units
+                      </p>
+                      <p className="text-sm font-black text-white mt-1">
+                        {stop?.number_of_units ?? 'N/A'} {stop?.unit_type || ''}
+                      </p>
                     </div>
                     <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><DollarSign size={10} /> Payment</p>
-                      <p className={`text-sm font-black mt-1 ${stop?.payment_status === 'paid' ? 'text-emerald-400' : 'text-red-400'}`}>{stop?.payment_status?.toUpperCase() || 'N/A'}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
+                        <DollarSign size={10} /> Payment
+                      </p>
+                      <p className={`text-sm font-black mt-1 ${stop?.payment_status === 'paid' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {stop?.payment_status?.toUpperCase() || 'N/A'}
+                      </p>
                     </div>
                   </div>
 
@@ -222,6 +272,15 @@ export default function BottomPanel() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Evidence capture — mounted regardless of state so it can be opened from anywhere */}
+        <EvidenceCapture
+          open={evidenceOpen}
+          onClose={() => setEvidenceOpen(false)}
+          activityType={evidenceContext?.type || 'pickup'}
+          buildingId={currentStop?.building_id ?? null}
+          contextLabel={evidenceContext?.label}
+        />
       </div>
     </motion.div>
   );

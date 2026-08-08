@@ -1,0 +1,7 @@
+// lib/core/communications/events/operationalEvents.ts
+export const OPERATIONS_EMAIL_EVENTS = {
+  DRIVER_ASSIGNED: 'DRIVER_ASSIGNED',
+  ROUTE_ASSIGNED: 'ROUTE_ASSIGNED',
+  PICKUP_COMPLETED: 'PICKUP_COMPLETED',
+  INCIDENT_REPORTED: 'INCIDENT_REPORTED',
+} as const;
