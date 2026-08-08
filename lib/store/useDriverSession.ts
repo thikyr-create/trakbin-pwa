@@ -21,7 +21,9 @@ export interface GeocodeResult {
 
 export interface DriverSessionState {
   driver: any;
+  driverCompanyId: number | null;     // ← ADD
   route: DriverRoute | null;
+  // ... rest unchanged
   routeStops: RouteBuilding[];
   currentStop: RouteBuilding | null;
   isArrived: boolean;
@@ -71,26 +73,32 @@ let routeStartRecorded = false;
 let approachedFor: string | null = null;
 
 export const useDriverSession = create<DriverSessionState>((set, get) => {
-  // Activity recorder helper: real driver context on every event
   const act = (eventType: DriverEventType, extra?: { buildingId?: string | null; metadata?: Record<string, unknown> }) => {
-    const { driver, route, gpsLocation } = get();
+    const { driver, driverCompanyId, route, gpsLocation } = get();
     const { tenant } = useCompanySession.getState();
-    if (!tenant.companyId) return;
+    // FIX: prefer the driver's own company_id; fall back to tenant for safety
+    const companyId = driverCompanyId ?? tenant.companyId;
+    if (!companyId) {
+      console.warn('[driver-act] no companyId available, skipping', eventType);
+      return;
+    }
     recordActivity({
       eventType,
       driverId: driver?.employee_id || driver?.id || 'unknown',
-      companyId: tenant.companyId,
+      companyId,
       routeId: route?.id ?? null,
       buildingId: extra?.buildingId ?? null,
       latitude: gpsLocation?.lat ?? null,
       longitude: gpsLocation?.lng ?? null,
       metadata: extra?.metadata ?? {},
-    }).catch(() => {});
+    }).catch((e) => console.warn('[driver-act] record failed', eventType, e));
   };
 
   return ({
   driver: null,
+  driverCompanyId: null,          // ← ADD
   route: null,
+  // ... rest unchanged
   routeStops: [],
   currentStop: null,
   isArrived: false,
@@ -131,7 +139,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
     const driver = profile.drivers || profile;
     set({ driver });
-
+   
+    const cid = driver?.company_id ? Number(driver.company_id) : null;
+    set({ driver, driverCompanyId: cid });
     const { tenant } = useCompanySession.getState();
 
     set({ isLoading: true });
@@ -249,7 +259,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     const { currentStop, route, routeStops } = get();
     const { tenant } = useCompanySession.getState();
     if (!currentStop || !route || !tenant.companyId) return;
-
+console.log('[driver] completePickup, company=', get().driverCompanyId, 'stop=', currentStop?.building_id);
     act('DRIVER_PICKUP_CONFIRMED', { buildingId: currentStop.building_id });
 
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'completed' as RouteBuilding['status'] } : s);
@@ -272,7 +282,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     const { currentStop, routeStops } = get();
     const { tenant } = useCompanySession.getState();
     if (!currentStop || !tenant.companyId) return;
-
+console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', currentStop?.building_id);
     act('DRIVER_PICKUP_SKIPPED', { buildingId: currentStop.building_id, metadata: { reason } });
 
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'skipped' as RouteBuilding['status'], skip_reason: reason } : s);
@@ -389,7 +399,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     const { tenant } = useCompanySession.getState();
 
     if (!route || !tenant.companyId) return;
-
+        console.log('[driver] endShift, company=', get().driverCompanyId, 'route=', route?.id);
     act('DRIVER_ROUTE_COMPLETED', {});
 
     try {
