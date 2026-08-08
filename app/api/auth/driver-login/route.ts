@@ -14,19 +14,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'missing_params' }, { status: 400 });
     }
 
-    // Resolve driver by employee ID (service role bypasses RLS)
-    const { data: driver } = await admin
+    const { data: driver, error: drvErr } = await admin
       .from('drivers')
       .select('*')
       .eq('employee_id', employeeId.trim())
       .maybeSingle();
 
-    if (!driver) return NextResponse.json({ ok: false, error: 'invalid_credentials' }, { status: 401 });
-    if (!driver.user_id) return NextResponse.json({ ok: false, error: 'driver_not_migrated' }, { status: 401 });
+    if (drvErr || !driver) {
+      return NextResponse.json({ ok: false, error: 'invalid_credentials' }, { status: 401 });
+    }
+    if (!driver.user_id) {
+      return NextResponse.json({ ok: false, error: 'driver_not_migrated' }, { status: 401 });
+    }
 
-    const { data: authUser } = await admin.auth.admin.getUserById(driver.user_id);
-    const email = authUser?.user?.email;
-    if (!email) return NextResponse.json({ ok: false, error: 'no_auth_account' }, { status: 401 });
+    // Prefer admin lookup; fall back to drivers.email so login never
+    // depends on the service-role admin endpoint being reachable.
+    let email: string | null = null;
+    try {
+      const { data: authUser } = await admin.auth.admin.getUserById(driver.user_id);
+      email = authUser?.user?.email ?? null;
+    } catch { /* service key may be absent in some environments */ }
+    if (!email) email = driver.email ?? null;
+    if (!email) {
+      return NextResponse.json({ ok: false, error: 'no_auth_account' }, { status: 401 });
+    }
 
     // Verify password by minting a real session from GoTrue
     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
