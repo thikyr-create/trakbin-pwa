@@ -124,20 +124,17 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
       return;
     }
 
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('*, drivers(*)')
-      .eq('id', user.id)
-      .single();
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const { data: driverRow } = await supabase.from('drivers').select('*').eq('user_id', user.id).maybeSingle();
 
-    if (error || !profile) {
+    if (!profile && !driverRow) {
       console.error('Driver profile not found');
       window.location.href = '/auth';
       return;
     }
 
-    const driver = profile.drivers || profile;
-    const cid = driver?.company_id ? Number(driver.company_id) : null;
+    const driver = driverRow ?? profile;
+    const cid = Number(driverRow?.company_id ?? profile?.company_id ?? 0) || null;
     set({ driver, driverCompanyId: cid });
 
     set({ isLoading: true });
