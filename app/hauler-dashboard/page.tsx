@@ -9,14 +9,15 @@ import EndShiftModal from './components/EndShiftModal';
 import ShiftCard from './components/ShiftCard';
 import RouteProgressCard from './components/RouteProgressCard';
 import SkipReasonModal from './components/SkipReasonModal';
+import DriverReportModal from './components/DriverReportModal';
+import DeviationAlert from './components/DeviationAlert';
 import BottomPanel from './components/BottomPanel';
 import MapboxMap from './MapboxMap';
 import { calculateTotalDistanceKm } from './utils/geo';
-import DriverReportModal from './components/DriverReportModal';
 
 export default function HaulerDashboard() {
   const router = useRouter();
-  
+
   const {
     route, routeStops, currentStop, isLoading, progressStats, isRoutePaused,
     initializeSession, startGpsTracking, flyToLocation, toggleRoutePause
@@ -62,8 +63,7 @@ export default function HaulerDashboard() {
         </div>
       </div>
 
-      {/* ✅ PAUSE / RESUME FLOATING ACTION BUTTON */}
-      {/* Changed condition to 'route' so it ALWAYS shows when on shift */}
+      {/* Pause / Resume FAB */}
       <AnimatePresence>
         {route && (
           <motion.button
@@ -72,28 +72,25 @@ export default function HaulerDashboard() {
             exit={{ scale: 0, opacity: 0 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => { 
+            onClick={() => {
+              toggleRoutePause();
               if (isRoutePaused) {
-                toggleRoutePause();
-                // Fly to current stop if it exists, otherwise fly to first pending stop
                 const target = currentStop || routeStops.find(s => s.status === 'pending');
                 if (target?.latitude && target?.longitude) {
                   flyToLocation(target.latitude, target.longitude, 17);
                 }
-              } else {
-                toggleRoutePause();
               }
             }}
             className={`absolute right-6 bottom-[120px] z-30 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-slate-700 transition-colors ${
-  isRoutePaused 
-    ? 'bg-white hover:bg-gray-100 shadow-white/30' 
-    : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50' 
-}`}
+              isRoutePaused
+                ? 'bg-white hover:bg-gray-100 shadow-white/30'
+                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50'
+            }`}
           >
             {isRoutePaused ? (
-              <Play size={24} className="text-white fill-white" /> 
+              <Play size={24} className="text-white fill-white" />
             ) : (
-              <Pause size={24} className="text-white" /> 
+              <Pause size={24} className="text-white" />
             )}
           </motion.button>
         )}
@@ -102,10 +99,10 @@ export default function HaulerDashboard() {
       {/* Bottom Panel */}
       <BottomPanel />
 
-              <SkipReasonModal />
+      <SkipReasonModal />
       <DriverReportModal />
-      
-      <EndShiftModal /> {/* ✅ Add this line */}
+      <DeviationAlert />
+      <EndShiftModal />
     </div>
   );
 }

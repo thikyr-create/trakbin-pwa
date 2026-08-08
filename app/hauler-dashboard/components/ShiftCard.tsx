@@ -12,7 +12,7 @@ interface ShiftCardProps {
 
 export default function ShiftCard({ route }: ShiftCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { isRoutePaused, setShowEndShiftModal } = useDriverSession();
+  const { isRoutePaused, setShowEndShiftModal, driver } = useDriverSession();
 
   if (!route) {
     return (
@@ -24,12 +24,11 @@ export default function ShiftCard({ route }: ShiftCardProps) {
   }
 
   return (
-    <motion.div 
+    <motion.div
       layout
       className="bg-slate-900/90 backdrop-blur-md rounded-2xl shadow-lg border border-slate-800 overflow-hidden"
     >
-      {/* Minimal Header - Always Visible */}
-      <button 
+      <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full p-3 flex items-center justify-between hover:bg-slate-800/50 transition-colors"
       >
@@ -47,14 +46,9 @@ export default function ShiftCard({ route }: ShiftCardProps) {
             <p className="text-xs font-black text-white">{route.total_stops} Stops Today</p>
           </div>
         </div>
-        {isExpanded ? (
-          <ChevronUp size={16} className="text-gray-400" />
-        ) : (
-          <ChevronDown size={16} className="text-gray-400" />
-        )}
+        {isExpanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
       </button>
 
-      {/* Expanded Details */}
       {isExpanded && (
         <motion.div
           initial={{ height: 0, opacity: 0 }}
@@ -63,7 +57,7 @@ export default function ShiftCard({ route }: ShiftCardProps) {
         >
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-400 flex items-center gap-1"><User size={12} /> Driver:</span>
-            <span className="font-bold text-white">Michael</span>
+            <span className="font-bold text-white">{driver?.full_name || 'Unknown'}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-400 flex items-center gap-1"><Truck size={12} /> Truck:</span>
@@ -73,7 +67,7 @@ export default function ShiftCard({ route }: ShiftCardProps) {
             <span className="text-gray-400 flex items-center gap-1"><MapPin size={12} /> Zone:</span>
             <span className="font-bold text-white">{route.zone_id}</span>
           </div>
-          
+
           <div className="flex gap-3 pt-2">
             <div className="flex-1 bg-slate-800/50 rounded-lg p-2 text-center border border-slate-700/50">
               <p className="text-[10px] text-gray-500 uppercase font-bold">Done</p>
@@ -85,14 +79,14 @@ export default function ShiftCard({ route }: ShiftCardProps) {
             </div>
           </div>
 
-          {/* ✅ End Shift Button */}
-          <button
+          <motion.button
+            whileTap={{ scale: 0.98 }}
             onClick={() => setShowEndShiftModal(true)}
             className="w-full flex items-center justify-center gap-2 py-3 bg-slate-800 text-red-400 font-bold rounded-xl text-xs uppercase hover:bg-slate-700 transition-colors border border-slate-700 mt-2"
           >
             <LogOut size={16} />
             End Shift
-          </button>
+          </motion.button>
         </motion.div>
       )}
     </motion.div>

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { createClient } from '@supabase/supabase-js';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { recordActivity, type DriverEventType } from '@/lib/features/driver/activity';
+import { deviationDetector } from '@/lib/features/driver/deviation/deviationDetector';
 import { DriverRoute, RouteBuilding } from '../../app/hauler-dashboard/components/types';
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from '../../app/hauler-dashboard/utils/geo';
 
@@ -21,9 +22,8 @@ export interface GeocodeResult {
 
 export interface DriverSessionState {
   driver: any;
-  driverCompanyId: number | null;     // ← ADD
+  driverCompanyId: number | null;
   route: DriverRoute | null;
-  // ... rest unchanged
   routeStops: RouteBuilding[];
   currentStop: RouteBuilding | null;
   isArrived: boolean;
@@ -73,10 +73,10 @@ let routeStartRecorded = false;
 let approachedFor: string | null = null;
 
 export const useDriverSession = create<DriverSessionState>((set, get) => {
+  // Activity recorder: uses the driver's OWN company_id (never the company session)
   const act = (eventType: DriverEventType, extra?: { buildingId?: string | null; metadata?: Record<string, unknown> }) => {
     const { driver, driverCompanyId, route, gpsLocation } = get();
     const { tenant } = useCompanySession.getState();
-    // FIX: prefer the driver's own company_id; fall back to tenant for safety
     const companyId = driverCompanyId ?? tenant.companyId;
     if (!companyId) {
       console.warn('[driver-act] no companyId available, skipping', eventType);
@@ -96,9 +96,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
   return ({
   driver: null,
-  driverCompanyId: null,          // ← ADD
+  driverCompanyId: null,
   route: null,
-  // ... rest unchanged
   routeStops: [],
   currentStop: null,
   isArrived: false,
@@ -138,18 +137,15 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     }
 
     const driver = profile.drivers || profile;
-    set({ driver });
-   
     const cid = driver?.company_id ? Number(driver.company_id) : null;
     set({ driver, driverCompanyId: cid });
-    const { tenant } = useCompanySession.getState();
 
     set({ isLoading: true });
     try {
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
-        .eq('company_id', tenant.companyId)
+        .eq('company_id', cid)
         .eq('driver_id', driver.employee_id || driver.id)
         .in('status', ['assigned', 'active', 'paused'])
         .order('created_at', { ascending: false })
@@ -163,10 +159,13 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
       set({ route: routeData, isRoutePaused: routeData.status === 'paused' });
 
+      // Load planned geometry for deviation detection
+      deviationDetector.loadRouteGeometry(routeData.id).catch(() => {});
+
       const { data: stopsData } = await supabase
         .from('route_stops')
         .select('*')
-        .eq('company_id', tenant.companyId)
+        .eq('company_id', cid)
         .eq('route_id', routeData.id)
         .order('sequence', { ascending: true });
 
@@ -174,11 +173,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
       const buildingIds = stopsData.map((stop: any) => stop.building_id);
 
-      // FIX: only real columns that exist on Buildings
-            const { data: buildingsData } = await supabase
+      // Real columns only (lat/lng required for arrival geofence)
+      const { data: buildingsData } = await supabase
         .from('Buildings')
         .select('custom_id, address, estate, building_type, number_of_units, unit_type, payment_status, latitude, longitude')
-        .eq('company_id', tenant.companyId)
+        .eq('company_id', cid)
         .in('custom_id', buildingIds);
 
       const mergedStops: RouteBuilding[] = stopsData.map((stop: any) => {
@@ -191,8 +190,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
           building_type: building?.building_type,
           number_of_units: building?.number_of_units,
           unit_type: building?.unit_type,
-          latitude: building?.latitude,
-          longitude: building?.longitude,
+          latitude: building?.latitude != null ? Number(building.latitude) : undefined,
+          longitude: building?.longitude != null ? Number(building.longitude) : undefined,
           payment_status: building?.payment_status,
         } as any;
       });
@@ -222,11 +221,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
   updateGps: (lat, lng) => {
     set({ gpsLocation: { lat, lng } });
-    const { currentStop, isArrived, isRoutePaused, route } = get();
+    const { currentStop, isArrived, isRoutePaused, route, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
 
-        // Route start: first GPS lock on an assigned route
-    if (route && route.status === 'assigned' && tenant.companyId && !routeStartRecorded) {
+    // Route start: first GPS lock on an assigned route
+    if (route && route.status === 'assigned' && (driverCompanyId ?? tenant.companyId) && !routeStartRecorded) {
       routeStartRecorded = true;
       (async () => {
         try {
@@ -235,6 +234,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
           act('DRIVER_ROUTE_STARTED', {});
         } catch {}
       })();
+    }
+
+    // Deviation detection (only while actively on route)
+    if (route && route.status === 'active' && !isRoutePaused) {
+      deviationDetector.checkDeviation(lat, lng);
     }
 
     if (isRoutePaused || !currentStop || !currentStop.latitude || !currentStop.longitude) return;
@@ -258,8 +262,11 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   completePickup: async () => {
     const { currentStop, route, routeStops } = get();
     const { tenant } = useCompanySession.getState();
-    if (!currentStop || !route || !tenant.companyId) return;
-console.log('[driver] completePickup, company=', get().driverCompanyId, 'stop=', currentStop?.building_id);
+    const { driverCompanyId } = get();
+    const cid = driverCompanyId ?? tenant.companyId;
+    if (!currentStop || !route || !cid) return;
+
+    console.log('[driver] completePickup, company=', cid, 'stop=', currentStop?.building_id);
     act('DRIVER_PICKUP_CONFIRMED', { buildingId: currentStop.building_id });
 
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'completed' as RouteBuilding['status'] } : s);
@@ -269,8 +276,8 @@ console.log('[driver] completePickup, company=', get().driverCompanyId, 'stop=',
     set({ routeStops: newStops, currentStop: nextStop, route: newRoute, isArrived: false });
     approachedFor = null;
 
-    await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
-    await supabase.from('routes').update({ completed_stops: newRoute.completed_stops }).eq('id', route.id).eq('company_id', tenant.companyId);
+    await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id).eq('company_id', cid);
+    await supabase.from('routes').update({ completed_stops: newRoute.completed_stops }).eq('id', route.id).eq('company_id', cid);
 
     const skippedCount = newStops.filter(s => s.status === 'skipped').length;
     if (newRoute.completed_stops + skippedCount >= newRoute.total_stops) {
@@ -279,10 +286,12 @@ console.log('[driver] completePickup, company=', get().driverCompanyId, 'stop=',
   },
 
   skipStop: async (reason: string) => {
-    const { currentStop, routeStops } = get();
+    const { currentStop, routeStops, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
-    if (!currentStop || !tenant.companyId) return;
-console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', currentStop?.building_id);
+    const cid = driverCompanyId ?? tenant.companyId;
+    if (!currentStop || !cid) return;
+
+    console.log('[driver] skipStop, company=', cid, 'stop=', currentStop?.building_id);
     act('DRIVER_PICKUP_SKIPPED', { buildingId: currentStop.building_id, metadata: { reason } });
 
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'skipped' as RouteBuilding['status'], skip_reason: reason } : s);
@@ -291,13 +300,14 @@ console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', curre
     set({ routeStops: newStops, currentStop: nextStop, isArrived: false, showSkipModal: false });
     approachedFor = null;
 
-    await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id).eq('company_id', tenant.companyId);
+    await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id).eq('company_id', cid);
   },
 
   reportIssue: async (issueType: string, description: string) => {
-    const { currentStop, driver, gpsLocation } = get();
+    const { currentStop, driver, gpsLocation, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
-    if (!tenant.companyId) return;
+    const cid = driverCompanyId ?? tenant.companyId;
+    if (!cid) return;
 
     const { error } = await supabase.from('environmental_issues').insert([{
       issue_type: issueType,
@@ -306,7 +316,7 @@ console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', curre
       status: 'pending',
       building_id: currentStop?.building_id ?? null,
       reported_by: driver?.employee_id || driver?.id || 'driver',
-      company_id: tenant.companyId,
+      company_id: cid,
       latitude: gpsLocation?.lat ?? null,
       longitude: gpsLocation?.lng ?? null,
     }]);
@@ -378,16 +388,17 @@ console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', curre
   },
 
   toggleRoutePause: async () => {
-    const { isRoutePaused, route } = get();
+    const { isRoutePaused, route, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
+    const cid = driverCompanyId ?? tenant.companyId;
     const newPauseState = !isRoutePaused;
 
     set({ isRoutePaused: newPauseState });
     act(newPauseState ? 'DRIVER_ROUTE_PAUSED' : 'DRIVER_ROUTE_RESUMED', {});
 
-    if (route && tenant.companyId) {
+    if (route && cid) {
       try {
-        await supabase.from('routes').update({ status: newPauseState ? 'paused' : 'active' }).eq('id', route.id).eq('company_id', tenant.companyId);
+        await supabase.from('routes').update({ status: newPauseState ? 'paused' : 'active' }).eq('id', route.id).eq('company_id', cid);
       } catch (error) {
         console.error('Error updating route status:', error);
       }
@@ -395,18 +406,21 @@ console.log('[driver] skipStop, company=', get().driverCompanyId, 'stop=', curre
   },
 
   endShift: async () => {
-    const { route, stopGpsTracking } = get();
+    const { route, stopGpsTracking, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
+    const cid = driverCompanyId ?? tenant.companyId;
 
-    if (!route || !tenant.companyId) return;
-        console.log('[driver] endShift, company=', get().driverCompanyId, 'route=', route?.id);
+    if (!route || !cid) return;
+
+    console.log('[driver] endShift, company=', cid, 'route=', route?.id);
     act('DRIVER_ROUTE_COMPLETED', {});
+    deviationDetector.reset();
 
     try {
       await supabase.from('routes').update({
         status: 'completed',
         ended_at: new Date().toISOString()
-      }).eq('id', route.id).eq('company_id', tenant.companyId);
+      }).eq('id', route.id).eq('company_id', cid);
 
       stopGpsTracking();
 

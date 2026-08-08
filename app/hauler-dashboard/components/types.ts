@@ -24,20 +24,21 @@ export interface DriverRoute {
 export interface RouteBuilding {
   id: string;
   route_id: string;
-  building_id: string; // Matches custom_id
+  building_id: string;
   sequence: number;
   status: 'pending' | 'arrived' | 'completed' | 'skipped';
   skip_reason?: string;
   arrival_time?: string;
   completion_time?: string;
-  // We will join this with the Buildings table to get address, coords, etc.
   address?: string;
+  estate?: string;
+  building_type?: string;
+  number_of_units?: number;
+  unit_type?: string;
   latitude?: number;
   longitude?: number;
   payment_status?: string;
-  waste_type?: string;
-  estimated_waste?: string;
-  occupancy?: string;
+  // Removed: waste_type, estimated_waste, occupancy (don't exist on Buildings)
 }
 
 export type TruckStatus = 'Moving' | 'Stopped' | 'Collecting' | 'Driving';
