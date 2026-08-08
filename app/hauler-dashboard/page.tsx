@@ -35,9 +35,6 @@ export default function HaulerDashboard() {
     useDriverSession.setState({ progressStats: { distance: distanceKm, eta: (distanceKm / 25) * 60 } });
   }, [routeStops]);
 
-  if (isLoading) {
-    return <div className="h-screen w-full bg-slate-900 flex items-center justify-center"><div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
-  }
 
   return (
     <div className="relative h-screen w-full bg-slate-900 overflow-hidden">

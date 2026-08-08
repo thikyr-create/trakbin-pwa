@@ -42,8 +42,33 @@ export const authEngine = {
       return { ok: true, message: '✅ Login successful! Redirecting...', role: 'caretaker' };
     }
 
-    // ── COMPANY / DRIVER: email + password ──
-    const email = (input.email || '').trim();
+    // ── DRIVER: employee ID + password → real session via API ──
+      // ── DRIVER: employee ID + password → real session via API ──
+    // (Caretaker already returned above, so only company/driver reach here)
+    const idOrEmail = (input.email || '').trim();
+    if (/^DRV-/i.test(idOrEmail)) {
+      const res = await fetch('/api/auth/driver-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: idOrEmail, password: (input.password || '').trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) return { ok: false, message: '❌ Invalid Driver ID or password' };
+
+      const { error } = await supabaseAuth.client.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      if (error) return { ok: false, message: '❌ Session error: ' + error.message };
+
+      const row = { ...data.driver, id: data.driver.company_id ?? data.driver.id };
+      localStorage.setItem(KEYS.driver, JSON.stringify(row));
+      useAuthStore.getState().setSession('driver', row);
+      return { ok: true, message: '✅ Login successful! Redirecting...', role: 'driver' };
+    }
+
+    // ── COMPANY / DRIVER(by email): email + password ──
+    const email = idOrEmail;
     const password = (input.password || '').trim();
 
     // 1) Supabase Auth first (hashed password, real session)
