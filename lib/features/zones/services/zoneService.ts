@@ -314,7 +314,23 @@ export async function createZone(
     streets?: string[];
     addresses?: string[];
   }
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; duplicate?: { zoneId: string; zoneName: string } }> {
+  // Check for duplicate zone name
+  const { data: existing } = await supabase
+    .from('company_zones')
+    .select('id, zone_name')
+    .eq('company_id', company_id)
+    .ilike('zone_name', payload.zone_name.trim())
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      ok: false,
+      error: 'zone_name_exists',
+      duplicate: { zoneId: existing.id, zoneName: existing.zone_name },
+    };
+  }
+
   const { error } = await supabase.from('company_zones').insert([
     {
       company_id,
@@ -419,5 +435,43 @@ export async function setAutoAssignFlag(
       .from('company_settings')
       .insert([{ company_id, auto_zone_assignment: enabled }]);
   }
+  return { ok: true };
+}
+
+/** Merge new coverage details into an existing zone (union, never overwrite). */
+export async function mergeIntoZone(
+  zone_id: string,
+  payload: {
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
+    estates?: string[];
+    streets?: string[];
+    addresses?: string[];
+  }
+): Promise<{ ok: boolean; error?: string }> {
+  const { data: zone } = await supabase
+    .from('company_zones')
+    .select('*')
+    .eq('id', zone_id)
+    .maybeSingle();
+
+  if (!zone) return { ok: false, error: 'zone_not_found' };
+
+  const union = (a: string[] | null, b: string[] | undefined) =>
+    Array.from(new Set([...(a || []), ...(b || [])]));
+
+  const patch: Record<string, unknown> = {
+    estates: union(zone.estates, payload.estates),
+    streets: union(zone.streets, payload.streets),
+    addresses: union(zone.addresses, payload.addresses),
+  };
+  if (payload.center_lat != null) patch.center_lat = payload.center_lat;
+  if (payload.center_lng != null) patch.center_lng = payload.center_lng;
+  if (payload.radius_km != null) patch.radius_km = payload.radius_km;
+
+  const { error } = await supabase.from('company_zones').update(patch).eq('id', zone_id);
+  if (error) return { ok: false, error: error.message };
+  ZonePublisher.publish('ZONE_UPDATED', { zoneId: zone_id });
   return { ok: true };
 }

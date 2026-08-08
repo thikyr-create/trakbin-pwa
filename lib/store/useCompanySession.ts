@@ -86,17 +86,63 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
 
-  fetchServiceRequests: async () => {
+   fetchServiceRequests: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
-    const { data, error } = await supabase
+
+    // 1. Fetch all pending requests (unassigned) + already assigned to this company
+    const { data: allRequests, error } = await supabase
       .from('service_requests')
-      .select(`*, buildings:building_id (address, latitude, longitude, building_type)`)
+      .select(`*, buildings:building_id (address, estate, latitude, longitude, building_type)`)
       .in('status', ['pending', 'auto_assigned'])
       .or(`company_id.eq.${cid},company_id.is.null`)
       .order('submitted_at', { ascending: false });
-    if (error) console.error('Error fetching requests:', error);
-    else set({ serviceRequests: data || [] });
+
+    if (error) {
+      console.error('Error fetching requests:', error);
+      return;
+    }
+
+    // 2. Fetch all zones for this company
+    const { data: zones } = await supabase
+      .from('company_zones')
+      .select('id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active')
+      .eq('company_id', cid)
+      .neq('is_active', false);
+
+    if (!zones || zones.length === 0) {
+      // Company has no zones → only show requests already assigned to them
+      const assigned = (allRequests || []).filter((r) => r.company_id === cid);
+      set({ serviceRequests: assigned });
+      return;
+    }
+
+    // 3. Filter: keep requests already assigned to this company + unassigned requests that match a zone
+    const filtered = (allRequests || []).filter((req) => {
+      // Already assigned to this company → always show
+      if (req.company_id === cid) return true;
+
+      // Unassigned → check if building matches any zone
+      const building = req.buildings as any;
+      if (!building) return false;
+
+      const { resolveBuildingZone } = require('@/lib/features/zones/utils/zoneAssignment');
+      const result = resolveBuildingZone(
+        {
+          custom_id: req.building_id,
+          latitude: building.latitude ? Number(building.latitude) : null,
+          longitude: building.longitude ? Number(building.longitude) : null,
+          estate: building.estate,
+          address: building.address,
+        },
+        zones
+      );
+
+      // Only show if high or medium confidence match
+      return result && (result.confidence === 'high' || result.confidence === 'medium');
+    });
+
+    set({ serviceRequests: filtered });
   },
 
   fetchPayouts: async () => {

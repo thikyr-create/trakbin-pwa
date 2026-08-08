@@ -23,7 +23,7 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 export default function ZonesPage() {
   const {
     zones, loading, error, refetch,
-    createZone, updateZone, deleteZone, toggleZone,
+    createZone, updateZone, deleteZone, toggleZone, mergeZone,
     autoAssignEnabled, runAutoAssign, assignBuilding, toggleAutoAssign,
   } = useZones();
 
@@ -178,6 +178,7 @@ export default function ZonesPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         onCreate={createZone}
+        onMerge={mergeZone}
       />
       <EditZoneModal
         open={!!editingZone}

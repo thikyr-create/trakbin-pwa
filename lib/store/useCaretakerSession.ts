@@ -80,7 +80,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
   selectedMethod: '', loading: true, billingProcessing: false,
 
   initializeSession: async () => {
-    // Caretakers now have REAL Supabase sessions (Building ID identity)
+    // Caretakers have REAL Supabase sessions (Building ID identity)
     const { data: { user } } = await supabase.auth.getUser();
     const stored = typeof window !== 'undefined' ? localStorage.getItem('trakbin_caretaker') : null;
 
@@ -198,6 +198,15 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collections', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchFullHistory(true); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_transactions', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchLedger(); })
+      // FIX: Watch the building row itself. When a company accepts (company_id updates),
+      // the caretaker's local state refreshes instantly → Report tab unlocks live.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `custom_id=eq.${bId}` }, async () => {
+        const { data: updated } = await supabase.from('Buildings').select('*').eq('custom_id', bId).maybeSingle();
+        if (updated) {
+          set({ building: updated });
+          await get().refreshAll();
+        }
+      })
       .subscribe();
     realtimeCleanup = () => { supabase.removeChannel(channel); };
   },

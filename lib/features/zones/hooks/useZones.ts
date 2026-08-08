@@ -11,6 +11,7 @@ import {
   toggleZoneActive,
   autoAssignZones,
   assignBuildingToZone,
+  mergeIntoZone,
   fetchUnassignedBuildings,
   fetchAutoAssignFlag,
   setAutoAssignFlag,
@@ -36,6 +37,15 @@ function getCompanyId(): number | null {
   } catch {
     return null;
   }
+}
+
+export interface ZoneMergePayload {
+  center_lat?: number | null;
+  center_lng?: number | null;
+  radius_km?: number | null;
+  estates?: string[];
+  streets?: string[];
+  addresses?: string[];
 }
 
 export function useZones() {
@@ -124,6 +134,16 @@ export function useZones() {
     [refetch]
   );
 
+  /** Merge coverage details into an existing zone (duplicate-name flow). */
+  const handleMerge = useCallback(
+    async (zoneId: string, payload: ZoneMergePayload) => {
+      const result = await mergeIntoZone(zoneId, payload);
+      if (result.ok) await refetch();
+      return result;
+    },
+    [refetch]
+  );
+
   /** Runs the zone engine across all unassigned buildings. */
   const runAutoAssign = useCallback(async (): Promise<AutoAssignResult | null> => {
     const companyId = getCompanyId();
@@ -168,6 +188,7 @@ export function useZones() {
     updateZone: handleUpdate,
     deleteZone: handleDelete,
     toggleZone: handleToggle,
+    mergeZone: handleMerge,
     runAutoAssign,
     assignBuilding,
     loadUnassigned,
