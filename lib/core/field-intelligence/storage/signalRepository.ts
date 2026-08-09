@@ -29,6 +29,14 @@ export const signalRepository = {
     return data?.id ?? null;
   },
 
+    async listByCompany(companyId: number, sinceIso: string, kind?: string, limit = 2000, client?: SupabaseClient) {
+    const c = client ?? admin();
+    let q = c.from('field_signals').select('*').eq('company_id', companyId).gte('created_at', sinceIso);
+    if (kind) q = q.eq('kind', kind);
+    const { data } = await q.order('created_at', { ascending: true }).limit(limit);
+    return data || [];
+  },
+
   async latestFor(companyId: number, entityType: string, entityId: string, kind: string, client?: SupabaseClient) {
     const c = client ?? admin();
     const { data } = await c.from('field_signals')

@@ -10,22 +10,37 @@ function admin(): SupabaseClient {
 }
 
 export const intelligenceRepository = {
-  /** Upsert learned value; on conflict, merge sample count (caller recomputes value/confidence). */
-  async upsert(companyId: number, entityType: string, entityId: string, kind: string, patch: {
-    value: Record<string, unknown>; confidence: number; sampleCount: number; variance?: number | null; status?: string;
-  }, client?: SupabaseClient) {
+  /**
+   * Upsert learned value; unique on (company_id, entity_type, entity_id, kind).
+   * Positional signature — matches every intelligence module call site.
+   */
+  async upsert(
+    companyId: number,
+    entityType: string,
+    entityId: string,
+    kind: string,
+    value: Record<string, unknown>,
+    confidence: number,
+    sampleCount: number,
+    variance?: number | null,
+    status?: string,
+    client?: SupabaseClient
+  ): Promise<void> {
     const c = client ?? admin();
-    const { error } = await c.from('field_intelligence').upsert({
-      company_id: companyId,
-      entity_type: entityType,
-      entity_id: entityId,
-      kind,
-      value: patch.value,
-      confidence: patch.confidence,
-      sample_count: patch.sampleCount,
-      variance: patch.variance ?? null,
-      status: patch.status ?? 'candidate',
-    }, { onConflict: 'company_id,entity_type,entity_id,kind' });
+    const { error } = await c.from('field_intelligence').upsert(
+      {
+        company_id: companyId,
+        entity_type: entityType,
+        entity_id: entityId,
+        kind,
+        value,
+        confidence,
+        sample_count: sampleCount,
+        variance: variance ?? null,
+        status: status ?? 'candidate',
+      },
+      { onConflict: 'company_id,entity_type,entity_id,kind' }
+    );
     if (error) throw new StorageError('field_intelligence upsert failed: ' + error.message, error);
   },
 
