@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Truck, Users, ClipboardList,
   AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut,
   Activity, Menu, X, Building2,
-  ArrowLeft, Inbox, Wallet, Radio, Radar,
+  ArrowLeft, Inbox, Wallet, Radio, Radar, TrendingUp,
 } from 'lucide-react';
 
 import { useCompanySession } from '@/lib/store/useCompanySession';
@@ -29,6 +29,7 @@ import SettingsPage from './components/settings/SettingsPage';
 import ServiceRequestsPage from './components/ServiceRequestsPage';
 import ReviewDrawer from './components/ReviewDrawer';
 import FinancePage from './components/finance/FinancePage';
+import FieldIntelligencePage from './components/FieldIntelligencePage';
 import { canOperate } from '@/lib/auth/companyVerification';
 import CompanyVerificationCard from './components/CompanyVerificationCard';
 
@@ -43,7 +44,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 type PageView =
   | 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments'
   | 'issues' | 'analytics' | 'maintenance' | 'zones'
-  | 'settings' | 'service-requests' | 'earnings';
+  | 'settings' | 'service-requests' | 'earnings' | 'field-intelligence';
 
 function Counter({ value, prefix = '', duration = 1.1 }: { value: number; prefix?: string; duration?: number }) {
   const mv = useMotionValue(0);
@@ -159,6 +160,7 @@ export default function WasteCompanyDashboard() {
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['company', 'admin', 'government'] },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['company', 'admin'] },
     { id: 'zones', label: 'Zones', icon: Globe, roles: ['company', 'admin'] },
+    { id: 'field-intelligence', label: 'Field Intelligence', icon: TrendingUp, roles: ['company', 'admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['company', 'admin', 'government', 'caretaker'] },
   ];
 
@@ -176,6 +178,7 @@ export default function WasteCompanyDashboard() {
     analytics: 'Performance analytics',
     maintenance: 'Fleet maintenance',
     zones: 'Zone management',
+    'field-intelligence': 'Self-learning operations',
     settings: 'Company settings',
   };
 
@@ -337,6 +340,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
               {activePage === 'zones' && <ZonesPage />}
+              {activePage === 'field-intelligence' && <FieldIntelligencePage />}
               {activePage === 'settings' && <SettingsPage />}
             </motion.div>
 
