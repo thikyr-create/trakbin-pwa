@@ -6,7 +6,7 @@ import { chunkStops } from '../constraints/maxStops';
 import { getRoutingProvider } from '../routing/routingProvider';
 import { HaversineProvider } from '../routing/routeMatrix';
 import { optimizeSingle } from './routeOptimizer';
-
+import { withFieldIntelligence } from '@/lib/core/field-intelligence/integrations/fieldIntelligenceRoutingProvider';
 const isValidCoord = (lat: number, lng: number) =>
   Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
 
@@ -33,12 +33,14 @@ export async function runOptimization(input: OptimizationInput): Promise<Optimiz
 
   const constraints = input.constraints ?? {};
   const chunks = chunkStops(valid, constraints.maxStopsPerRoute);
-  const provider = getRoutingProvider();
+   const companyId = (input as any).companyId ?? (constraints as any).companyId ?? null;
+  const provider = withFieldIntelligence(getRoutingProvider(), companyId);
 
   const routes: OptimizedRoute[] = [];
   for (const chunk of chunks) {
     const depot: GeoPoint = input.startLocation ?? { latitude: chunk[0].latitude, longitude: chunk[0].longitude };
     const points: GeoPoint[] = [depot, ...chunk.map((s) => ({ latitude: s.latitude, longitude: s.longitude }))];
+        provider.setStopContext(chunk.map((s: any) => s.building_id ?? null));
     const matrix = await safeMatrix(provider, points, constraints.averageSpeedKmh);
     routes.push(optimizeSingle(chunk, matrix, constraints));
   }

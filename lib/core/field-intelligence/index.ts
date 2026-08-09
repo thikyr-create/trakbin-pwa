@@ -58,3 +58,8 @@ export * from './correctors/locationCorrector';
 export * from './correctors/stopCorrector';
 export * from './correctors/routeCorrector';
 export * from './correctors/dataCorrectionService';
+export * from './feedback/routingFeedbackService';
+export * from './feedback/locationFeedbackService';
+export * from './feedback/driverFeedbackService';
+export * from './feedback/fieldFeedbackAggregator';
+export * from './integrations/fieldIntelligenceRoutingProvider';

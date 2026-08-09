@@ -7,6 +7,10 @@
     {
       "path": "/api/queue/drain",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/field-intelligence",
+      "schedule": "0 2 * * *"
     }
   ]
 }
