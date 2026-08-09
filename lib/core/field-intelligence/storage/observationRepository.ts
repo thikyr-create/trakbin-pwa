@@ -31,6 +31,14 @@ export const observationRepository = {
     return data?.id ?? null;
   },
 
+    async listByCompany(companyId: number, sinceIso: string, limit = 5000, client?: SupabaseClient) {
+    const c = client ?? admin();
+    const { data } = await c.from('field_observations')
+      .select('*').eq('company_id', companyId).gte('occurred_at', sinceIso)
+      .order('occurred_at', { ascending: true }).limit(limit);
+    return data || [];
+  },
+
   async listByBuilding(companyId: number, buildingId: string, kind?: string, limit = 200, client?: SupabaseClient) {
     const c = client ?? admin();
     let q = c.from('field_observations')

@@ -19,3 +19,17 @@ export interface FieldSignal {
   observationIds?: number[];
   metadata?: Record<string, unknown>;
 }
+export function buildSignal(
+  companyId: number,
+  entityType: SignalEntityType,
+  entityId: string,
+  kind: SignalKind,
+  value: number,
+  confidence: number,
+  windowStart: string,
+  windowEnd: string,
+  observationIds: number[] = [],
+  metadata: Record<string, unknown> = {}
+): FieldSignal {
+  return { companyId, entityType, entityId, kind, value, confidence, windowStart, windowEnd, observationIds, metadata };
+}
