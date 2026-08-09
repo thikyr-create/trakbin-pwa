@@ -1,6 +1,9 @@
 // lib/core/communications/engine/communicationEngine.ts
 import { emailChannel, type EmailSendRequest } from '../channels/email';
 import { EMAIL_EVENTS } from '../events/emailEvents';
+import { buildNotificationContext } from './notificationContext';
+import { notificationResolver } from './notificationResolver';
+import { notificationDispatcher } from './notificationDispatcher';
 import {
   renderDriverCredentialsEmail, renderOtpEmail, renderVerificationEmail,
   renderPasswordResetEmail, renderRecoveryEmail, renderTwoFactorEmail,
@@ -10,6 +13,7 @@ import {
 import { communicationConfig } from '../config/communicationConfig';
 import { CommunicationError } from '../errors';
 import type { DeliveryRecord } from '../models';
+import { emailPolicy } from '../policies/emailPolicy';
 
 /**
  * The single entry point for every business email in Trakbin.
@@ -47,6 +51,21 @@ export const communications = {
   async sendTwoFactorEnrolled(c: TwoFactorContext & { email: string }): Promise<DeliveryRecord> {
     const { subject, html, text } = renderTwoFactorEmail(c);
     return this.send({ to: { email: c.email, name: c.name }, subject, html, text });
+  },
+
+  async dispatch(
+    event: string,
+    companyId: number | null,
+    recipient: { email: string; name?: string },
+    data: Record<string, any> = {}
+  ) {
+    const resolution = notificationResolver.resolve(event);
+    if (!resolution.critical && companyId) {
+      const gate = await emailPolicy.gate(companyId, event);
+      if (!gate.allow) return [];
+    }
+    const ctx = buildNotificationContext(event, companyId, recipient, data);
+    return notificationDispatcher.dispatch(ctx, resolution);
   },
 
   /** Low-level escape hatch. Prefer the named methods above. */

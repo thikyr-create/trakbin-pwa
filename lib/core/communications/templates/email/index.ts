@@ -11,3 +11,9 @@ export { renderBillingReminderEmail, type BillingReminderContext } from './billi
 export { renderRouteAssignmentEmail, type RouteAssignmentContext } from './operations/routeAssignment/routeAssignmentTemplate';
 export { renderIncidentReportedEmail, type IncidentContext } from './operations/incident/incidentTemplate';
 export { renderWelcomeEmail, type WelcomeContext } from './account/welcome/welcomeTemplate';
+export { renderReceiptEmail, type ReceiptContext } from './billing/receipt/receiptTemplate';
+export { renderDriverAssignmentEmail, type DriverAssignmentContext } from './operations/driverAssignment/driverAssignmentTemplate';
+export { renderPickupCompletedEmail, type PickupCompletedContext } from './operations/pickup/pickupTemplate';
+export { renderAccountChangeEmail, type AccountChangeContext } from './account/accountChange/accountChangeTemplate';
+export { renderAccountDeactivatedEmail, type AccountDeactivatedContext } from './account/accountDeactivated/accountDeactivatedTemplate';
+export { renderReportReadyEmail, type ReportReadyContext } from './reports/reportReady/reportReadyTemplate';
