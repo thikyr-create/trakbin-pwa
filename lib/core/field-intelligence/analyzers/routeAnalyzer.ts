@@ -3,7 +3,7 @@ import { observationRepository } from '../storage/observationRepository';
 import { signalRepository } from '../storage/signalRepository';
 import { routeProcessor } from '../processors/routeProcessor';
 import { buildSignal } from '../models/FieldSignal';
-import { clamp01 } from '../models/ConfidenceScore';
+import { routeConfidenceEngine } from '../confidence/routeConfidenceEngine';
 import type { FieldSignal } from '../models/FieldSignal';
 
 /** Answers: how long do routes actually take, and how much time is lost to deviation? */
@@ -30,10 +30,15 @@ export const routeAnalyzer = {
       if (start && end) {
         const durationMs = new Date(end.occurred_at).getTime() - new Date(start.occurred_at).getTime();
         if (durationMs > 0) {
-          const conf = clamp01(sorted.length / 20);
+          const adherence = Math.max(0, 1 - deviatedMs / durationMs);
+          const conf = routeConfidenceEngine.score({
+            samples: sorted.length,
+            adherence,
+          }).score;
+
           const out: FieldSignal[] = [
             buildSignal(companyId, 'route', routeId, 'travel_time', Math.round(durationMs / 60000), conf, sinceIso, untilIso, [], { deviatedMs }),
-            buildSignal(companyId, 'route', routeId, 'route_efficiency', Math.max(0, 1 - deviatedMs / durationMs), conf, sinceIso, untilIso),
+            buildSignal(companyId, 'route', routeId, 'route_efficiency', adherence, conf, sinceIso, untilIso),
           ];
           for (const s of out) await signalRepository.insert(s);
           signals.push(...out);

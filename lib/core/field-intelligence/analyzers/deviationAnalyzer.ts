@@ -3,7 +3,7 @@ import { observationRepository } from '../storage/observationRepository';
 import { signalRepository } from '../storage/signalRepository';
 import { routeProcessor } from '../processors/routeProcessor';
 import { buildSignal } from '../models/FieldSignal';
-import { clamp01 } from '../models/ConfidenceScore';
+import { routeConfidenceEngine } from '../confidence/routeConfidenceEngine';
 import type { FieldSignal } from '../models/FieldSignal';
 
 /** Answers: did drivers depart significantly from planned routes, and by how much? */
@@ -14,8 +14,13 @@ export const deviationAnalyzer = {
 
     const episodes = routeProcessor.deviationEpisodes(obs);
     const signals: FieldSignal[] = [];
+
     for (const e of episodes) {
-      const conf = clamp01((e.durationMs ?? 5 * 60000) / (10 * 60000));
+      const conf = routeConfidenceEngine.score({
+        samples: 5,
+        episodeDurationMs: e.durationMs ?? 5 * 60000,
+      }).score;
+
       const sig = buildSignal(
         companyId, 'route', e.routeId || 'unknown', 'route_deviation',
         Math.round(e.maxDistanceM), conf, e.startedAt, e.endedAt ?? untilIso, [],

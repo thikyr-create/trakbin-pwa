@@ -3,8 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { observationRepository } from '../storage/observationRepository';
 import { signalRepository } from '../storage/signalRepository';
 import { buildSignal } from '../models/FieldSignal';
-import { clamp01 } from '../models/ConfidenceScore';
-import { confidenceConfig } from '../config/confidenceConfig';
+import { locationConfidenceEngine } from '../confidence/locationConfidenceEngine';
 import { haversineKm } from '@/lib/core/route-optimization/routing/routeMatrix';
 import type { FieldSignal } from '../models/FieldSignal';
 
@@ -30,7 +29,10 @@ export async function listCompanyBuildingPoints(companyId: number): Promise<Map<
 }
 
 function offsetM(a: BuildingPoint, lat: number, lng: number): number {
-  return haversineKm({ latitude: a.lat, longitude: a.lng }, { latitude: lat, longitude: lng }) * 1000;
+  return haversineKm(
+    { latitude: a.lat, longitude: a.lng },
+    { latitude: lat, longitude: lng }
+  ) * 1000;
 }
 
 /**
@@ -66,12 +68,14 @@ export const locationAnalyzer = {
       const mean = agg.offsets.reduce((s, x) => s + x, 0) / agg.offsets.length;
       const variance = agg.offsets.reduce((s, x) => s + (x - mean) ** 2, 0) / agg.offsets.length;
       const std = Math.sqrt(variance);
-      // Consistency bonus: tight cluster = stronger signal; corrections weigh more
-      const consistency = clamp01(1 - Math.min(std, 200) / 200);
-      const sampleConf = clamp01(agg.offsets.length / confidenceConfig.minSamples.promote);
-      const confidence = clamp01(0.5 * sampleConf + 0.5 * consistency + 0.1 * clamp01(agg.corrections / 3));
 
-      const sig = buildSignal(companyId, 'building', buildingId, 'location_accuracy', Math.round(mean), confidence, sinceIso, untilIso, agg.ids, { stdM: Math.round(std), samples: agg.offsets.length, corrections: agg.corrections });
+      const cs = locationConfidenceEngine.score(agg.offsets, agg.corrections);
+
+      const sig = buildSignal(
+        companyId, 'building', buildingId, 'location_accuracy',
+        Math.round(mean), cs.score, sinceIso, untilIso, agg.ids,
+        { stdM: Math.round(std), samples: agg.offsets.length, corrections: agg.corrections, factors: cs.factors }
+      );
       await signalRepository.insert(sig);
       signals.push(sig);
     }
