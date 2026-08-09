@@ -19,9 +19,11 @@ export interface PlatformEventMap {
   SERVICE_DELETED: { buildingId: string; companyId: number };
 
   // ── Assignment events ──
-  ASSIGNMENT_UPDATED: { buildingId: string; companyId: number };
-  ASSIGNMENT_CREATED: { buildingId: string; companyId: number };
-  ASSIGNMENT_DELETED: { buildingId: string; companyId: number };
+    // ── Assignment events ──
+  // buildingId is optional: zone-wide / bulk assignments publish with companyId only
+  ASSIGNMENT_UPDATED: { buildingId?: string | null; companyId: number };
+  ASSIGNMENT_CREATED: { buildingId?: string | null; companyId: number };
+  ASSIGNMENT_DELETED: { buildingId?: string | null; companyId: number };
 
   // ── Zone lifecycle ──
   ZONE_CREATED: { zoneId: string; companyId: number };
