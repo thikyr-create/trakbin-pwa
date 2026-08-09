@@ -7,7 +7,7 @@
  * have at the call site (a zone-wide change has no single buildingId, a bulk
  * assignment has no single zoneId). Subscribers read what they need.
  */
-export interface PlatformEventMap {
+interface RawPlatformEventMap {
   // ── Building lifecycle ──
   BUILDING_REGISTERED: { buildingId?: string | null; companyId?: number | null };
   BUILDING_UPDATED: { buildingId?: string | null; companyId?: number | null };
@@ -127,6 +127,10 @@ export interface PlatformEventMap {
   // ── Field Intelligence (Phase C) ──
   FIELD_INTELLIGENCE_LEARNED: { companyId?: number | null; source?: string | null; sampleCount?: number | null };
 }
+
+export type PlatformEventMap = {
+  [K in keyof RawPlatformEventMap]: RawPlatformEventMap[K] & { [key: string]: any };
+};
 
 export type PlatformEventType = keyof PlatformEventMap;
 export type PlatformEventName = PlatformEventType;
