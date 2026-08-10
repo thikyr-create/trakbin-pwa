@@ -1,15 +1,15 @@
 // app/hauler-dashboard/screens/MapScreen.tsx
 "use client";
 
-import MapboxMap from '../MapboxMap';
+import ConsoleMapView from '../components/map/ConsoleMapView';
 import BottomSheet from '../components/console/BottomSheet';
+import DeviationAlert from '../components/DeviationAlert';
 
 export default function MapScreen() {
   return (
     <>
-      <div className="absolute inset-0">
-        <MapboxMap />
-      </div>
+      <ConsoleMapView />
+      <DeviationAlert />
       <BottomSheet />
     </>
   );

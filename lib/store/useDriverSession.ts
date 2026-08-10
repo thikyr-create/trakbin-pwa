@@ -1,3 +1,4 @@
+// lib/store/useDriverSession.ts
 "use client";
 
 import { create } from 'zustand';
@@ -28,6 +29,7 @@ export interface DriverSessionState {
   currentStop: RouteBuilding | null;
   isArrived: boolean;
   gpsLocation: { lat: number; lng: number } | null;
+  gpsAccuracy: number | null;
   isLoading: boolean;
   progressStats: { distance: number; eta: number };
   isRoutePaused: boolean;
@@ -47,7 +49,7 @@ export interface DriverSessionState {
   initializeSession: () => void;
   startGpsTracking: () => void;
   stopGpsTracking: () => void;
-  updateGps: (lat: number, lng: number) => void;
+  updateGps: (lat: number, lng: number, accuracy?: number) => void;
   completePickup: () => Promise<void>;
   skipStop: (reason: string) => Promise<void>;
   reportIssue: (issueType: string, description: string) => Promise<void>;
@@ -102,6 +104,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   currentStop: null,
   isArrived: false,
   gpsLocation: null,
+  gpsAccuracy: null,
   isLoading: true,
   progressStats: { distance: 0, eta: 0 },
   isRoutePaused: false,
@@ -124,7 +127,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
       return;
     }
 
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
     const { data: driverRow } = await supabase.from('drivers').select('*').eq('user_id', user.id).maybeSingle();
 
     if (!profile && !driverRow) {
@@ -203,7 +206,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   startGpsTracking: () => {
     if (!navigator.geolocation) return;
     gpsWatchId = navigator.geolocation.watchPosition(
-      (pos) => get().updateGps(pos.coords.latitude, pos.coords.longitude),
+      (pos) => get().updateGps(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
       (err) => console.warn(err),
       { enableHighAccuracy: true, maximumAge: 0 }
     );
@@ -216,8 +219,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     }
   },
 
-  updateGps: (lat, lng) => {
-    set({ gpsLocation: { lat, lng } });
+  updateGps: (lat, lng, accuracy?) => {
+    set({ gpsLocation: { lat, lng }, gpsAccuracy: accuracy ?? null });
     const { currentStop, isArrived, isRoutePaused, route, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
 
