@@ -14,7 +14,19 @@ export default function SearchPauseBar() {
   const { setPauseModalOpen } = useConsoleStore();
   const [focused, setFocused] = useState(false);
 
-  if (!route) return null;
+          {route && (
+          <button
+            onClick={() => (isRoutePaused ? toggleRoutePause() : setPauseModalOpen(true))}
+            className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm shadow-lg border transition-all active:scale-95 ${
+              isRoutePaused
+                ? 'bg-emerald-600 text-white border-emerald-600'
+                : 'bg-white text-gray-900 border-gray-200'
+            }`}
+          >
+            {isRoutePaused ? <Play size={18} /> : <Pause size={18} />}
+            {isRoutePaused ? 'Resume' : 'Pause'}
+          </button>
+        )}
   const showResults = focused && searchQuery.trim().length > 0;
 
   return (

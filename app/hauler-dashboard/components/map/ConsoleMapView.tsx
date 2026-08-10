@@ -5,7 +5,6 @@ import { useState } from 'react';
 import type mapboxgl from 'mapbox-gl';
 import MapboxMap from '../../MapboxMap';
 import MapControls from './MapControls';
-import GpsChip from './GpsChip';
 
 export default function ConsoleMapView() {
   const [map, setMap] = useState<mapboxgl.Map | null>(null);
@@ -14,7 +13,6 @@ export default function ConsoleMapView() {
     <div className="absolute inset-0">
       <MapboxMap onMapReady={setMap} />
       <MapControls map={map} />
-      <GpsChip />
     </div>
   );
 }
