@@ -16,10 +16,11 @@ import SkipReasonModal from './components/SkipReasonModal';
 import DriverReportModal from './components/DriverReportModal';
 import DeviationAlert from './components/DeviationAlert';
 import EndShiftModal from './components/EndShiftModal';
+import EvidenceCapture from './components/EvidenceCapture';
 
 export default function HaulerDashboard() {
   const { initializeSession, startGpsTracking } = useDriverSession();
-  const { activeTab } = useConsoleStore();
+  const { activeTab, evidence, closeEvidence } = useConsoleStore();
 
   useEffect(() => {
     initializeSession();
@@ -42,11 +43,18 @@ export default function HaulerDashboard() {
       <TopBar />
       <BottomTabBar />
 
-      {/* Global modals (retired BottomPanel's modals stay mounted) */}
+      {/* Global modals — mounted once, survive screen/tab changes */}
       <SkipReasonModal />
       <DriverReportModal />
       <DeviationAlert />
       <EndShiftModal />
+      <EvidenceCapture
+        open={evidence.open}
+        onClose={closeEvidence}
+        activityType={evidence.type}
+        buildingId={evidence.buildingId}
+        contextLabel={evidence.label}
+      />
     </div>
   );
 }
