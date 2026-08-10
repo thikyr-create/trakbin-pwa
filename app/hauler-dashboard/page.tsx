@@ -1,101 +1,48 @@
+// app/hauler-dashboard/page.tsx
 "use client";
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { LogOut, Pause, Play } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useDriverSession } from '@/lib/store/useDriverSession';
-import EndShiftModal from './components/EndShiftModal';
-import ShiftCard from './components/ShiftCard';
-import RouteProgressCard from './components/RouteProgressCard';
+import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
+import TopBar from './components/console/TopBar';
+import SearchPauseBar from './components/console/SearchPauseBar';
+import BottomTabBar from './components/console/BottomTabBar';
+import MapScreen from './screens/MapScreen';
+import StopsScreen from './screens/StopsScreen';
+import ProgressScreen from './screens/ProgressScreen';
+import ActivityScreen from './screens/ActivityScreen';
+import MoreScreen from './screens/MoreScreen';
 import SkipReasonModal from './components/SkipReasonModal';
 import DriverReportModal from './components/DriverReportModal';
 import DeviationAlert from './components/DeviationAlert';
-import BottomPanel from './components/BottomPanel';
-import MapboxMap from './MapboxMap';
-import { calculateTotalDistanceKm } from './utils/geo';
+import EndShiftModal from './components/EndShiftModal';
 
 export default function HaulerDashboard() {
-  const router = useRouter();
-
-  const {
-    route, routeStops, currentStop, isLoading, progressStats, isRoutePaused,
-    initializeSession, startGpsTracking, flyToLocation, toggleRoutePause
-  } = useDriverSession();
+  const { initializeSession, startGpsTracking } = useDriverSession();
+  const { activeTab } = useConsoleStore();
 
   useEffect(() => {
     initializeSession();
     startGpsTracking();
   }, []);
 
-  useEffect(() => {
-    if (routeStops.length === 0) return;
-    const pendingStops = routeStops.filter((s: any) => s.status === 'pending' || s.status === 'arrived');
-    const distanceKm = calculateTotalDistanceKm(pendingStops);
-    useDriverSession.setState({ progressStats: { distance: distanceKm, eta: (distanceKm / 25) * 60 } });
-  }, [routeStops]);
-
-
   return (
-    <div className="relative h-screen w-full bg-slate-900 overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <MapboxMap />
-      </div>
+    <div className="relative h-screen w-full bg-gray-50 overflow-hidden">
+      {activeTab === 'map' && (
+        <>
+          <MapScreen />
+          <SearchPauseBar />
+        </>
+      )}
+      {activeTab === 'stops' && <StopsScreen />}
+      {activeTab === 'progress' && <ProgressScreen />}
+      {activeTab === 'activity' && <ActivityScreen />}
+      {activeTab === 'more' && <MoreScreen />}
 
-      {/* Top Left: Shift Card + Progress Card */}
-      <div className="absolute top-4 left-4 z-10 w-[calc(100%-2rem)] max-w-xs sm:max-w-sm flex flex-col gap-2">
-        <ShiftCard route={route} />
-        {route && routeStops.length > 0 && (
-          <RouteProgressCard completed={route.completed_stops} remaining={route.total_stops - route.completed_stops} totalDistanceKm={progressStats.distance} etaMinutes={progressStats.eta} />
-        )}
-      </div>
+      <TopBar />
+      <BottomTabBar />
 
-      {/* Top Right: Time + Logout */}
-      <div className="absolute top-4 right-4 z-10">
-        <div className="bg-slate-900/90 backdrop-blur-md rounded-full px-4 py-2 shadow-lg border border-slate-800 flex items-center gap-3">
-          <p className="text-xs font-bold text-white">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-          <button onClick={() => { localStorage.removeItem('trakbin_driver'); router.push('/'); }} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-            <LogOut size={16} className="text-red-400" />
-          </button>
-        </div>
-      </div>
-
-      {/* Pause / Resume FAB */}
-      <AnimatePresence>
-        {route && (
-          <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              toggleRoutePause();
-              if (isRoutePaused) {
-                const target = currentStop || routeStops.find(s => s.status === 'pending');
-                if (target?.latitude && target?.longitude) {
-                  flyToLocation(target.latitude, target.longitude, 17);
-                }
-              }
-            }}
-            className={`absolute right-6 bottom-[120px] z-30 w-14 h-14 rounded-full flex items-center justify-center shadow-2xl border-2 border-slate-700 transition-colors ${
-              isRoutePaused
-                ? 'bg-white hover:bg-gray-100 shadow-white/30'
-                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50'
-            }`}
-          >
-            {isRoutePaused ? (
-              <Play size={24} className="text-white fill-white" />
-            ) : (
-              <Pause size={24} className="text-white" />
-            )}
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* Bottom Panel */}
-      <BottomPanel />
-
+      {/* Global modals (retired BottomPanel's modals stay mounted) */}
       <SkipReasonModal />
       <DriverReportModal />
       <DeviationAlert />
