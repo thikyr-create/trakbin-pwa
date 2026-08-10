@@ -3,16 +3,18 @@
 
 import { Pause, Play, Flag, Power, LifeBuoy, ChevronRight } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
+import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 
 export default function ToolsList() {
   const { route, isRoutePaused, toggleRoutePause, setShowReportModal, setShowEndShiftModal } = useDriverSession();
+  const { setPauseModalOpen } = useConsoleStore();
 
   const rows = [
     {
       icon: isRoutePaused ? Play : Pause,
       label: isRoutePaused ? 'Resume Route' : 'Pause Route',
       hint: isRoutePaused ? 'Route is paused' : 'For disposal drops, breaks',
-      onClick: toggleRoutePause,
+      onClick: () => (isRoutePaused ? toggleRoutePause() : setPauseModalOpen(true)),
       show: !!route,
     },
     {

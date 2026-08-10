@@ -3,6 +3,7 @@
 
 import { Search, Pause, Play, Building2, MapPin } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
+import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 import { useState } from 'react';
 
 export default function SearchPauseBar() {
@@ -10,6 +11,7 @@ export default function SearchPauseBar() {
     route, isRoutePaused, toggleRoutePause,
     searchQuery, setSearchQuery, searchGeocode, geocodeResults, selectGeocodeResult,
   } = useDriverSession();
+  const { setPauseModalOpen } = useConsoleStore();
   const [focused, setFocused] = useState(false);
 
   if (!route) return null;
@@ -32,7 +34,7 @@ export default function SearchPauseBar() {
         </div>
 
         <button
-          onClick={toggleRoutePause}
+          onClick={() => (isRoutePaused ? toggleRoutePause() : setPauseModalOpen(true))}
           className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm shadow-lg border transition-all active:scale-95 ${
             isRoutePaused
               ? 'bg-emerald-600 text-white border-emerald-600'

@@ -61,7 +61,7 @@ export interface DriverSessionState {
   setShowEndShiftModal: (show: boolean) => void;
   searchGeocode: (query: string) => Promise<void>;
   selectGeocodeResult: (result: GeocodeResult) => void;
-  toggleRoutePause: () => Promise<void>;
+  toggleRoutePause: (reason?: string) => Promise<void>;
   endShift: () => Promise<void>;
 
   setCameraMode: (mode: 'following' | 'exploring' | 'navigating' | 'idle') => void;
@@ -387,14 +387,17 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     }
   },
 
-  toggleRoutePause: async () => {
+  toggleRoutePause: async (reason?: string) => {
     const { isRoutePaused, route, driverCompanyId } = get();
     const { tenant } = useCompanySession.getState();
     const cid = driverCompanyId ?? tenant.companyId;
     const newPauseState = !isRoutePaused;
 
     set({ isRoutePaused: newPauseState });
-    act(newPauseState ? 'DRIVER_ROUTE_PAUSED' : 'DRIVER_ROUTE_RESUMED', {});
+    act(
+      newPauseState ? 'DRIVER_ROUTE_PAUSED' : 'DRIVER_ROUTE_RESUMED',
+      reason ? { metadata: { reason } } : {}
+    );
 
     if (route && cid) {
       try {
