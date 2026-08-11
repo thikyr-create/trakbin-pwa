@@ -8,32 +8,22 @@ import DeviationAlert from '../components/DeviationAlert';
 import GpsChip from '../components/map/GpsChip';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 
-const HEADER_H = 60;
-
 export default function MapScreen() {
   const { route, currentStop, isRoutePaused } = useDriverSession();
-  const sheetVisible = !!currentStop && !isRoutePaused;
+  const sheetVisible = !!currentStop;
 
   return (
     <>
       <ConsoleMapView />
 
       {!route && (
-        <div
-          className="absolute inset-x-4 z-10 bg-white/95 backdrop-blur rounded-2xl border border-gray-200 shadow-lg p-4 flex items-center gap-3"
-          style={{ top: HEADER_H + 70 }}
-        >
-          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center shrink-0">
-            <Package size={20} className="text-gray-500" />
-          </div>
-          <div>
-            <p className="text-sm font-black text-gray-900">No route assigned</p>
-            <p className="text-xs text-gray-500">You're off shift. When dispatch assigns a route, it appears here automatically.</p>
-          </div>
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-white/95 backdrop-blur rounded-full px-4 py-2 shadow-lg border border-gray-200 flex items-center gap-2">
+          <Package size={14} className="text-gray-500" />
+          <p className="text-xs font-bold text-gray-600 whitespace-nowrap">No route assigned — off shift</p>
         </div>
       )}
 
-      <GpsChip className={sheetVisible ? 'bottom-[300px]' : 'bottom-6'} />
+      <GpsChip className={sheetVisible && !isRoutePaused ? 'bottom-[300px]' : 'bottom-6'} />
       <DeviationAlert />
       <BottomSheet />
     </>

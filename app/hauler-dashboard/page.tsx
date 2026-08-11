@@ -19,6 +19,7 @@ import EndShiftModal from './components/EndShiftModal';
 import EvidenceCapture from './components/EvidenceCapture';
 import PauseReasonModal from './components/console/PauseReasonModal';
 import NotificationsSheet from './components/console/NotificationsSheet';
+import SearchScreen from './components/console/SearchScreen';
 
 const HEADER_H = 60; // px — matches TopBar content height
 const TABBAR_H = 72; // px — matches BottomTabBar height
@@ -72,6 +73,7 @@ export default function HaulerDashboard() {
       <EndShiftModal />
       <PauseReasonModal />
       <NotificationsSheet />
+            <SearchScreen />
       <EvidenceCapture
         open={evidence.open}
         onClose={closeEvidence}

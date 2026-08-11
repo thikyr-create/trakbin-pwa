@@ -6,6 +6,7 @@ import mapboxgl from 'mapbox-gl';
 // @ts-ignore
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useDriverSession } from '@/lib/store/useDriverSession';
+import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 
 const DEFAULT_CENTER: [number, number] = [3.3792, 6.5244];
 
@@ -28,8 +29,10 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const stopMarkersRef = useRef<mapboxgl.Marker[]>([]);
+  const destMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   const { routeStops, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
+  const { searchDestination } = useConsoleStore();
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -77,6 +80,64 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
       window.removeEventListener('resize', resize);
     };
   }, []);
+
+  // Driving route line to a searched destination (Bolt-style)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const clear = () => {
+      if (map.getLayer('search-route-layer')) map.removeLayer('search-route-layer');
+      if (map.getSource('search-route')) map.removeSource('search-route');
+      if (destMarkerRef.current) { destMarkerRef.current.remove(); destMarkerRef.current = null; }
+    };
+
+    if (!searchDestination) { clear(); return; }
+
+    const { gpsLocation } = useDriverSession.getState();
+    const origin = gpsLocation ?? { lat: DEFAULT_CENTER[1], lng: DEFAULT_CENTER[0] };
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const url =
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${searchDestination.lng},${searchDestination.lat}` +
+          `?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (cancelled || !mapRef.current) return;
+        const coords = data?.routes?.[0]?.geometry?.coordinates;
+        clear();
+        if (!coords || coords.length < 2) return;
+
+        map.addSource('search-route', {
+          type: 'geojson',
+          data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
+        });
+        map.addLayer({
+          id: 'search-route-layer',
+          type: 'line',
+          source: 'search-route',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#2563EB', 'line-width': 5, 'line-opacity': 0.9 },
+        });
+
+        const el = document.createElement('div');
+        el.innerHTML = `<div style="width:16px;height:16px;background:#2563EB;border:3px solid #fff;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>`;
+        destMarkerRef.current = new mapboxgl.Marker({ element: el })
+          .setLngLat([searchDestination.lng, searchDestination.lat])
+          .addTo(map);
+
+        const bounds = new mapboxgl.LngLatBounds();
+        coords.forEach((c: [number, number]) => bounds.extend(c));
+        map.fitBounds(bounds, { padding: 70, duration: 1200 });
+      } catch (e) {
+        console.warn('[search-route] directions failed', e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [searchDestination]);
 
   const drawRoute = () => {
     const map = mapRef.current;

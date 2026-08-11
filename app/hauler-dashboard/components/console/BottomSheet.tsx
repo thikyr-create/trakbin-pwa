@@ -3,30 +3,29 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Camera, SkipForward, Flag, MapPin, Package, DollarSign, Building2 } from 'lucide-react';
+import { ChevronDown, Camera, SkipForward, Flag, MapPin, Package, DollarSign, Building2, Pause, Play } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 import { calculateDistanceInMeters } from '../../utils/geo';
 import NextStopCard from './NextStopCard';
 
-const COLLAPSED_VISIBLE_PX = 216; // handle + full next-stop card visible
+const COLLAPSED_VISIBLE_PX = 272; // handle + next-stop card + pause button
 
 export default function BottomSheet() {
   const {
     currentStop, isArrived, isRoutePaused, gpsLocation,
-    completePickup, setShowSkipModal, setShowReportModal,
+    completePickup, setShowSkipModal, setShowReportModal, toggleRoutePause,
   } = useDriverSession();
-  const { sheetState, setSheetState, openEvidence } = useConsoleStore();
+  const { sheetState, setSheetState, openEvidence, setPauseModalOpen } = useConsoleStore();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [collapsedY, setCollapsedY] = useState(300);
 
-  // Measure so collapsed always shows exactly the next-stop card
   useLayoutEffect(() => {
     const h = sheetRef.current?.offsetHeight ?? 0;
     if (h > 0) setCollapsedY(Math.max(0, h - COLLAPSED_VISIBLE_PX));
-  }, [currentStop?.id, sheetState]);
+  }, [currentStop?.id, sheetState, isRoutePaused]);
 
-  if (!currentStop || isRoutePaused) return null;
+  if (!currentStop) return null;
 
   const stop: any = currentStop;
   const distanceM =
@@ -70,26 +69,52 @@ export default function BottomSheet() {
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
       className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-200 will-change-transform"
     >
-      {/* Drag handle — always a drag source */}
       <div className="w-full flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
         <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
       </div>
 
-      {/* When expanded, inner scroll owns the pointer; when collapsed, whole sheet drags */}
       <div
         className="px-5 pb-5 overflow-y-auto max-h-[58vh]"
         onPointerDown={sheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
       >
-        <NextStopCard
-          stop={currentStop}
-          isArrived={isArrived}
-          distanceM={distanceM}
-          etaMin={etaMin}
-          onNavigate={handleNavigate}
-          onConfirm={handleConfirm}
-        />
+        {isRoutePaused ? (
+          /* ── Paused state: Resume lives here ── */
+          <div className="space-y-3">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center gap-3">
+              <Pause size={18} className="text-amber-600 shrink-0" />
+              <div>
+                <p className="text-sm font-black text-amber-800">Route paused</p>
+                <p className="text-xs text-amber-600">Progress preserved — stops won't be marked late.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => toggleRoutePause()}
+              className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white font-bold rounded-xl text-sm uppercase active:scale-95 transition-all"
+            >
+              <Play size={16} /> Resume Route
+            </button>
+          </div>
+        ) : (
+          /* ── Active state: Navigate / Confirm Pickup / Pause ── */
+          <>
+            <NextStopCard
+              stop={currentStop}
+              isArrived={isArrived}
+              distanceM={distanceM}
+              etaMin={etaMin}
+              onNavigate={handleNavigate}
+              onConfirm={handleConfirm}
+            />
+            <button
+              onClick={() => setPauseModalOpen(true)}
+              className="mt-2 w-full flex items-center justify-center gap-2 py-3 bg-amber-50 text-amber-700 border border-amber-200 font-bold rounded-xl text-sm uppercase active:scale-95 transition-all"
+            >
+              <Pause size={16} /> Pause Route
+            </button>
+          </>
+        )}
 
-        {sheetState === 'expanded' && (
+        {sheetState === 'expanded' && !isRoutePaused && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 pt-4 border-t border-gray-200">
             <div className="grid grid-cols-2 gap-2 mb-4">
               <div className="col-span-2 bg-gray-50 rounded-xl p-3 border border-gray-200">

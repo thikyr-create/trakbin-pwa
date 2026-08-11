@@ -1,22 +1,26 @@
 // app/hauler-dashboard/components/console/TopBar.tsx
 "use client";
 
-import { Menu, Bell, LogOut } from 'lucide-react';
+import { Search, Bell, LogOut } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 import { useDriverNotifications } from '@/lib/features/driver-console/hooks/useDriverNotifications';
 
 export default function TopBar() {
   const { route, isRoutePaused } = useDriverSession();
-  const { setActiveTab, setNotifOpen } = useConsoleStore();
+  const { setNotifOpen, setSearchOpen } = useConsoleStore();
   const { unread } = useDriverNotifications();
   const onShift = !!route && route.status !== 'completed';
 
   return (
     <div className="h-full flex items-center justify-between px-4">
       <div className="flex items-center gap-3">
-        <button onClick={() => setActiveTab('more')} className="p-2 hover:bg-gray-100 rounded-xl transition-colors" title="Menu">
-          <Menu size={22} className="text-gray-700" />
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          title="Search places"
+        >
+          <Search size={22} className="text-gray-700" />
         </button>
         <div
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-xs uppercase tracking-wide ${
