@@ -28,7 +28,12 @@ export default function AuthPage() {
   const [showIdCard, setShowIdCard] = useState(false);
   const [generated, setGenerated] = useState<{ id: string; passcode: string; address: string }>({ id: '', passcode: '', address: '' });
 
-  useEffect(() => { if (typeof window !== 'undefined' && window.location.hash === '#login') setIsLogin(true); }, []);
+   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (window.location.hash === '#login') setIsLogin(true);
+      if (window.location.hash === '#register') setIsLogin(false);
+    }
+  }, []);
 
   const handleIdCardClose = () => { setShowIdCard(false); setIsLogin(true); setGenerated({ id: '', passcode: '', address: '' }); };
 
