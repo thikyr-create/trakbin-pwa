@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Printer, ArrowLeft, ShieldCheck, CheckCircle2, Download } from 'lucide-react';
+import { Printer, ArrowLeft, ShieldCheck, CircleCheck, Download } from 'lucide-react';
 import { formatNaira, bpsToPercent } from '@/lib/utils/money';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -209,7 +209,7 @@ export default function ReceiptPage() {
                   style={{ boxShadow: 'inset 0 0 0 2px #fbfaf6, inset 0 0 0 4px rgba(5,150,105,0.5)' }}
                 >
                   <div className="flex flex-col items-center leading-none">
-                    <CheckCircle2 className="h-5 w-5" />
+                    <CircleCheck className="h-5 w-5" />
                     <span className={`${display.className} mt-0.5 text-[13px] font-black uppercase tracking-[0.12em]`}>Paid</span>
                   </div>
                 </motion.div>
