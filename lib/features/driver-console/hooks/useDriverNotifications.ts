@@ -36,7 +36,6 @@ export function useDriverNotifications() {
     const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
     const out: DriverNotification[] = [];
 
-    // Company acted on an issue the driver reported
     const { data: issues } = await supabase
       .from('environmental_issues')
       .select('id, issue_type, status, updated_at')
@@ -56,7 +55,6 @@ export function useDriverNotifications() {
       })
     );
 
-    // Dispatch assigned a route this week
     const { data: routes } = await supabase
       .from('routes')
       .select('id, total_stops, created_at')
@@ -81,11 +79,12 @@ export function useDriverNotifications() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Live: company resolves/updates an issue → badge pops
+  // Live updates — unique topic per instance (duplicate fixed names crash supabase-js)
   useEffect(() => {
     if (!driverCompanyId) return;
+    const topic = `driver_notifs_${Math.random().toString(36).slice(2)}`;
     const ch = supabase
-      .channel('driver_notifs')
+      .channel(topic)
       .on(
         'postgres_changes' as any,
         { event: '*', schema: 'public', table: 'environmental_issues', filter: `company_id=eq.${driverCompanyId}` },

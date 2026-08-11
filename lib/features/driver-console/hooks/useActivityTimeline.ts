@@ -41,18 +41,19 @@ export function useActivityTimeline() {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  // Live updates as new activity is recorded
+  // Live updates — unique topic per instance
   useEffect(() => {
     if (!driverCompanyId) return;
-    const channel = supabase
-      .channel('driver_activity_live')
+    const topic = `driver_activity_${Math.random().toString(36).slice(2)}`;
+    const ch = supabase
+      .channel(topic)
       .on(
         'postgres_changes' as any,
         { event: 'INSERT', schema: 'public', table: 'driver_activity', filter: `company_id=eq.${driverCompanyId}` },
         () => fetchEvents()
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(ch); };
   }, [driverCompanyId, fetchEvents]);
 
   return { events, loading };
