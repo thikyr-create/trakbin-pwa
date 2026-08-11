@@ -7,7 +7,7 @@ import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Va
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   LayoutDashboard, Truck, Users, ClipboardList,
-  AlertTriangle, BarChart3, Wrench, Globe, Settings, LogOut,
+  TriangleAlert, ChartColumn, Wrench, Globe, Settings, LogOut,
   Activity, Menu, X, Building2,
   ArrowLeft, Inbox, Wallet, Radio, Radar, TrendingUp,
 } from 'lucide-react';
@@ -156,8 +156,8 @@ export default function WasteCompanyDashboard() {
     { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
     { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
     { id: 'assignments', label: 'Assignments', icon: ClipboardList, roles: ['company', 'admin'] },
-    { id: 'issues', label: 'Issues', icon: AlertTriangle, roles: ['company', 'admin', 'government', 'caretaker'] },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['company', 'admin', 'government'] },
+    { id: 'issues', label: 'Issues', icon: TriangleAlert, roles: ['company', 'admin', 'government', 'caretaker'] },
+    { id: 'analytics', label: 'Analytics', icon: ChartColumn, roles: ['company', 'admin', 'government'] },
     { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['company', 'admin'] },
     { id: 'zones', label: 'Zones', icon: Globe, roles: ['company', 'admin'] },
     { id: 'field-intelligence', label: 'Field Intelligence', icon: TrendingUp, roles: ['company', 'admin'] },

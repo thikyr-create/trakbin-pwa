@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { X, Wallet, CreditCard, Landmark, Zap, CheckCircle2, Plus, ShieldCheck, Info } from 'lucide-react';
+import { X, Wallet, CreditCard, Landmark, Zap, CircleCheck, Plus, ShieldCheck, Info } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 import { formatNaira } from '@/lib/utils/money';
 
@@ -52,13 +52,13 @@ export default function AutopaySheet({ open, onClose, onLinkBank }: Props) {
               <button onClick={() => setSource('wallet')} className={`flex w-full items-center gap-3.5 rounded-2xl border-2 p-3.5 text-left transition-colors ${source === 'wallet' ? 'border-emerald-500 bg-emerald-50/60' : 'border-gray-200 hover:border-gray-300'}`}>
                 <span className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${source === 'wallet' ? 'bg-emerald-600 text-white ring-emerald-300/40' : 'bg-gray-50 text-gray-600 ring-gray-100'}`}><Wallet className="h-5 w-5" /></span>
                 <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Trakbin wallet</span><span className="block text-xs font-semibold text-gray-500">Balance {formatNaira(walletBalance)} · deducted on the 1st</span></span>
-                {source === 'wallet' && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                {source === 'wallet' && <CircleCheck className="h-5 w-5 text-emerald-600" />}
               </button>
 
               <button onClick={() => setSource('card')} className={`flex w-full items-center gap-3.5 rounded-2xl border-2 p-3.5 text-left transition-colors ${source === 'card' ? 'border-emerald-500 bg-emerald-50/60' : 'border-gray-200 hover:border-gray-300'}`}>
                 <span className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${source === 'card' ? 'bg-emerald-600 text-white ring-emerald-300/40' : 'bg-gray-50 text-gray-600 ring-gray-100'}`}><CreditCard className="h-5 w-5" /></span>
                 <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Saved card</span><span className="block text-xs font-semibold text-gray-500">Charged when due</span></span>
-                {source === 'card' && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                {source === 'card' && <CircleCheck className="h-5 w-5 text-emerald-600" />}
               </button>
 
               <div className="rounded-2xl border border-gray-200 p-3.5">

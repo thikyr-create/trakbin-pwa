@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle, AlertCircle, LogOut } from 'lucide-react';
+import { X, CircleCheckBig, CircleAlert, LogOut } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 
 export default function EndShiftModal() {
@@ -40,7 +40,7 @@ export default function EndShiftModal() {
             <div className="p-5">
               {remainingStops > 0 ? (
                 <div className="flex items-start gap-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
-                  <AlertCircle size={20} className="text-amber-400 mt-0.5" />
+                  <CircleAlert size={20} className="text-amber-400 mt-0.5" />
                   <div>
                     <p className="text-sm font-bold text-amber-400">Unfinished Stops</p>
                     <p className="text-xs text-gray-400 mt-1">You have {remainingStops} remaining stop{remainingStops !== 1 ? 's' : ''} that will be marked as incomplete.</p>
@@ -48,7 +48,7 @@ export default function EndShiftModal() {
                 </div>
               ) : (
                 <div className="flex items-start gap-3 mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3">
-                  <CheckCircle size={20} className="text-emerald-400 mt-0.5" />
+                  <CircleCheckBig size={20} className="text-emerald-400 mt-0.5" />
                   <div>
                     <p className="text-sm font-bold text-emerald-400">Route Complete!</p>
                     <p className="text-xs text-gray-400 mt-1">Great job! All stops have been completed.</p>

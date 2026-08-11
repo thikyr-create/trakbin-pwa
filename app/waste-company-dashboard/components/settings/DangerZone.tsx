@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { AlertTriangle, Download, RotateCcw, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { TriangleAlert, Download, RotateCcw, Loader2, CircleCheck, CircleX } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 
@@ -114,7 +114,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
     <div className="rounded-[24px] border border-red-200/70 bg-white p-6 shadow-sm">
       <div className="mb-6 flex items-center gap-3">
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 ring-1 ring-red-100">
-          <AlertTriangle size={18} />
+          <TriangleAlert size={18} />
         </span>
         <div>
           <h2 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>
@@ -186,7 +186,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
 
         {/* Planned destructive actions — honest */}
         <div className="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 px-4 py-4">
-          <XCircle size={16} className="shrink-0 text-gray-300" />
+          <CircleX size={16} className="shrink-0 text-gray-300" />
           <div>
             <p className="text-xs font-bold text-gray-500">Deactivate / delete company</p>
             <p className="text-[11px] font-medium text-gray-400">
@@ -201,7 +201,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
         <div className={`mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${
           feedback.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
         }`}>
-          {feedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+          {feedback.type === "success" ? <CircleCheck size={14} /> : <TriangleAlert size={14} />}
           {feedback.text}
         </div>
       )}

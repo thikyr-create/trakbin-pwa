@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import {
   Building2, ClipboardCheck, Target, TrendingUp,
-  AlertTriangle, Users, Truck, Flag,
+  TriangleAlert, Users, Truck, Flag,
 } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { formatNaira } from "@/lib/utils/money";
@@ -49,7 +49,7 @@ export default function KPIGrid({ kpis, loading, executionGap }: KPIGridProps) {
       accent: "text-violet-700",
     },
     { Icon: TrendingUp, label: "Revenue (period)", value: formatNaira(kpis.revenue), tile: "bg-emerald-50 text-emerald-600", accent: "text-emerald-700" },
-    { Icon: AlertTriangle, label: "Outstanding", value: formatNaira(kpis.outstanding), tile: "bg-amber-50 text-amber-600", accent: "text-amber-700" },
+    { Icon: TriangleAlert, label: "Outstanding", value: formatNaira(kpis.outstanding), tile: "bg-amber-50 text-amber-600", accent: "text-amber-700" },
     { Icon: Users, label: "Active drivers", value: String(kpis.activeDrivers), tile: "bg-gray-100 text-gray-600", accent: "text-gray-900" },
     { Icon: Truck, label: "Fleet utilization", value: `${kpis.fleetUtilization}%`, tile: "bg-sky-50 text-sky-600", accent: "text-sky-700" },
     { Icon: Flag, label: "Issue reports", value: String(kpis.issueReports), tile: "bg-red-50 text-red-500", accent: "text-red-600" },

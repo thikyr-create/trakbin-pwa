@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ListChecks, Loader2, MapPin, CheckCircle2 } from "lucide-react";
+import { X, ListChecks, Loader2, MapPin, CircleCheck } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { UnassignedBuilding, ZoneRecord } from "@/lib/features/zones/services/zoneService";
 
@@ -94,7 +94,7 @@ export default function NeedsReviewDrawer({ open, items, zones, onAssign, onClos
             <div className="flex-1 overflow-y-auto p-5">
               {local.length === 0 ? (
                 <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white/60 p-10 text-center">
-                  <CheckCircle2 className="mb-2 h-7 w-7 text-emerald-400" />
+                  <CircleCheck className="mb-2 h-7 w-7 text-emerald-400" />
                   <p className="text-sm font-bold text-gray-600">Review queue is clear</p>
                   <p className="mt-1 text-xs text-gray-400">
                     Every building is assigned to a zone.

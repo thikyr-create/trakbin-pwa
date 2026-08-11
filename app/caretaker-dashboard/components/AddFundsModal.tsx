@@ -1,5 +1,5 @@
 "use client";
-import { X, CheckCircle2, CreditCard, Landmark } from 'lucide-react';
+import { X, CircleCheck, CreditCard, Landmark } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 import { useState } from 'react';
 
@@ -42,7 +42,7 @@ export default function AddFundsModal() {
                 </p>
                 <p className="text-xs text-gray-700 font-semibold">{method.type === 'card' ? 'Credit/Debit Card' : 'Bank Account'}</p>
               </div>
-              {selectedMethod === method.id && <CheckCircle2 className="w-5 h-5 text-green-600 ml-auto" />}
+              {selectedMethod === method.id && <CircleCheck className="w-5 h-5 text-green-600 ml-auto" />}
             </button>
           ))}
         </div>

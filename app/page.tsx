@@ -1,6 +1,6 @@
    // TRIGGER BUILD TEST
 import Link from 'next/link';
-import { Building2, Truck, MapPin, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Building2, Truck, MapPin, ArrowRight, CircleCheck } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -37,7 +37,7 @@ export default function Home() {
               <p className="text-sm text-gray-500">Optimized routes for waste collection companies.</p>
             </div>
             <div className="p-6 rounded-2xl border border-green-100 bg-green-50/50">
-              <CheckCircle2 className="w-8 h-8 text-green-600 mb-3" />
+              <CircleCheck className="w-8 h-8 text-green-600 mb-3" />
               <h3 className="font-bold text-gray-900 mb-1">Accountability</h3>
               <p className="text-sm text-gray-500">Transparent status updates for every building.</p>
             </div>

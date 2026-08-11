@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { AlertTriangle, Truck, MapPin, Upload, Loader2, CheckCircle2, Navigation, Wrench, ShieldAlert, TrafficCone, Cog, HelpCircle } from 'lucide-react';
+import { TriangleAlert, Truck, MapPin, Upload, Loader2, CircleCheck, Navigation, Wrench, ShieldAlert, TrafficCone, Cog, CircleHelp } from 'lucide-react';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -16,7 +16,7 @@ const TYPES = [
   { id: 'accident', label: 'Accident', Icon: ShieldAlert },
   { id: 'route_blocked', label: 'Route blocked', Icon: TrafficCone },
   { id: 'vehicle_fault', label: 'Vehicle fault', Icon: Cog },
-  { id: 'other', label: 'Other', Icon: HelpCircle },
+  { id: 'other', label: 'Other', Icon: CircleHelp },
 ];
 
 const STATUS_CHIP: Record<string, string> = {
@@ -148,7 +148,7 @@ export default function DriverIssuesCard() {
           <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">{myIssues.length} total</span>
         </div>
         {myIssues.length === 0 ? (
-          <div className="px-6 py-12 text-center"><AlertTriangle className="mx-auto h-7 w-7 text-gray-300" /><p className="mt-3 text-sm font-bold text-gray-700">No issues reported</p><p className="mt-1 text-xs text-gray-400">When you report a breakdown or incident, it shows up here with its status.</p></div>
+          <div className="px-6 py-12 text-center"><TriangleAlert className="mx-auto h-7 w-7 text-gray-300" /><p className="mt-3 text-sm font-bold text-gray-700">No issues reported</p><p className="mt-1 text-xs text-gray-400">When you report a breakdown or incident, it shows up here with its status.</p></div>
         ) : (
           <ul className="divide-y divide-gray-100">
             {myIssues.map((it) => (
@@ -161,7 +161,7 @@ export default function DriverIssuesCard() {
                     <p className="mt-0.5 text-xs font-medium text-gray-500">{it.description}</p>
                     <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` · ${it.truck_id}` : ''} · {new Date(it.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
                   </div>
-                  {it.status === 'resolved' && <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />}
+                  {it.status === 'resolved' && <CircleCheck className="h-5 w-5 shrink-0 text-emerald-500" />}
                 </div>
               </li>
             ))}

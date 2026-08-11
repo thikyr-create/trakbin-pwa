@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   X, CreditCard, Landmark, Smartphone, Wallet, Lock, ShieldCheck,
-  ArrowRight, CheckCircle2, AlertCircle, Mail, Loader2, Sparkles, Plus,
+  ArrowRight, CircleCheck, CircleAlert, Mail, Loader2, Sparkles, Plus,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 import { PAYMENT_METHODS, type MethodMeta } from '@/lib/payments/methods';
@@ -198,7 +198,7 @@ export default function CheckoutSheet({ open, mode, invoiceId, amount, descripti
                             <span className="block text-sm font-bold text-gray-900">{m.label}</span>
                             <span className="block truncate text-xs font-semibold text-gray-500">{disabled ? `Insufficient · top up ${formatNaira(effectiveAmount - walletBalance)}` : m.hint}</span>
                           </span>
-                          {selected && <CheckCircle2 className="relative z-10 h-5 w-5 shrink-0 text-emerald-600" />}
+                          {selected && <CircleCheck className="relative z-10 h-5 w-5 shrink-0 text-emerald-600" />}
                         </motion.button>
 
                         {/* saved-bank sub-options for the Bank method */}
@@ -209,13 +209,13 @@ export default function CheckoutSheet({ open, mode, invoiceId, amount, descripti
                                 <button onClick={() => setBankMethodId('hosted')} className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${bankMethodId === 'hosted' ? 'border-emerald-500 bg-white' : 'border-transparent bg-white hover:border-gray-200'}`}>
                                   <Landmark className="h-4 w-4 text-gray-500" />
                                   <span className="flex-1"><span className="block text-sm font-bold text-gray-900">One‑off bank transfer</span><span className="block text-xs font-semibold text-gray-500">Approve on your bank’s secure page</span></span>
-                                  {bankMethodId === 'hosted' && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                                  {bankMethodId === 'hosted' && <CircleCheck className="h-4 w-4 text-emerald-600" />}
                                 </button>
                                 {savedBanks.map((b: any) => (
                                   <button key={b.id} onClick={() => setBankMethodId(b.id)} className={`flex w-full items-center gap-3 rounded-xl border-2 p-3 text-left transition-colors ${bankMethodId === b.id ? 'border-emerald-500 bg-white' : 'border-transparent bg-white hover:border-gray-200'}`}>
                                     <Landmark className="h-4 w-4 text-gray-500" />
                                     <span className="flex-1"><span className="block text-sm font-bold text-gray-900">{b.bank_name} •••• {b.account_last4}</span><span className="block text-xs font-semibold text-gray-500">{b.account_name}</span></span>
-                                    {bankMethodId === b.id && <CheckCircle2 className="h-4 w-4 text-emerald-600" />}
+                                    {bankMethodId === b.id && <CircleCheck className="h-4 w-4 text-emerald-600" />}
                                   </button>
                                 ))}
                                 <button onClick={onLinkBank} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-50"><Plus className="h-4 w-4" /> Link a bank account</button>
@@ -247,7 +247,7 @@ export default function CheckoutSheet({ open, mode, invoiceId, amount, descripti
 
               {step === 'done' && (
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="py-4 text-center">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></motion.div>
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CircleCheck className="h-8 w-8" /></motion.div>
                   <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Payment successful</h3>
                   <p className="mt-1 text-sm font-medium text-gray-500">{formatNaira(effectiveAmount)} {mode === 'invoice' ? 'paid' : 'added to your wallet'}.</p>
                 </motion.div>
@@ -255,7 +255,7 @@ export default function CheckoutSheet({ open, mode, invoiceId, amount, descripti
 
               {step === 'error' && (
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="py-4 text-center">
-                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-100 text-rose-600"><AlertCircle className="h-8 w-8" /></div>
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-100 text-rose-600"><CircleAlert className="h-8 w-8" /></div>
                   <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Couldn’t complete</h3>
                   <p className="mx-auto mt-1 max-w-xs text-sm font-medium text-gray-500">{error}</p>
                 </motion.div>

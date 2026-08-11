@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Tags, Plus, Pencil, History, Loader2, CheckCircle2, AlertTriangle, X, Link2 } from "lucide-react";
+import { Tags, Plus, Pencil, History, Loader2, CircleCheck, TriangleAlert, X, Link2 } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 import type { PricingPlan } from "@/lib/features/settings/services/settingsService";
@@ -283,7 +283,7 @@ export default function PricingSettings({ bundle, loading, addPlan, changeFee }:
             </div>
             <div className="px-6 pb-5">
               <button type="submit" disabled={saving} className="flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-200 transition hover:bg-sky-700 disabled:opacity-50">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <CircleCheck size={14} />}
                 {saving ? "Saving…" : "Apply fee change"}
               </button>
             </div>
@@ -299,7 +299,7 @@ export default function PricingSettings({ bundle, loading, addPlan, changeFee }:
               : "border-red-200 bg-red-50 text-red-700"
           }`}
         >
-          {feedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+          {feedback.type === "success" ? <CircleCheck size={14} /> : <TriangleAlert size={14} />}
           {feedback.text}
         </div>
       )}

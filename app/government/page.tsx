@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { ShieldCheck, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { ShieldCheck, Lock, Eye, EyeOff, CircleAlert, Loader2 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -57,7 +57,7 @@ export default function GovernmentLoginPage() {
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-6 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <CircleAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-black text-amber-900 uppercase">Restricted Government Access</p>
               <p className="text-xs text-amber-700 mt-1">Authorized environmental personnel only. All actions are audited.</p>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Wrench, CheckCircle2, AlertTriangle } from "lucide-react";
+import { X, Wrench, CircleCheck, TriangleAlert } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import TruckStatusBadge from "./TruckStatusBadge";
 import { setTruckStatus, TruckEngineError, type TruckRecord } from "@/lib/core/company/truckEngine";
@@ -111,7 +111,7 @@ export default function TruckMaintenanceModal({
 
               {onRoute && (
                 <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 ring-1 ring-amber-200">
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                  <TriangleAlert size={16} className="mt-0.5 shrink-0 text-amber-600" />
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-amber-800">
                       This truck is currently on a route. Pulling it for maintenance will disrupt active collections.
@@ -153,7 +153,7 @@ export default function TruckMaintenanceModal({
                     onClick={() => apply("active")}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <CheckCircle2 size={15} />
+                    <CircleCheck size={15} />
                     {submitting === "active" ? "Updating..." : "Return to service"}
                   </motion.button>
                 )}

@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
-  Activity, TrendingUp, Wallet, ArrowUpRight, Receipt, RotateCcw, AlertTriangle,
-  Radio, CheckCircle2, XCircle, Link2, ShieldAlert, Coins, LogOut,
+  Activity, TrendingUp, Wallet, ArrowUpRight, Receipt, RotateCcw, TriangleAlert,
+  Radio, CircleCheck, CircleX, Link2, ShieldAlert, Coins, LogOut,
 } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { formatNaira, bpsToPercent } from '@/lib/utils/money';
@@ -188,8 +188,8 @@ export default function AdminFinancePage() {
               <motion.span initial={{ width: 0 }} animate={{ width: `${100 - successRate}%` }} transition={{ duration: 1, ease: EASE }} className="bg-rose-400/70" />
             </div>
             <div className="mt-4 flex items-center gap-6">
-              <span className="flex items-center gap-2 text-sm font-bold text-emerald-300"><CheckCircle2 className="h-4 w-4" /> {data?.counts?.success ?? 0} successful</span>
-              <span className="flex items-center gap-2 text-sm font-bold text-rose-300"><XCircle className="h-4 w-4" /> {data?.counts?.failed ?? 0} failed</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-emerald-300"><CircleCheck className="h-4 w-4" /> {data?.counts?.success ?? 0} successful</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-rose-300"><CircleX className="h-4 w-4" /> {data?.counts?.failed ?? 0} failed</span>
               <span className={`${mono.className} text-xs font-semibold text-emerald-100/40`}>{data?.counts?.total ?? 0} attempts</span>
             </div>
           </motion.section>
@@ -206,7 +206,7 @@ export default function AdminFinancePage() {
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-400/20 px-6 py-5">
             <div className="flex items-center gap-3">
               <span className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300 ring-1 ring-amber-300/30">
-                <AlertTriangle className="h-5 w-5" />
+                <TriangleAlert className="h-5 w-5" />
                 {unmatched.length > 0 && <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-amber-950">{unmatched.length}</span>}
               </span>
               <div>

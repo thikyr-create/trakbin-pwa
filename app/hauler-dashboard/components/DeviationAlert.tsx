@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, X, Map } from 'lucide-react';
+import { TriangleAlert, X, Map } from 'lucide-react';
 import { recordActivity } from '@/lib/features/driver/activity';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useCompanySession } from '@/lib/store/useCompanySession';
@@ -71,7 +71,7 @@ export default function DeviationAlert() {
 
             <div className="p-5">
               <div className="flex items-start gap-3 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
-                <AlertTriangle size={20} className="text-amber-400 mt-0.5" />
+                <TriangleAlert size={20} className="text-amber-400 mt-0.5" />
                 <div>
                   <p className="text-sm font-bold text-amber-400">Off-route detected</p>
                   <p className="text-xs text-gray-400 mt-1">You are ~{distanceM}m from the planned route. Reason?</p>

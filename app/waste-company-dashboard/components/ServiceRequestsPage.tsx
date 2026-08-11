@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Inbox, MapPin, Building2, CheckCircle2, X, Loader2, Globe, CalendarClock } from 'lucide-react';
+import { Inbox, MapPin, Building2, CircleCheck, X, Loader2, Globe, CalendarClock } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -113,7 +113,7 @@ export default function ServiceRequestsPage() {
                     <input value={timeWindow} onChange={(e) => setTimeWindow(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
                   </div>
                   <motion.button whileTap={{ scale: 0.98 }} onClick={approve} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
-                    {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />} Activate service
+                    {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <CircleCheck className="h-5 w-5" />} Activate service
                   </motion.button>
                 </div>
               )}

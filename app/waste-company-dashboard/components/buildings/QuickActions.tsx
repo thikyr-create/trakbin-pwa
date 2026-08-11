@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays, AlertTriangle, Zap } from "lucide-react";
+import { CalendarDays, TriangleAlert, Zap } from "lucide-react";
 import { JetBrains_Mono } from "next/font/google";
 import {
   updateSchedule,
@@ -201,7 +201,7 @@ export default function QuickActions({
               : "bg-gray-50 text-gray-700 hover:bg-gray-100"
           }`}
         >
-          <AlertTriangle size={14} /> Report issue
+          <TriangleAlert size={14} /> Report issue
         </button>
       </div>
 

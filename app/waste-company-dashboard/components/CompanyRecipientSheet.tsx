@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { X, ShieldCheck, CheckCircle2, Landmark, AlertCircle } from 'lucide-react';
+import { X, ShieldCheck, CircleCheck, Landmark, CircleAlert } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { DEFAULT_COUNTRY, SUPPORTED_COUNTRIES } from '@/lib/payments/countries';
 import type { BankInfo } from '@/lib/payments/types';
@@ -67,14 +67,14 @@ export default function CompanyRecipientSheet({ open, onClose }: Props) {
             <div className="max-h-[56vh] overflow-y-auto px-6 py-5">
               {saved ? (
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="py-6 text-center">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CheckCircle2 className="h-8 w-8" /></motion.div>
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600"><CircleCheck className="h-8 w-8" /></motion.div>
                   <h3 className={`${display.className} mt-4 text-xl font-extrabold tracking-tight text-gray-900`}>Account saved</h3>
                   <p className="mt-1 text-sm font-medium text-gray-500">{bank?.name} •••• {digits.slice(-4)} is ready for payouts.</p>
                 </motion.div>
               ) : (
                 <>
                   <BankPicker country={country} onCountryChange={setCountry} bank={bank} onBankChange={setBank} accountNumber={accountNumber} onAccountNumberChange={setAccountNumber} accountName={accountName} onAccountNameChange={setAccountName} />
-                  {error && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> {error}</p>}
+                  {error && <p className="mt-3 flex items-center gap-2 text-xs font-bold text-rose-600"><CircleAlert className="h-4 w-4" /> {error}</p>}
                 </>
               )}
             </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Shield, Loader2, CheckCircle2, AlertTriangle, KeyRound, Fingerprint, MonitorSmartphone } from "lucide-react";
+import { Shield, Loader2, CircleCheck, TriangleAlert, KeyRound, Fingerprint, MonitorSmartphone } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 
@@ -104,7 +104,7 @@ export default function SecuritySettings(_props: SettingsSectionProps) {
             <div className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${
               feedback.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
             }`}>
-              {feedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+              {feedback.type === "success" ? <CircleCheck size={14} /> : <TriangleAlert size={14} />}
               {feedback.text}
             </div>
           )}

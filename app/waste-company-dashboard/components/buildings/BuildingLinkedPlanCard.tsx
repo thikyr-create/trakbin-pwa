@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Tags, Loader2, CheckCircle2, AlertTriangle, Unlink } from "lucide-react";
+import { Tags, Loader2, CircleCheck, TriangleAlert, Unlink } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { fetchLinkedPlan, linkBuildingToPlan } from "@/lib/features/finance/services/billingService";
 import { fetchSettingsBundle } from "@/lib/features/settings/services/settingsService";
@@ -166,7 +166,7 @@ export default function BuildingLinkedPlanCard({
             ? "border-emerald-200 bg-emerald-50 text-emerald-700"
             : "border-red-200 bg-red-50 text-red-700"
         }`}>
-          {feedback.type === "success" ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+          {feedback.type === "success" ? <CircleCheck size={13} /> : <TriangleAlert size={13} />}
           {feedback.text}
         </div>
       )}
@@ -186,7 +186,7 @@ export default function BuildingLinkedPlanCard({
           disabled={saving || !dirty}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:opacity-50"
         >
-          {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <CircleCheck size={12} />}
           {saving ? "Saving…" : "Save linkage"}
         </button>
       </div>

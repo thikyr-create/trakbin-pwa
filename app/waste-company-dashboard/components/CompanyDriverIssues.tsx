@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { Wrench, ShieldAlert, TrafficCone, Cog, HelpCircle, CheckCircle2 } from 'lucide-react';
+import { Wrench, ShieldAlert, TrafficCone, Cog, CircleHelp, CircleCheck } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 
-const TYPE_ICON: Record<string, any> = { breakdown: Wrench, accident: ShieldAlert, route_blocked: TrafficCone, vehicle_fault: Cog, other: HelpCircle };
+const TYPE_ICON: Record<string, any> = { breakdown: Wrench, accident: ShieldAlert, route_blocked: TrafficCone, vehicle_fault: Cog, other: CircleHelp };
 const STATUS_CHIP: Record<string, string> = {
   open: 'bg-amber-50 text-amber-700 ring-amber-200',
   acknowledged: 'bg-sky-50 text-sky-700 ring-sky-200',
@@ -51,7 +51,7 @@ export default function CompanyDriverIssues() {
       ) : (
         <ul className="divide-y divide-gray-100">
           {issues.map((it) => {
-            const Icon = TYPE_ICON[it.issue_type] || HelpCircle;
+            const Icon = TYPE_ICON[it.issue_type] || CircleHelp;
             return (
               <li key={it.id} className="px-6 py-4">
                 <div className="flex items-start justify-between gap-3">
@@ -67,7 +67,7 @@ export default function CompanyDriverIssues() {
                   </div>
                   {it.status !== 'resolved'
                     ? <button onClick={() => advance(it)} className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">Mark {NEXT[it.status]}</button>
-                    : <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />}
+                    : <CircleCheck className="h-5 w-5 shrink-0 text-emerald-500" />}
                 </div>
               </li>
             );

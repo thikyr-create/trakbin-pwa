@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
-import { Building2, LogIn, CheckCircle2, AlertCircle, KeyRound, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Building2, LogIn, CircleCheck, CircleAlert, KeyRound, ArrowLeft, ArrowRight } from 'lucide-react';
 import { authEngine } from '@/lib/auth/authEngine';
 import { supabaseAuth } from '@/lib/auth/supabaseAuth';
 import { ROLE_HOME } from '@/lib/auth/permissions';
@@ -194,7 +194,7 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
 
       {message && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={`flex items-start gap-3 rounded-xl p-4 text-sm font-medium ${message.includes('❌') ? 'border border-red-100 bg-red-50 text-red-700' : 'border border-green-200 bg-green-50 text-green-700'}`}>
-          {message.includes('❌') ? <AlertCircle size={18} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={18} className="mt-0.5 shrink-0" />}
+          {message.includes('❌') ? <CircleAlert size={18} className="mt-0.5 shrink-0" /> : <CircleCheck size={18} className="mt-0.5 shrink-0" />}
           <p>{message}</p>
         </motion.div>
       )}

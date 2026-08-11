@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Pencil, Loader2, AlertTriangle, Info, Lock } from "lucide-react";
+import { X, Pencil, Loader2, TriangleAlert, Info, Lock } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { ZoneRecord } from "@/lib/features/zones/services/zoneService";
 import ZoneBoundaryEditor from "./ZoneBoundaryEditor";
@@ -179,7 +179,7 @@ export default function EditZoneModal({ open, zone, onClose, onUpdate }: EditZon
 
               {error && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-red-600" />
+                  <TriangleAlert size={14} className="mt-0.5 shrink-0 text-red-600" />
                   <p className="text-xs font-semibold text-red-700">{error}</p>
                 </div>
               )}

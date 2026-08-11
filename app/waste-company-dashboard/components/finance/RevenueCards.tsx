@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { TrendingUp, CalendarDays, AlertTriangle, Clock, Wallet } from "lucide-react";
+import { TrendingUp, CalendarDays, TriangleAlert, Clock, Wallet } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { formatNaira } from "@/lib/utils/money";
 import type { FinanceOverview } from "@/lib/features/finance/services/financeService";
@@ -30,7 +30,7 @@ export default function RevenueCards({ overview, available, loading }: RevenueCa
   const cards = [
     { Icon: TrendingUp, label: "Total revenue", value: overview.totalRevenue, tile: "bg-emerald-50 text-emerald-600", accent: "text-emerald-700" },
     { Icon: CalendarDays, label: "Collected this month", value: overview.collectedThisMonth, tile: "bg-sky-50 text-sky-600", accent: "text-sky-700" },
-    { Icon: AlertTriangle, label: "Outstanding", value: overview.outstanding, tile: "bg-amber-50 text-amber-600", accent: "text-amber-700" },
+    { Icon: TriangleAlert, label: "Outstanding", value: overview.outstanding, tile: "bg-amber-50 text-amber-600", accent: "text-amber-700" },
     { Icon: Clock, label: "Pending settlement", value: overview.pendingSettlement, tile: "bg-gray-100 text-gray-500", accent: "text-gray-700" },
     { Icon: Wallet, label: "Available balance", value: available, tile: "bg-emerald-50 text-emerald-600", accent: "text-emerald-700" },
   ];

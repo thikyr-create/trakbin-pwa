@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import { createClient } from '@supabase/supabase-js';
 import {
-  AlertTriangle, CalendarX, Camera, Video, Image as ImageIcon, MapPin, Navigation,
-  X, CheckCircle2, Clock, Send, ChevronRight, Radio, ShieldCheck, Paperclip, Loader2,
+  TriangleAlert, CalendarX, Camera, Video, Image as ImageIcon, MapPin, Navigation,
+  X, CircleCheck, Clock, Send, ChevronRight, Radio, ShieldCheck, Paperclip, Loader2,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
@@ -19,8 +19,8 @@ type Kind = 'dump' | 'miss';
 type MediaItem = { id: string; blob: Blob; url: string; kind: 'image' | 'video'; uploadedUrl?: string; failed?: boolean };
 type Toast = { msg: string; tone: 'ok' | 'err' | 'info' } | null;
 
-const TYPE_META: Record<string, { label: string; chip: string; rail: string; Icon: typeof AlertTriangle }> = {
-  illegal_dumping: { label: 'Illegal dumping', chip: 'bg-amber-50 text-amber-700 ring-amber-200', rail: 'bg-amber-400', Icon: AlertTriangle },
+const TYPE_META: Record<string, { label: string; chip: string; rail: string; Icon: typeof TriangleAlert }> = {
+  illegal_dumping: { label: 'Illegal dumping', chip: 'bg-amber-50 text-amber-700 ring-amber-200', rail: 'bg-amber-400', Icon: TriangleAlert },
   missed_collection: { label: 'Missed collection', chip: 'bg-rose-50 text-rose-700 ring-rose-200', rail: 'bg-rose-400', Icon: CalendarX },
 };
 
@@ -202,8 +202,8 @@ export default function ReportConsole() {
         {toast && (
           <motion.div initial={{ opacity: 0, y: -12, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -12, scale: 0.96 }} className={`fixed left-1/2 top-20 z-[1200] flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-bold shadow-xl ring-1 ${toast.tone === 'ok' ? 'bg-emerald-600 text-white ring-emerald-400/40' : toast.tone === 'err' ? 'bg-rose-600 text-white ring-rose-400/40' : 'bg-gray-900 text-white ring-white/10'}`}>
             {toast.tone === 'info' && <Loader2 className="h-4 w-4 animate-spin" />}
-            {toast.tone === 'ok' && <CheckCircle2 className="h-4 w-4" />}
-            {toast.tone === 'err' && <AlertTriangle className="h-4 w-4" />}
+            {toast.tone === 'ok' && <CircleCheck className="h-4 w-4" />}
+            {toast.tone === 'err' && <TriangleAlert className="h-4 w-4" />}
             {toast.msg}
           </motion.div>
         )}
@@ -231,7 +231,7 @@ export default function ReportConsole() {
       {/* chooser */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {([
-          { id: 'dump' as Kind, Icon: AlertTriangle, title: 'Illegal dumping', sub: 'Photograph the site', ring: 'ring-amber-300', bg: 'bg-amber-50', tx: 'text-amber-700', solid: 'bg-amber-500', glow: 'bg-amber-200/60', ringSoft: 'ring-amber-100' },
+          { id: 'dump' as Kind, Icon: TriangleAlert, title: 'Illegal dumping', sub: 'Photograph the site', ring: 'ring-amber-300', bg: 'bg-amber-50', tx: 'text-amber-700', solid: 'bg-amber-500', glow: 'bg-amber-200/60', ringSoft: 'ring-amber-100' },
           { id: 'miss' as Kind, Icon: CalendarX, title: 'Missed collection', sub: 'The truck didn’t come', ring: 'ring-rose-300', bg: 'bg-rose-50', tx: 'text-rose-700', solid: 'bg-rose-500', glow: 'bg-rose-200/60', ringSoft: 'ring-rose-100' },
         ]).map((c, i) => {
           const sel = kind === c.id;
@@ -240,7 +240,7 @@ export default function ReportConsole() {
               <div aria-hidden className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full blur-2xl ${sel ? c.glow : 'bg-gray-100'}`} />
               <div className="relative flex items-start justify-between">
                 <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ring-1 transition-transform group-hover:scale-105 ${sel ? `${c.solid} text-white ring-transparent` : `${c.bg} ${c.tx} ${c.ringSoft}`}`}><c.Icon className="h-6 w-6" /></span>
-                {sel && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className={`flex h-6 w-6 items-center justify-center rounded-full ${c.solid} text-white`}><CheckCircle2 className="h-4 w-4" /></motion.span>}
+                {sel && <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} className={`flex h-6 w-6 items-center justify-center rounded-full ${c.solid} text-white`}><CircleCheck className="h-4 w-4" /></motion.span>}
               </div>
               <p className="relative mt-4 text-base font-extrabold text-gray-900">{c.title}</p>
               <p className="relative mt-0.5 text-sm font-semibold text-gray-500">{c.sub}</p>
@@ -267,7 +267,7 @@ export default function ReportConsole() {
                   <motion.button whileTap={{ scale: 0.95 }} onClick={useMyLocation} disabled={locBusy} className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-gray-900 px-3.5 py-3 text-xs font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-60">{locBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}<span className="hidden sm:inline">Use my location</span></motion.button>
                 </div>
                 {pinned ? (
-                  <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> GPS pinned · {pinned}</p>
+                  <p className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold text-emerald-600"><CircleCheck className="h-3.5 w-3.5" /> GPS pinned · {pinned}</p>
                 ) : null}
               </div>
 
@@ -353,7 +353,7 @@ export default function ReportConsole() {
         {reports.length === 0 ? (
           <div className="relative px-6 py-14 text-center">
             <div aria-hidden className="pointer-events-none absolute inset-0 opacity-50" style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.08) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
-            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-gray-200"><CheckCircle2 className="h-7 w-7 text-gray-300" /></div>
+            <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-dashed border-gray-200"><CircleCheck className="h-7 w-7 text-gray-300" /></div>
             <p className="relative mt-4 text-sm font-bold text-gray-700">No reports yet</p>
             <p className="relative mx-auto mt-1 max-w-xs text-xs text-gray-400">When you flag illegal dumping or a missed collection, it shows up here with its status.</p>
           </div>

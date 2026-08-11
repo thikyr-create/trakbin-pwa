@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
-import { Building2, UserPlus, Truck, MapPin, Phone, Loader2, Search, CheckCircle2, AlertCircle, Smartphone, Monitor, ChevronDown } from 'lucide-react';
+import { Building2, UserPlus, Truck, MapPin, Phone, Loader2, Search, CircleCheck, CircleAlert, Smartphone, Monitor, ChevronDown } from 'lucide-react';
 import CompanyIdCard from './CompanyIdCard';
 import { authEngine } from '@/lib/auth/authEngine';
 import type { AccountType } from '@/lib/auth/types';
@@ -164,8 +164,8 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 {gpsStatus === 'requesting' && <Loader2 className="h-5 w-5 animate-spin text-green-600" />}
-                {gpsStatus === 'captured' && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                {gpsStatus === 'error' && <AlertCircle className="h-5 w-5 text-gray-600" />}
+                {gpsStatus === 'captured' && <CircleCheck className="h-5 w-5 text-green-600" />}
+                {gpsStatus === 'error' && <CircleAlert className="h-5 w-5 text-gray-600" />}
                 <div>
                   <p className="flex items-center gap-2 text-sm font-bold text-gray-900">
                     {isMobile ? <Smartphone size={14} /> : <Monitor size={14} />}
@@ -238,7 +238,7 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
 
       {message && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={`flex items-start gap-3 rounded-xl p-4 text-sm font-medium ${message.includes('❌') ? 'border border-red-100 bg-red-50 text-red-700' : message.includes('✅') ? 'border border-green-200 bg-green-50 text-green-700' : 'border border-gray-100 bg-gray-50 text-gray-700'}`}>
-          {message.includes('❌') ? <AlertCircle size={18} className="mt-0.5 shrink-0" /> : <CheckCircle2 size={18} className="mt-0.5 shrink-0" />}
+          {message.includes('❌') ? <CircleAlert size={18} className="mt-0.5 shrink-0" /> : <CircleCheck size={18} className="mt-0.5 shrink-0" />}
           <p>{message}</p>
         </motion.div>
       )}

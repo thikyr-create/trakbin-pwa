@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Building2, Users, Truck, Route, CheckCircle2, Loader2, RefreshCw, MapPin, Clock, Navigation } from 'lucide-react';
+import { Building2, Users, Truck, Route, CircleCheck, Loader2, RefreshCw, MapPin, Clock, Navigation } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { AssignmentEngine } from '@/lib/core/assignment/AssignmentEngine';
 import { availableDrivers } from '@/lib/core/assignment/DriverAllocator';

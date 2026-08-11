@@ -1,13 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, AlertCircle, XCircle, Info, X } from 'lucide-react';
+import { CircleCheckBig, CircleAlert, CircleX, Info, X } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
 const NOTIFICATION_ICONS = {
-  success: CheckCircle,
-  warning: AlertCircle,
-  error: XCircle,
+  success: CircleCheckBig,
+  warning: CircleAlert,
+  error: CircleX,
   info: Info,
 };
 

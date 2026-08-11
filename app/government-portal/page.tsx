@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
-  LayoutDashboard, Building2, ClipboardList, Truck, Home, AlertTriangle, 
-  Trash2, SearchCheck, BarChart3, Leaf, Megaphone, ScrollText, Settings, LogOut, 
+  LayoutDashboard, Building2, ClipboardList, Truck, Home, TriangleAlert, 
+  Trash2, SearchCheck, ChartColumn, Leaf, Megaphone, ScrollText, Settings, LogOut, 
   Menu, X, TrendingUp, TrendingDown, Activity, ShieldCheck, Eye, Filter, Plus, ChevronRight, Zap, Phone, Users, DollarSign, MapPin, ArrowLeft, Mail, Hash, Calendar, Briefcase
 } from 'lucide-react';
 
@@ -80,10 +80,10 @@ export default function GovernmentPortal() {
     { id: 'fleet', label: 'Fleet', icon: Truck },
     { id: 'drivers', label: 'Drivers', icon: Users },
     { id: 'buildings', label: 'Buildings', icon: Home },
-    { id: 'incidents', label: 'Incidents', icon: AlertTriangle },
+    { id: 'incidents', label: 'Incidents', icon: TriangleAlert },
     { id: 'dumping', label: 'Illegal Dumping', icon: Trash2 },
     { id: 'inspections', label: 'Inspections', icon: SearchCheck },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'analytics', label: 'Analytics', icon: ChartColumn },
     { id: 'sustainability', label: 'Sustainability', icon: Leaf },
     { id: 'notices', label: 'Notices', icon: Megaphone },
     { id: 'audit', label: 'Audit Log', icon: ScrollText },
@@ -443,7 +443,7 @@ function TruckProfile({ truck, onBack }: any) {
 
 // ============ OVERVIEW PAGE ============
 function OverviewPage({ setActivePage, stats }: any) {
-  const kpis = [ { label: 'Licensed Companies', value: stats.companies, sub: 'Registered', icon: Building2, color: 'emerald', page: 'companies' }, { label: 'Total Collections', value: stats.collections, sub: 'Platform Wide', icon: ClipboardList, color: 'blue', page: 'compliance' }, { label: 'Open Issues', value: stats.issues, sub: 'Needs Action', icon: AlertTriangle, color: 'red', page: 'incidents' } ];
+  const kpis = [ { label: 'Licensed Companies', value: stats.companies, sub: 'Registered', icon: Building2, color: 'emerald', page: 'companies' }, { label: 'Total Collections', value: stats.collections, sub: 'Platform Wide', icon: ClipboardList, color: 'blue', page: 'compliance' }, { label: 'Open Issues', value: stats.issues, sub: 'Needs Action', icon: TriangleAlert, color: 'red', page: 'incidents' } ];
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">{kpis.map((kpi, idx) => { const Icon = kpi.icon; return ( <button key={idx} onClick={() => setActivePage(kpi.page)} className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all text-left group"><div className={`w-12 h-12 bg-${kpi.color}-100 rounded-xl flex items-center justify-center mb-3`}><Icon className={`w-6 h-6 text-${kpi.color}-600`} /></div><p className="text-xs font-black text-slate-500 uppercase mb-1">{kpi.label}</p><p className="text-3xl font-black text-slate-900">{kpi.value}</p><p className={`text-xs font-bold text-${kpi.color}-600 mt-1`}>{kpi.sub}</p></button> ); })}</div>
@@ -458,7 +458,7 @@ function DumpingPage({ reports }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-xl p-6 text-white flex items-center gap-4"><div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm"><Trash2 className="w-8 h-8 text-white" /></div><div><h2 className="text-xl font-black uppercase mb-1">Illegal Dumping Command</h2><p className="text-sm font-bold text-red-100">{reports.length} Recent Reports Loaded from Database</p></div></div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"><h2 className="text-xs font-black text-slate-900 uppercase">Recent Reports</h2></div><div className="divide-y divide-slate-100">{reports.length === 0 ? ( <div className="p-8 text-center text-sm font-bold text-slate-500">No illegal dumping reports recorded yet.</div> ) : ( reports.map((r: any, idx: number) => ( <div key={idx} className="px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer"><div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.severity === 'Critical' ? 'bg-red-100' : r.severity === 'High' ? 'bg-orange-100' : 'bg-yellow-100'}`}><AlertTriangle className={`w-5 h-5 ${r.severity === 'Critical' ? 'text-red-600' : r.severity === 'High' ? 'text-orange-600' : 'text-yellow-600'}`} /></div><div><p className="text-sm font-black text-slate-900 uppercase">{r.location}</p><p className="text-xs font-bold text-slate-500">ID: {r.id} • Reported by {r.reported_by} • {new Date(r.created_at).toLocaleDateString()}</p></div></div><div className="flex items-center gap-3"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getStatusColor(r.status)}`}>{r.status}</span><button className="p-2 hover:bg-slate-100 rounded-lg"><Eye size={16} className="text-slate-500" /></button></div></div> )) )}</div></div>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"><h2 className="text-xs font-black text-slate-900 uppercase">Recent Reports</h2></div><div className="divide-y divide-slate-100">{reports.length === 0 ? ( <div className="p-8 text-center text-sm font-bold text-slate-500">No illegal dumping reports recorded yet.</div> ) : ( reports.map((r: any, idx: number) => ( <div key={idx} className="px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer"><div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.severity === 'Critical' ? 'bg-red-100' : r.severity === 'High' ? 'bg-orange-100' : 'bg-yellow-100'}`}><TriangleAlert className={`w-5 h-5 ${r.severity === 'Critical' ? 'text-red-600' : r.severity === 'High' ? 'text-orange-600' : 'text-yellow-600'}`} /></div><div><p className="text-sm font-black text-slate-900 uppercase">{r.location}</p><p className="text-xs font-bold text-slate-500">ID: {r.id} • Reported by {r.reported_by} • {new Date(r.created_at).toLocaleDateString()}</p></div></div><div className="flex items-center gap-3"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getStatusColor(r.status)}`}>{r.status}</span><button className="p-2 hover:bg-slate-100 rounded-lg"><Eye size={16} className="text-slate-500" /></button></div></div> )) )}</div></div>
     </div>
   );
 }
@@ -548,7 +548,7 @@ function IssuesPage({ issues, search, setSearch }: any) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><SearchBar placeholder="Search issues by type or location..." value={search} onChange={setSearch} /><p className="text-xs font-black text-slate-500 uppercase">{issues.length} Issues Found</p></div>
-      {issues.length === 0 ? ( <div className="bg-white rounded-xl border border-slate-200 p-12 text-center"><AlertTriangle className="w-12 h-12 text-slate-300 mx-auto mb-4" /><p className="text-sm font-bold text-slate-500">No issues found.</p></div> ) : (
+      {issues.length === 0 ? ( <div className="bg-white rounded-xl border border-slate-200 p-12 text-center"><TriangleAlert className="w-12 h-12 text-slate-300 mx-auto mb-4" /><p className="text-sm font-bold text-slate-500">No issues found.</p></div> ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 border-b border-slate-200"><tr><th className="px-6 py-3 text-xs font-black text-slate-500 uppercase">Date</th><th className="px-6 py-3 text-xs font-black text-slate-500 uppercase">Type</th><th className="px-6 py-3 text-xs font-black text-slate-500 uppercase">Location</th><th className="px-6 py-3 text-xs font-black text-slate-500 uppercase">Severity</th><th className="px-6 py-3 text-xs font-black text-slate-500 uppercase">Status</th></tr></thead><tbody className="divide-y divide-slate-100">{issues.map((i: any, idx: number) => ( <tr key={i.id || idx} className="hover:bg-slate-50 transition-all"><td className="px-6 py-4 text-sm font-bold text-slate-700">{new Date(i.created_at).toLocaleDateString()}</td><td className="px-6 py-4 text-sm font-black text-slate-900 uppercase">{i.type || 'N/A'}</td><td className="px-6 py-4 text-sm font-bold text-slate-700 truncate max-w-xs">{i.location || 'N/A'}</td><td className="px-6 py-4"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getSeverityColor(i.severity)}`}>{i.severity || 'Medium'}</span></td><td className="px-6 py-4"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${i.status === 'Open' ? 'bg-red-100 text-red-700' : i.status === 'Resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{i.status}</span></td></tr> ))}</tbody></table></div></div>
       )}
     </div>

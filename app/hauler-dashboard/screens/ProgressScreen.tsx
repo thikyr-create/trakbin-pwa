@@ -1,7 +1,7 @@
 // app/hauler-dashboard/screens/ProgressScreen.tsx
 "use client";
 
-import { Package, Weight, Route, Clock, CheckCircle2, Target } from 'lucide-react';
+import { Package, Weight, Route, Clock, CircleCheck, Target } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useProgress } from '@/lib/features/driver-console/hooks/useProgress';
 import ProgressRing from '../components/progress/ProgressRing';
@@ -70,7 +70,7 @@ export default function ProgressScreen() {
           <SummaryRow Icon={Weight} label="Waste collected" value={p.wasteKg != null ? `${p.wasteKg} kg` : '—'} />
           <SummaryRow Icon={Route} label="Distance travelled" value={p.traveledKm != null ? `${p.traveledKm} km` : '—'} />
           <SummaryRow Icon={Clock} label="Time on route" value={p.timeOnRouteMin != null ? fmtTime(p.timeOnRouteMin) : '—'} />
-          <SummaryRow Icon={CheckCircle2} label="Stops on time" value={p.onTime ? `${p.onTime.done} / ${p.onTime.total}` : '—'} />
+          <SummaryRow Icon={CircleCheck} label="Stops on time" value={p.onTime ? `${p.onTime.done} / ${p.onTime.total}` : '—'} />
           <SummaryRow Icon={Target} label="Success rate" value={p.successRate != null ? `${Math.round(p.successRate * 100)}%` : '—'} />
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, XCircle, Receipt, Loader2 } from "lucide-react";
+import { RotateCcw, CircleX, Receipt, Loader2 } from "lucide-react";
 import { JetBrains_Mono } from "next/font/google";
 import { invoiceStatusMeta } from "@/lib/core/finance/BillingStatus";
 import {
@@ -126,7 +126,7 @@ export default function InvoiceCard({
                   {busy === "cancel" ? (
                     <Loader2 size={15} className="animate-spin" />
                   ) : (
-                    <XCircle size={15} />
+                    <CircleX size={15} />
                   )}
                 </button>
               </>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CreditCard, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react';
+import { CreditCard, CircleCheck, ArrowRight, CircleAlert } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
@@ -82,13 +82,13 @@ export default function BillingCard() {
       <p className="font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400">Billing</p>
       <p className="mt-1 text-4xl font-black tracking-tight text-gray-900">{headline}</p>
       <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-gray-600">
-        {isOverdue && <AlertCircle className="h-4 w-4 text-red-500" />} {sub}
+        {isOverdue && <CircleAlert className="h-4 w-4 text-red-500" />} {sub}
       </p>
 
       <div className="mt-auto pt-5">
         <div className="flex items-center justify-between border-t border-gray-100 pt-4 text-xs font-semibold text-gray-500">
           <span>{invoiceCount.paid} paid · {loaded ? (pending || []).length : invoiceCount.due} due</span>
-          {loaded && (pending || []).length === 0 && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+          {loaded && (pending || []).length === 0 && <CircleCheck className="h-4 w-4 text-emerald-500" />}
         </div>
         <div className="mt-3 flex items-center gap-1 text-sm font-bold text-emerald-600">
           <span>{(pending || []).length > 0 ? 'View invoice' : 'View billing'}</span>

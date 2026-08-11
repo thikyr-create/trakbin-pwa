@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-  LogOut, Building2, Calendar, ArrowRight, CheckCircle2, Activity, Radio,
+  LogOut, Building2, Calendar, ArrowRight, CircleCheck, Activity, Radio,
   ShieldCheck, Wallet, Landmark, Zap, Plus, Receipt, Home, History,
-  Headphones, AlertTriangle, MapPin, Copy, Check, ExternalLink, Users, Hash, Clock,
+  Headphones, TriangleAlert, MapPin, Copy, Check, ExternalLink, Users, Hash, Clock,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
@@ -109,7 +109,7 @@ export default function CaretakerDashboard() {
     { id: 'building', label: 'Building', Icon: Building2 },
     { id: 'statement', label: 'Statement', Icon: Receipt },
     { id: 'service', label: 'Service', Icon: Headphones, dot: needsService },
-    { id: 'report', label: 'Report', Icon: AlertTriangle },
+    { id: 'report', label: 'Report', Icon: TriangleAlert },
   ];
 
   return (
@@ -243,7 +243,7 @@ export default function CaretakerDashboard() {
                     <span className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-bold ${collectionHistory.length > 0 ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}><span className={`h-1.5 w-1.5 rounded-full ${collectionHistory.length > 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />{collectionHistory.length > 0 ? 'Up to date' : 'Awaiting first'}</span>
                   </div>
                   <h2 className={`${display.className} relative z-10 mb-2 text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl`}>{collectionHistory.length > 0 ? new Date(collectionHistory[0].collection_date).toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'No collections yet'}</h2>
-                  <p className="relative z-10 mb-6 flex items-center gap-2 text-base font-semibold text-emerald-600"><CheckCircle2 className="h-5 w-5" /> {collectionHistory.length > 0 ? 'Completed successfully' : 'Awaiting first pickup'}</p>
+                  <p className="relative z-10 mb-6 flex items-center gap-2 text-base font-semibold text-emerald-600"><CircleCheck className="h-5 w-5" /> {collectionHistory.length > 0 ? 'Completed successfully' : 'Awaiting first pickup'}</p>
                   <div className="relative z-10 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50/60 p-5">
                     <motion.span aria-hidden initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.6, ease: EASE }} className="absolute inset-y-3 left-0 w-1 origin-top rounded-r-full bg-gradient-to-b from-emerald-400 to-emerald-600" />
                     <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
@@ -285,7 +285,7 @@ export default function CaretakerDashboard() {
                         return (
                           <motion.li key={it.id || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.1 + i * 0.04, ease: EASE }} className="flex items-center justify-between px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <span className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 ${recChip(s)}`}><CheckCircle2 className="h-4 w-4" /></span>
+                              <span className={`flex h-9 w-9 items-center justify-center rounded-xl ring-1 ${recChip(s)}`}><CircleCheck className="h-4 w-4" /></span>
                               <div>
                                 <p className="text-sm font-bold text-gray-900">{new Date(it.collection_date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
                                 <p className="flex items-center gap-1 text-xs font-semibold text-gray-500"><MapPin size={11} /> {it.hauler_name || provider}</p>

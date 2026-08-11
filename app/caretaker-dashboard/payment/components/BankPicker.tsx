@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus_Jakarta_Sans } from 'next/font/google';
-import { Search, Check, ChevronDown, Loader2, CheckCircle2, XCircle, Landmark } from 'lucide-react';
+import { Search, Check, ChevronDown, Loader2, CircleCheck, CircleX, Landmark } from 'lucide-react';
 import { SUPPORTED_COUNTRIES, DEFAULT_COUNTRY } from '@/lib/payments/countries';
 import type { BankInfo } from '@/lib/payments/types';
 
@@ -175,7 +175,7 @@ export default function BankPicker({
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 px-4 py-3 ring-1 ring-emerald-200">
               <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 16 }} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-                <CheckCircle2 className="h-4 w-4" />
+                <CircleCheck className="h-4 w-4" />
               </motion.span>
               <div className="min-w-0">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-600/70">Account belongs to</p>
@@ -187,7 +187,7 @@ export default function BankPicker({
       </AnimatePresence>
 
       {verifyError && !resolving && (
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600"><XCircle className="h-3.5 w-3.5 shrink-0" /> {verifyError}</p>
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-600"><CircleX className="h-3.5 w-3.5 shrink-0" /> {verifyError}</p>
       )}
 
       {/* manual override / re-check — auto-verify handles the happy path */}
@@ -198,7 +198,7 @@ export default function BankPicker({
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 py-3 text-sm font-extrabold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
         {resolving ? <><Loader2 className="h-4 w-4 animate-spin" /> Verifying…</>
-          : accountName ? <><CheckCircle2 className="h-4 w-4" /> Verified · re-check</>
+          : accountName ? <><CircleCheck className="h-4 w-4" /> Verified · re-check</>
           : <><Search className="h-4 w-4" /> Verify account name</>}
       </motion.button>
     </div>

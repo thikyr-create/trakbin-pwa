@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MapPin, Building2, Clock, CheckCircle2, Calendar, Truck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { X, MapPin, Building2, Clock, CircleCheck, Calendar, Truck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
 export default function ReviewDrawer() {
@@ -141,7 +141,7 @@ export default function ReviewDrawer() {
                 <div className="space-y-6">
                   <div className="text-center">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 className="w-8 h-8 text-green-600" />
+                      <CircleCheck className="w-8 h-8 text-green-600" />
                     </div>
                     <h3 className="text-xl font-black text-gray-900">Ready to Activate?</h3>
                     <p className="text-sm text-gray-500 mt-2">This will provision the caretaker's dashboard and enable route generation.</p>

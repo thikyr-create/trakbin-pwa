@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Building2, Loader2, CircleCheck, TriangleAlert } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 
@@ -112,7 +112,7 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
                 : "border-red-200 bg-red-50 text-red-700"
             }`}
           >
-            {feedback.type === "success" ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+            {feedback.type === "success" ? <CircleCheck size={14} /> : <TriangleAlert size={14} />}
             {feedback.text}
           </div>
         )}
@@ -122,7 +122,7 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
           disabled={saving || !dirty}
           className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:opacity-50"
         >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <CircleCheck size={15} />}
           {saving ? "Saving…" : "Save changes"}
         </button>
       </form>

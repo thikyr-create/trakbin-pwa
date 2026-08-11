@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, Loader2, CheckCircle2, AlertTriangle, Truck, Users, Route } from "lucide-react";
+import { CalendarDays, Loader2, CircleCheck, TriangleAlert, Truck, Users, Route } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { previewDispatch, executeDispatch, type DispatchPreview } from "@/lib/features/dispatch/services/dispatchService";
 import { useCompanySession } from "@/lib/store/useCompanySession";
@@ -148,7 +148,7 @@ export default function DispatchPlanner() {
 
             {preview.blockReason && (
               <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
-                <AlertTriangle size={14} />
+                <TriangleAlert size={14} />
                 {preview.blockReason}
               </div>
             )}
@@ -158,7 +158,7 @@ export default function DispatchPlanner() {
               disabled={!preview.canExecute || executing}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-200 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
             >
-              {executing ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+              {executing ? <Loader2 size={16} className="animate-spin" /> : <CircleCheck size={16} />}
               {executing ? "Materializing Routes…" : "Materialize Dispatch"}
             </button>
           </motion.div>

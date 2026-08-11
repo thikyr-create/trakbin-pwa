@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Mail, UserCheck, FileCheck2, CheckCircle2, Loader2, Upload, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Mail, UserCheck, FileCheck2, CircleCheck, Loader2, Upload, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { getCompanyVerification } from '@/lib/auth/companyVerification';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -51,7 +51,7 @@ export default function CompanyVerificationCard({ companyId }: Props) {
   const Row = ({ Icon, label, done, pending, optional, children }: any) => (
     <div className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50/60 p-3.5">
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ${done ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : pending ? 'bg-amber-50 text-amber-600 ring-amber-100' : 'bg-gray-100 text-gray-400 ring-gray-200'}`}>
-        {done ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+        {done ? <CircleCheck className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 text-sm font-bold text-gray-900">{label}
@@ -91,7 +91,7 @@ export default function CompanyVerificationCard({ companyId }: Props) {
           <h3 className={`${display.className} mt-1 text-xl font-extrabold tracking-tight text-gray-900`}>Your operator status</h3>
         </div>
         <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
-          <AlertTriangle className="h-3.5 w-3.5" /> Action needed
+          <TriangleAlert className="h-3.5 w-3.5" /> Action needed
         </span>
       </div>
 

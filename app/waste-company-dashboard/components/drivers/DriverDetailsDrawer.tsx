@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Mail, Phone, Truck, AlertTriangle, Pencil, CheckCircle2 } from "lucide-react";
+import { X, Mail, Phone, Truck, TriangleAlert, Pencil, CircleCheck } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import DriverStatusBadge from "./DriverStatusBadge";
 import type { DriverPageRecord, TruckOption } from "./DriversPage";
@@ -140,12 +140,12 @@ export default function DriverDetailsDrawer({
                 </p>
                 {openIssuesCount > 0 ? (
                   <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
-                    <AlertTriangle size={15} />
+                    <TriangleAlert size={15} />
                     {openIssuesCount} open issue{openIssuesCount === 1 ? "" : "s"}
                   </p>
                 ) : (
                   <p className="flex items-center gap-2 text-sm font-bold text-emerald-700">
-                    <CheckCircle2 size={15} />
+                    <CircleCheck size={15} />
                     No open issues
                   </p>
                 )}

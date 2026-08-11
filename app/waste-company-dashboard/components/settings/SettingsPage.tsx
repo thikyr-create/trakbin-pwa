@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Building2, Receipt, Tags, Truck, Bell, CreditCard, Plug, SlidersHorizontal,
-  Shield, Users, AlertTriangle, Construction,
+  Shield, Users, TriangleAlert, Construction,
 } from "lucide-react";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { useSettings } from "@/lib/features/settings/hooks/useSettings";
@@ -29,7 +29,7 @@ const SECTION_ICONS: Record<SettingsSectionId, React.ComponentType<{ size?: numb
   preferences: SlidersHorizontal,
   security: Shield,
   users: Users,
-  danger: AlertTriangle,
+  danger: TriangleAlert,
 };
 
 export default function SettingsPage() {

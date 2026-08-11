@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
-  LogOut, Receipt, Wallet, CreditCard, Landmark, Plus, X, CheckCircle2, Clock,
-  AlertCircle, ShieldCheck, ArrowUpRight, ArrowDownRight, Zap, Download, Lock,
+  LogOut, Receipt, Wallet, CreditCard, Landmark, Plus, X, CircleCheck, Clock,
+  CircleAlert, ShieldCheck, ArrowUpRight, ArrowDownRight, Zap, Download, Lock,
   Activity, CalendarClock, Hash, Loader2, ArrowLeft, Sparkles, Radio,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
@@ -179,7 +179,7 @@ export default function PaymentPage() {
               </div>
               <span className={`inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${unpaid.length === 0 ? 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30' : isOverdue ? 'bg-rose-400/15 text-rose-100 ring-rose-300/30' : 'bg-amber-400/15 text-amber-100 ring-amber-300/30'}`}>
                 <span className="relative flex h-2 w-2">{unpaid.length > 0 && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" style={{ background: 'currentColor' }} />}<span className={`relative inline-flex h-2 w-2 rounded-full ${unpaid.length === 0 ? 'bg-emerald-300' : isOverdue ? 'bg-rose-300' : 'bg-amber-300'}`} /></span>
-                {unpaid.length === 0 ? <><CheckCircle2 className="h-3.5 w-3.5" /> All clear</> : isOverdue ? <><AlertCircle className="h-3.5 w-3.5" /> Overdue</> : <><Clock className="h-3.5 w-3.5" /> {unpaid.length} open</>}
+                {unpaid.length === 0 ? <><CircleCheck className="h-3.5 w-3.5" /> All clear</> : isOverdue ? <><CircleAlert className="h-3.5 w-3.5" /> Overdue</> : <><Clock className="h-3.5 w-3.5" /> {unpaid.length} open</>}
               </span>
             </div>
 
@@ -206,7 +206,7 @@ export default function PaymentPage() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <motion.button whileTap={{ scale: 0.98 }} onClick={() => oldest && openInvoice(oldest)} disabled={unpaid.length === 0} className="group flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white py-4 text-base font-extrabold text-emerald-700 shadow-lg shadow-emerald-900/30 transition-all hover:bg-emerald-50 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-emerald-100/50 disabled:shadow-none">
-                {unpaid.length === 0 ? <><CheckCircle2 className="h-5 w-5" /> Nothing to pay</> : <>Pay {formatNaira(oldest ? Number(oldest.amount) : 0)} now <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></>}
+                {unpaid.length === 0 ? <><CircleCheck className="h-5 w-5" /> Nothing to pay</> : <>Pay {formatNaira(oldest ? Number(oldest.amount) : 0)} now <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></>}
               </motion.button>
               <motion.button whileTap={{ scale: 0.98 }} onClick={() => setShowAutopay(true)} className={`flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-bold ring-1 transition-all ${autopayOn ? 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30 hover:bg-emerald-400/25' : 'bg-white/5 text-emerald-100 ring-white/15 hover:bg-white/10'}`}><Zap className="h-4 w-4" /> {autopayOn ? 'Autopay on' : 'Set autopay'}</motion.button>
             </div>
@@ -312,7 +312,7 @@ export default function PaymentPage() {
                           <motion.li key={inv.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: i * 0.03, ease: EASE }} className="group relative flex items-center justify-between gap-3 overflow-hidden px-6 py-4 transition-colors hover:bg-gray-50/70">
                             <span aria-hidden className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-emerald-50/70 to-transparent transition-transform duration-500 group-hover:translate-x-full" />
                             <div className="relative flex items-center gap-3">
-                              <span className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${paid ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : overdue ? 'bg-rose-50 text-rose-600 ring-rose-100' : 'bg-amber-50 text-amber-600 ring-amber-100'}`}>{paid ? <CheckCircle2 className="h-5 w-5" /> : overdue ? <AlertCircle className="h-5 w-5" /> : <Clock className="h-5 w-5" />}</span>
+                              <span className={`flex h-10 w-10 items-center justify-center rounded-xl ring-1 ${paid ? 'bg-emerald-50 text-emerald-600 ring-emerald-100' : overdue ? 'bg-rose-50 text-rose-600 ring-rose-100' : 'bg-amber-50 text-amber-600 ring-amber-100'}`}>{paid ? <CircleCheck className="h-5 w-5" /> : overdue ? <CircleAlert className="h-5 w-5" /> : <Clock className="h-5 w-5" />}</span>
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-bold text-gray-900">{inv.description || 'Service invoice'}</p>
                                 <p className={`${mono.className} mt-0.5 text-[11px] font-semibold text-gray-400`}>{new Date(inv.due_date).toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
@@ -432,7 +432,7 @@ export default function PaymentPage() {
                             <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-emerald-50 blur-2xl" />
                             <div className="relative flex items-start justify-between">
                               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100 transition-transform group-hover:scale-105"><Landmark className="h-5 w-5" /></span>
-                              <span className={`${mono.className} inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200`}><CheckCircle2 className="h-2.5 w-2.5" /> verified</span>
+                              <span className={`${mono.className} inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200`}><CircleCheck className="h-2.5 w-2.5" /> verified</span>
                             </div>
                             <p className="relative mt-4 text-sm font-extrabold text-gray-900">{m.bank_name || 'Bank account'}</p>
                             <p className={`${mono.className} relative mt-0.5 text-sm font-bold tabular-nums text-gray-700`}>•••• {last4}</p>
@@ -534,12 +534,12 @@ export default function PaymentPage() {
                 <button onClick={() => setAutopaySource('wallet')} className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${autopaySource === 'wallet' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700"><Wallet className="h-5 w-5" /></span>
                   <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Trakbin wallet</span><span className="block text-xs font-semibold text-gray-500">Balance {formatNaira(walletBalance)}</span></span>
-                  {autopaySource === 'wallet' && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                  {autopaySource === 'wallet' && <CircleCheck className="h-5 w-5 text-emerald-600" />}
                 </button>
                 <button onClick={() => setAutopaySource('card')} className={`flex w-full items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${autopaySource === 'card' ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'}`}>
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 text-gray-700"><CreditCard className="h-5 w-5" /></span>
                   <span className="flex-1"><span className="block text-sm font-bold text-gray-900">Saved card / bank</span><span className="block text-xs font-semibold text-gray-500">Charged when due</span></span>
-                  {autopaySource === 'card' && <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+                  {autopaySource === 'card' && <CircleCheck className="h-5 w-5 text-emerald-600" />}
                 </button>
               </div>
               <div className="flex gap-3">

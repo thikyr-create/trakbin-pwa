@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BarChart3 } from "lucide-react";
+import { ChartColumn } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { formatNaira } from "@/lib/utils/money";
 import type { MonthlyRevenue } from "@/lib/features/finance/services/financeService";
@@ -21,7 +21,7 @@ export default function RevenueChart({ series }: RevenueChartProps) {
   if (!hasData) {
     return (
       <div className="flex flex-col items-center justify-center rounded-[24px] border border-gray-200/80 bg-white p-10 text-center shadow-sm">
-        <BarChart3 className="mb-2 h-8 w-8 text-gray-300" />
+        <ChartColumn className="mb-2 h-8 w-8 text-gray-300" />
         <p className="text-sm font-bold text-gray-500">No confirmed revenue yet</p>
         <p className="mt-1 text-xs text-gray-400">
           Monthly revenue appears here once receipts are issued.

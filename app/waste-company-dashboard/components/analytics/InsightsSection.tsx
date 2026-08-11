@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles, TrendingUp, AlertTriangle, Info } from "lucide-react";
+import { Sparkles, TrendingUp, TriangleAlert, Info } from "lucide-react";
 import { Sora } from "next/font/google";
 import type { Insight } from "@/lib/core/analytics/metricsEngine";
 
@@ -10,7 +10,7 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const TONE_STYLE = {
   positive: { Icon: TrendingUp, classes: "border-emerald-100 bg-emerald-50/60 text-emerald-800", iconTile: "bg-emerald-100 text-emerald-600" },
-  warning: { Icon: AlertTriangle, classes: "border-amber-100 bg-amber-50/60 text-amber-800", iconTile: "bg-amber-100 text-amber-600" },
+  warning: { Icon: TriangleAlert, classes: "border-amber-100 bg-amber-50/60 text-amber-800", iconTile: "bg-amber-100 text-amber-600" },
   neutral: { Icon: Info, classes: "border-gray-100 bg-gray-50/60 text-gray-600", iconTile: "bg-gray-100 text-gray-500" },
 } as const;
 

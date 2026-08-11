@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   LayoutDashboard, Building2, Users, Truck, Map, ClipboardList, 
-  AlertTriangle, BarChart3, Bot, Bell, ScrollText, Settings, LogOut, 
-  Menu, X, DollarSign, ChevronRight, Shield, Zap, Eye, Search, Filter, Plus, TrendingUp, Activity, Phone, Mail, Home, MapPin, CreditCard, CheckCircle2, XCircle, ArrowLeft, Calendar, Hash, Briefcase, Award, Clock
+  TriangleAlert, ChartColumn, Bot, Bell, ScrollText, Settings, LogOut, 
+  Menu, X, DollarSign, ChevronRight, Shield, Zap, Eye, Search, Filter, Plus, TrendingUp, Activity, Phone, Mail, Home, MapPin, CreditCard, CircleCheck, CircleX, ArrowLeft, Calendar, Hash, Briefcase, Award, Clock
 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -92,8 +92,8 @@ export default function AdminDashboard() {
     { id: 'buildings', label: 'Buildings', icon: Home },
     { id: 'collections', label: 'Collections', icon: ClipboardList },
     { id: 'billing', label: 'Billing', icon: DollarSign },
-    { id: 'issues', label: 'Issues', icon: AlertTriangle },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'issues', label: 'Issues', icon: TriangleAlert },
+    { id: 'analytics', label: 'Analytics', icon: ChartColumn },
     { id: 'ai', label: 'AI Intelligence', icon: Bot },
     { id: 'audit', label: 'Audit Logs', icon: ScrollText },
     { id: 'settings', label: 'Settings', icon: Settings },
@@ -244,7 +244,7 @@ function OverviewPage({ setActivePage, stats, loading }: any) {
     { label: 'Buildings', value: loading ? '...' : stats.buildings, sub: 'Active Nodes', icon: Home, color: 'blue', page: 'buildings' },
     { label: 'Drivers', value: loading ? '...' : stats.drivers, sub: 'Field Workers', icon: Users, color: 'purple', page: 'drivers' },
     { label: 'Collections', value: loading ? '...' : stats.collections, sub: 'Total Pickups', icon: ClipboardList, color: 'green', page: 'collections' },
-    { label: 'Open Issues', value: loading ? '...' : stats.issues, sub: 'Needs Action', icon: AlertTriangle, color: 'red', page: 'issues' },
+    { label: 'Open Issues', value: loading ? '...' : stats.issues, sub: 'Needs Action', icon: TriangleAlert, color: 'red', page: 'issues' },
     { label: 'Revenue', value: loading ? '...' : `₦${stats.revenue.toLocaleString()}`, sub: 'Total Collected', icon: DollarSign, color: 'green', page: 'billing' },
   ];
   return (
@@ -650,7 +650,7 @@ function IssuesPage({ issues, search, setSearch }: any) {
         <p className="text-xs font-black text-gray-500 uppercase">{issues.length} Issues Found</p>
       </div>
       {issues.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-4" /><p className="text-sm font-bold text-gray-500">No issues found.</p></div>
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center"><TriangleAlert className="w-12 h-12 text-gray-300 mx-auto mb-4" /><p className="text-sm font-bold text-gray-500">No issues found.</p></div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-50 border-b border-gray-200"><tr><th className="px-6 py-3 text-xs font-black text-gray-500 uppercase">Date</th><th className="px-6 py-3 text-xs font-black text-gray-500 uppercase">Type</th><th className="px-6 py-3 text-xs font-black text-gray-500 uppercase">Location</th><th className="px-6 py-3 text-xs font-black text-gray-500 uppercase">Severity</th><th className="px-6 py-3 text-xs font-black text-gray-500 uppercase">Status</th></tr></thead><tbody className="divide-y divide-gray-100">{issues.map((i: any, idx: number) => ( <tr key={i.id || idx} className="hover:bg-gray-50 transition-all"><td className="px-6 py-4 text-sm font-bold text-gray-700">{new Date(i.created_at).toLocaleDateString()}</td><td className="px-6 py-4 text-sm font-black text-gray-900 uppercase">{i.type || 'N/A'}</td><td className="px-6 py-4 text-sm font-bold text-gray-700 truncate max-w-xs">{i.location || 'N/A'}</td><td className="px-6 py-4"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getSeverityColor(i.severity)}`}>{i.severity || 'Medium'}</span></td><td className="px-6 py-4"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${i.status === 'Open' ? 'bg-red-100 text-red-700' : i.status === 'Resolved' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{i.status}</span></td></tr> ))}</tbody></table></div></div>
       )}
@@ -660,7 +660,7 @@ function IssuesPage({ issues, search, setSearch }: any) {
 
 // ============ AI PAGE ============
 function AIPage() {
-  const insights = [ { title: 'Waste Volume Spike', zone: 'Zone A', desc: 'Volume increased by 34%. Recommend deploying 2 trucks.', priority: 'High', icon: TrendingUp }, { title: 'Missed Collection Pattern', zone: 'Company: Eco Haulers', desc: 'Missed collections increased by 12%.', priority: 'Medium', icon: AlertTriangle } ];
+  const insights = [ { title: 'Waste Volume Spike', zone: 'Zone A', desc: 'Volume increased by 34%. Recommend deploying 2 trucks.', priority: 'High', icon: TrendingUp }, { title: 'Missed Collection Pattern', zone: 'Company: Eco Haulers', desc: 'Missed collections increased by 12%.', priority: 'Medium', icon: TriangleAlert } ];
   return (
     <div className="space-y-4">
       <div className="bg-gradient-to-br from-gray-900 to-green-900 rounded-xl p-6 text-white flex items-center gap-4"><div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm"><Bot className="w-8 h-8 text-green-400" /></div><div><h2 className="text-xl font-black uppercase mb-1">Trakbin AI Intelligence</h2><p className="text-sm font-bold text-green-200">2 new predictive insights generated</p></div></div>

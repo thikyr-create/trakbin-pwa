@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { CheckCircle2, AlertCircle, ArrowLeft, Wallet, Receipt, Radio } from 'lucide-react';
+import { CircleCheck, CircleAlert, ArrowLeft, Wallet, Receipt, Radio } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/money';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -92,16 +92,16 @@ function PaymentCallbackInner() {
             )}
             {phase === 'success' && (
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 240, damping: 15 }} className="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-400/20 ring-1 ring-emerald-300/40">
-                <CheckCircle2 className="h-10 w-10 text-emerald-200" />
+                <CircleCheck className="h-10 w-10 text-emerald-200" />
               </motion.div>
             )}
             {phase === 'failed' && (
               <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 240, damping: 15 }} className="flex h-20 w-20 items-center justify-center rounded-3xl bg-rose-400/20 ring-1 ring-rose-300/40">
-                <AlertCircle className="h-10 w-10 text-rose-200" />
+                <CircleAlert className="h-10 w-10 text-rose-200" />
               </motion.div>
             )}
             {phase === 'none' && (
-              <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-white/15"><AlertCircle className="h-10 w-10 text-white/70" /></div>
+              <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-white/15"><CircleAlert className="h-10 w-10 text-white/70" /></div>
             )}
           </div>
 

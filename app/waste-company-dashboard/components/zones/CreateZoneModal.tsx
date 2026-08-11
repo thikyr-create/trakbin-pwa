@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, MapPin, Loader2, AlertTriangle, GitMerge } from "lucide-react";
+import { X, MapPin, Loader2, TriangleAlert, GitMerge } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
@@ -193,7 +193,7 @@ export default function CreateZoneModal({ open, onClose, onCreate, onMerge }: Cr
 
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-red-600" />
+                    <TriangleAlert size={14} className="mt-0.5 shrink-0 text-red-600" />
                     <p className="text-xs font-semibold text-red-700">{error}</p>
                   </div>
                 )}
@@ -302,7 +302,7 @@ export default function CreateZoneModal({ open, onClose, onCreate, onMerge }: Cr
 
                 {error && (
                   <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0 text-red-600" />
+                    <TriangleAlert size={14} className="mt-0.5 shrink-0 text-red-600" />
                     <p className="text-xs font-semibold text-red-700">{error}</p>
                   </div>
                 )}

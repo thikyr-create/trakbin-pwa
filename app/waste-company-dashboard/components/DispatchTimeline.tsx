@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Play, CheckCircle2, SkipForward, AlertTriangle, Pause, PlayCircle,
+  Play, CircleCheck, SkipForward, TriangleAlert, Pause, PlayCircle,
   Flag, Package, Recycle, Repeat, UserPlus, Truck, Zap, Radio, Activity,
   type LucideIcon,
 } from 'lucide-react';
@@ -14,9 +14,9 @@ import { useCompanySession, type DispatchEventType } from '@/lib/store/useCompan
 // silently drift out of sync with the domain model.
 const EVENT_ICONS: Record<DispatchEventType, LucideIcon> = {
   route_started: Play,
-  pickup_completed: CheckCircle2,
+  pickup_completed: CircleCheck,
   pickup_skipped: SkipForward,
-  issue_reported: AlertTriangle,
+  issue_reported: TriangleAlert,
   route_paused: Pause,
   route_resumed: PlayCircle,
   route_completed: Flag,

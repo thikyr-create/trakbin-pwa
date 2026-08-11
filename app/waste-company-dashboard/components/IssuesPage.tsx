@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-  AlertTriangle, CalendarX, MapPin, Clock, CheckCircle2, ShieldCheck,
+  TriangleAlert, CalendarX, MapPin, Clock, CircleCheck, ShieldCheck,
   Building2, Hash, Inbox, ArrowUpRight,
 } from 'lucide-react';
 
@@ -17,8 +17,8 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'dump', label: 'Dumping' }, { id: 'miss', label: 'Missed' }, { id: 'other', label: 'Other' },
 ];
 
-const TYPE: Record<string, { label: string; chip: string; rail: string; Icon: typeof AlertTriangle }> = {
-  illegal_dumping: { label: 'Illegal dumping', chip: 'bg-amber-50 text-amber-700 ring-amber-200', rail: 'bg-amber-400', Icon: AlertTriangle },
+const TYPE: Record<string, { label: string; chip: string; rail: string; Icon: typeof TriangleAlert }> = {
+  illegal_dumping: { label: 'Illegal dumping', chip: 'bg-amber-50 text-amber-700 ring-amber-200', rail: 'bg-amber-400', Icon: TriangleAlert },
   missed_collection: { label: 'Missed collection', chip: 'bg-rose-50 text-rose-700 ring-rose-200', rail: 'bg-rose-400', Icon: CalendarX },
 };
 
@@ -100,7 +100,7 @@ export default function IssuesPage({ issues }: { issues: any[] }) {
         ) : (
           <ul className="divide-y divide-gray-100">
             {list.map((it: any, i: number) => {
-              const meta = TYPE[it.issue_type] || { label: it.issue_type || 'Issue', chip: 'bg-gray-100 text-gray-600 ring-gray-200', rail: 'bg-gray-300', Icon: AlertTriangle };
+              const meta = TYPE[it.issue_type] || { label: it.issue_type || 'Issue', chip: 'bg-gray-100 text-gray-600 ring-gray-200', rail: 'bg-gray-300', Icon: TriangleAlert };
               const urls: string[] = Array.isArray(it.media) ? it.media : it.photo_url ? [it.photo_url] : [];
               const locMatch = String(it.description || '').match(/Location:\s*([^\n]+)/);
               const missMatch = String(it.description || '').match(/Date missed:\s*([^\n]+)/);

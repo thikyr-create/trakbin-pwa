@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { Shield, Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { Shield, Lock, Eye, EyeOff, CircleAlert, Loader2 } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -61,7 +61,7 @@ export default function AdminLoginPage() {
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <div className="bg-red-50 border border-red-100 rounded-xl p-3 mb-6 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <CircleAlert className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-black text-red-900 uppercase">Restricted Access</p>
               <p className="text-xs text-red-700 mt-1">Authorized personnel only. All login attempts are logged.</p>

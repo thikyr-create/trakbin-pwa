@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, type Variants } from 'framer-motion';
-import { CheckCircle2, Clock, Circle } from 'lucide-react';
+import { CircleCheck, Clock, Circle } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -55,7 +55,7 @@ export default function StatusTimeline() {
                   className="flex h-6 w-6 items-center justify-center"
                 >
                   {step.status === 'completed' ? (
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    <CircleCheck className="h-6 w-6 text-green-600" />
                   ) : step.status === 'current' ? (
                     <motion.span animate={{ rotate: 360 }} transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }} className="flex">
                       <Clock className="h-6 w-6 text-amber-500" />

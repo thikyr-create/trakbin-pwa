@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
-  ArrowLeft, LogOut, Calendar, CheckCircle2, AlertCircle, XCircle,
+  ArrowLeft, LogOut, Calendar, CircleCheck, CircleAlert, CircleX,
   MapPin, Flame, TrendingUp, Clock, ShieldCheck, Activity, Truck, History,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
@@ -16,10 +16,10 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const rowMeta: Record<string, { cls: string; Icon: typeof CheckCircle2; label: string }> = {
-  completed: { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', Icon: CheckCircle2, label: 'Completed' },
-  skipped:   { cls: 'bg-amber-50 text-amber-700 ring-amber-200',       Icon: AlertCircle,  label: 'Skipped' },
-  missed:    { cls: 'bg-rose-50 text-rose-700 ring-rose-200',          Icon: XCircle,      label: 'Missed' },
+const rowMeta: Record<string, { cls: string; Icon: typeof CircleCheck; label: string }> = {
+  completed: { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', Icon: CircleCheck, label: 'Completed' },
+  skipped:   { cls: 'bg-amber-50 text-amber-700 ring-amber-200',       Icon: CircleAlert,  label: 'Skipped' },
+  missed:    { cls: 'bg-rose-50 text-rose-700 ring-rose-200',          Icon: CircleX,      label: 'Missed' },
 };
 const normStatus = (s?: string) => (s || 'completed').toLowerCase();
 

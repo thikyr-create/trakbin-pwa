@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Truck, X, CheckCircle2, Mail, Hash } from 'lucide-react';
+import { Truck, X, CircleCheck, Mail, Hash } from 'lucide-react';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -46,7 +46,7 @@ export default function CompanyIdCard({ company, onClose }: Props) {
           <div className="relative mt-6 space-y-2.5">
             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-50"><Hash className="h-4 w-4 text-emerald-300" /> Company ID · <span className={mono.className}>#{company.id}</span></div>
             <div className="flex items-center gap-2 text-sm font-semibold text-emerald-50"><Mail className="h-4 w-4 text-emerald-300" /> {company.email}</div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-50"><CheckCircle2 className="h-4 w-4 text-emerald-300" /> License · {company.license}</div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-emerald-50"><CircleCheck className="h-4 w-4 text-emerald-300" /> License · {company.license}</div>
           </div>
           <div className="relative mt-6 rounded-xl bg-white/10 p-3 ring-1 ring-white/15">
             <p className="text-[11px] font-semibold leading-relaxed text-emerald-50/90">Save this card. You'll use your business email + password to sign in and manage collections, payouts and zones.</p>

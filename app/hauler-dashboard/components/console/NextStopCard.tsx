@@ -1,7 +1,7 @@
 // app/hauler-dashboard/components/console/NextStopCard.tsx
 "use client";
 
-import { Navigation, CheckCircle2, Building2 } from 'lucide-react';
+import { Navigation, CircleCheck, Building2 } from 'lucide-react';
 import type { RouteBuilding } from '../types';
 
 interface Props {
@@ -61,7 +61,7 @@ export default function NextStopCard({ stop, isArrived, distanceM, etaMin, onNav
           disabled={!isArrived}
           className="flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white font-bold rounded-xl text-sm uppercase active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
         >
-          <CheckCircle2 size={16} /> Confirm Pickup
+          <CircleCheck size={16} /> Confirm Pickup
         </button>
       </div>
       {!isArrived && (

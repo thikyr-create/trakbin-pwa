@@ -1,5 +1,5 @@
 "use client";
-import { X, CheckCircle2, Wallet, CreditCard, Loader2 } from 'lucide-react';
+import { X, CircleCheck, Wallet, CreditCard, Loader2 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 
 export default function AutopayModal() {
@@ -26,7 +26,7 @@ export default function AutopayModal() {
               <p className="text-sm font-bold text-gray-900">Trakbin Wallet</p>
               <p className="text-xs text-gray-700 font-semibold">Balance: ₦{walletBalance.toLocaleString()}</p>
             </div>
-            {autopaySource === 'wallet' && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+            {autopaySource === 'wallet' && <CircleCheck className="w-5 h-5 text-green-600" />}
           </button>
           
           <button 
@@ -38,7 +38,7 @@ export default function AutopayModal() {
               <p className="text-sm font-bold text-gray-900">Saved Card / Bank</p>
               <p className="text-xs text-gray-700 font-semibold">Auto-charge when due</p>
             </div>
-            {autopaySource === 'card' && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+            {autopaySource === 'card' && <CircleCheck className="w-5 h-5 text-green-600" />}
           </button>
         </div>
         

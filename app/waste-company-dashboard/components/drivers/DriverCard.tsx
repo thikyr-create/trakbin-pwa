@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Phone, Mail, AlertTriangle, Truck } from "lucide-react";
+import { Phone, Mail, TriangleAlert, Truck } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { DriverPageRecord } from "./DriversPage";
 
@@ -40,7 +40,7 @@ export default function DriverCard({ driver, openIssuesCount, onClick, index }: 
 
         {openIssuesCount > 0 ? (
           <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 ring-1 ring-amber-200">
-            <AlertTriangle className="h-3 w-3" /> {openIssuesCount} open
+            <TriangleAlert className="h-3 w-3" /> {openIssuesCount} open
           </span>
         ) : (
           <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">

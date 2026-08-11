@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Wrench, Truck, Users, TrendingUp, CheckCircle2, AlertTriangle, Gauge } from 'lucide-react';
+import { Wrench, Truck, Users, TrendingUp, CircleCheck, TriangleAlert, Gauge } from 'lucide-react';
 import CompanyDriverIssues from './CompanyDriverIssues';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
@@ -55,7 +55,7 @@ export default function MaintenancePage({ trucks }: Props) {
                   {maint ? <Wrench className="h-5 w-5" /> : <Truck className="h-5 w-5" />}
                 </span>
                 <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ${maint ? 'bg-orange-50 text-orange-700 ring-orange-200' : 'bg-emerald-50 text-emerald-700 ring-emerald-200'}`}>
-                  {maint ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                  {maint ? <TriangleAlert className="h-3 w-3" /> : <CircleCheck className="h-3 w-3" />}
                   {maint ? 'In Maintenance' : 'Healthy'}
                 </span>
               </div>

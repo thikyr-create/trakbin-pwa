@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import { Building2, Users, Truck, Inbox, Activity, AlertTriangle, ArrowUpRight, Wallet } from 'lucide-react';
+import { Building2, Users, Truck, Inbox, Activity, TriangleAlert, ArrowUpRight, Wallet } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { formatNaira } from '@/lib/utils/money';
 import DispatchPlanner from './dispatch/DispatchPlanner';
@@ -34,7 +34,7 @@ export default function OverviewPage({ trucks, drivers, buildings, collections, 
     { Icon: Truck, label: 'Fleet on road', value: onRoad, page: 'fleet', tone: 'text-violet-600 bg-violet-50 ring-violet-100', live: onRoad > 0 },
     { Icon: Inbox, label: 'Pending requests', value: serviceRequests.length, page: 'service-requests', tone: 'text-amber-600 bg-amber-50 ring-amber-100', pulse: serviceRequests.length > 0 },
     { Icon: Activity, label: 'Collections this month', value: collectionsThisMonth.length, page: 'analytics', tone: 'text-emerald-600 bg-emerald-50 ring-emerald-100' },
-    { Icon: AlertTriangle, label: 'Open issues', value: openIssues.length, page: 'issues', tone: 'text-rose-600 bg-rose-50 ring-rose-100', pulse: openIssues.length > 0 },
+    { Icon: TriangleAlert, label: 'Open issues', value: openIssues.length, page: 'issues', tone: 'text-rose-600 bg-rose-50 ring-rose-100', pulse: openIssues.length > 0 },
   ];
 
   return (

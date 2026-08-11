@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
-import { X, Landmark, Plus, AlertCircle, ShieldCheck, ArrowUpRight, Info } from 'lucide-react';
+import { X, Landmark, Plus, CircleAlert, ShieldCheck, ArrowUpRight, Info } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { formatNaira } from '@/lib/utils/money';
 import CompanyRecipientSheet from './CompanyRecipientSheet';
@@ -118,7 +118,7 @@ export default function PayoutRequestSheet({ open, onClose }: Props) {
                       )}
                     </div>
 
-                    {error && <p className="flex items-center gap-2 text-xs font-bold text-rose-600"><AlertCircle className="h-4 w-4" /> {error}</p>}
+                    {error && <p className="flex items-center gap-2 text-xs font-bold text-rose-600"><CircleAlert className="h-4 w-4" /> {error}</p>}
                   </div>
                 )}
               </div>

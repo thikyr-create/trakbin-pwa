@@ -5,7 +5,7 @@ import { motion, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   Wallet, ArrowUpRight, Clock, TrendingUp, Landmark, Plus, ShieldCheck,
-  Activity, Receipt, CheckCircle2, Loader2, XCircle, Radio, Zap, RotateCcw,
+  Activity, Receipt, CircleCheck, Loader2, CircleX, Radio, Zap, RotateCcw,
 } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { formatNaira, bpsToPercent } from '@/lib/utils/money';
@@ -264,7 +264,7 @@ export default function FinancePage({ onNavigateToBuildings }: FinancePageProps)
                         return (
                           <div key={s} className="flex flex-1 items-center gap-2">
                             <span className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${reached ? (failed ? 'bg-rose-500' : 'bg-emerald-500') : 'bg-gray-200'}`}>
-                              {failed && idx === 0 ? <XCircle className="h-3 w-3 text-white" /> : reached ? <CheckCircle2 className="h-3 w-3 text-white" /> : <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                              {failed && idx === 0 ? <CircleX className="h-3 w-3 text-white" /> : reached ? <CircleCheck className="h-3 w-3 text-white" /> : <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                               {current && <span className="absolute h-5 w-5 animate-ping rounded-full bg-emerald-300/50" />}
                             </span>
                             {idx < STAGES.length - 1 && <span className={`h-0.5 flex-1 rounded-full ${reached && !failed ? 'bg-emerald-300' : 'bg-gray-200'}`} />}

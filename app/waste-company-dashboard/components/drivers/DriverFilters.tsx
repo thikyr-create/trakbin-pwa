@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { AlertTriangle } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { JetBrains_Mono } from "next/font/google";
 import { DRIVER_STATUS_OPTIONS } from "./DriverStatusBadge";
 
@@ -75,7 +75,7 @@ export default function DriverFilters({
             : "bg-white text-gray-600 ring-1 ring-gray-200 hover:ring-amber-300"
         } ${mono.className}`}
       >
-        <AlertTriangle size={12} />
+        <TriangleAlert size={12} />
         Open issues
         {issuesCount > 0 && (
           <span className="rounded-full bg-amber-200/70 px-1.5 text-[9px] text-amber-800">

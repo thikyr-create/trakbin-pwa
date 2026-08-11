@@ -6,7 +6,7 @@ import { motion, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   ArrowLeft, LogOut, Truck, CalendarClock, Clock, Calendar,
-  CheckCircle2, AlertCircle, XCircle, MapPin, Radio, ShieldCheck,
+  CircleCheck, CircleAlert, CircleX, MapPin, Radio, ShieldCheck,
   Activity, Signal,
 } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
@@ -25,19 +25,19 @@ const WEEK = [
 const todayKey = () => WEEK[new Date().getDay()].key;
 
 type StatusKey = 'live' | 'today' | 'pending' | 'delayed' | 'missed' | 'idle';
-const STATUS: Record<StatusKey, { label: string; chip: string; dot: string; Icon: typeof CheckCircle2 }> = {
-  live:    { label: 'On schedule',     chip: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30', dot: 'bg-emerald-300', Icon: CheckCircle2 },
+const STATUS: Record<StatusKey, { label: string; chip: string; dot: string; Icon: typeof CircleCheck }> = {
+  live:    { label: 'On schedule',     chip: 'bg-emerald-400/15 text-emerald-100 ring-emerald-300/30', dot: 'bg-emerald-300', Icon: CircleCheck },
   today:   { label: 'Due today',       chip: 'bg-sky-400/15 text-sky-100 ring-sky-300/30',             dot: 'bg-sky-300',     Icon: Clock },
   pending: { label: 'Schedule pending',chip: 'bg-amber-400/15 text-amber-100 ring-amber-300/30',       dot: 'bg-amber-300',   Icon: Radio },
-  delayed: { label: 'Delayed',         chip: 'bg-orange-400/15 text-orange-100 ring-orange-300/30',    dot: 'bg-orange-300',  Icon: AlertCircle },
-  missed:  { label: 'Missed',          chip: 'bg-rose-400/15 text-rose-100 ring-rose-300/30',          dot: 'bg-rose-300',    Icon: XCircle },
+  delayed: { label: 'Delayed',         chip: 'bg-orange-400/15 text-orange-100 ring-orange-300/30',    dot: 'bg-orange-300',  Icon: CircleAlert },
+  missed:  { label: 'Missed',          chip: 'bg-rose-400/15 text-rose-100 ring-rose-300/30',          dot: 'bg-rose-300',    Icon: CircleX },
   idle:    { label: 'Awaiting service',chip: 'bg-white/10 text-emerald-100/70 ring-white/15',          dot: 'bg-white/40',    Icon: Radio },
 };
 
-const rowHist: Record<string, { cls: string; Icon: typeof CheckCircle2 }> = {
-  completed: { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', Icon: CheckCircle2 },
-  skipped:   { cls: 'bg-amber-50 text-amber-700 ring-amber-200',       Icon: AlertCircle },
-  missed:    { cls: 'bg-rose-50 text-rose-700 ring-rose-200',          Icon: XCircle },
+const rowHist: Record<string, { cls: string; Icon: typeof CircleCheck }> = {
+  completed: { cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', Icon: CircleCheck },
+  skipped:   { cls: 'bg-amber-50 text-amber-700 ring-amber-200',       Icon: CircleAlert },
+  missed:    { cls: 'bg-rose-50 text-rose-700 ring-rose-200',          Icon: CircleX },
 };
 
 const factGrid: Variants = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } } };

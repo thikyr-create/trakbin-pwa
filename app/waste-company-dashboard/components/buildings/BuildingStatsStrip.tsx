@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Building2, CheckCircle2, Clock3, CreditCard } from "lucide-react";
+import { Building2, CircleCheck, Clock3, CreditCard } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { BuildingRecord } from "@/lib/features/buildings/services/buildingService";
 
@@ -25,7 +25,7 @@ export default function BuildingStatsStrip({ buildings }: BuildingStatsStripProp
 
     return [
       { Icon: Building2, label: "Buildings served", value: total, accent: "text-emerald-700", tile: "bg-emerald-50 text-emerald-600" },
-      { Icon: CheckCircle2, label: "Active", value: active, accent: "text-emerald-700", tile: "bg-emerald-50 text-emerald-600" },
+      { Icon: CircleCheck, label: "Active", value: active, accent: "text-emerald-700", tile: "bg-emerald-50 text-emerald-600" },
       { Icon: Clock3, label: "Pending", value: pending, accent: "text-amber-700", tile: "bg-amber-50 text-amber-600" },
       { Icon: CreditCard, label: "Not paid", value: unpaid, accent: "text-red-700", tile: "bg-red-50 text-red-600" },
     ];

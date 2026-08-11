@@ -1,5 +1,5 @@
 // lib/features/driver-console/constants/console.ts
-import { Map, List, TrendingUp, Activity, MoreHorizontal } from 'lucide-react';
+import { Map, List, TrendingUp, Activity, Ellipsis } from 'lucide-react';
 import type { ConsoleTab } from '../types/console';
 
 export const CONSOLE_TABS: { id: ConsoleTab; label: string; icon: typeof Map }[] = [
@@ -7,7 +7,7 @@ export const CONSOLE_TABS: { id: ConsoleTab; label: string; icon: typeof Map }[]
   { id: 'stops', label: 'Stops', icon: List },
   { id: 'progress', label: 'Progress', icon: TrendingUp },
   { id: 'activity', label: 'Activity', icon: Activity },
-  { id: 'more', label: 'More', icon: MoreHorizontal },
+  { id: 'more', label: 'More', icon: Ellipsis },
 ];
 
 export const CONSOLE_TOKENS = {

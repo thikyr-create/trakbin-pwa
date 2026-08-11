@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef,useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Trash2, Camera, MapPin, CheckCircle2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Trash2, Camera, MapPin, CircleCheck, Upload, X } from 'lucide-react';
 import { useCaretakerSession } from '@/lib/store/useCaretakerSession';
 import { createClient } from '@supabase/supabase-js';
 
