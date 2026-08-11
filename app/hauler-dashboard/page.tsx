@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 import TopBar from './components/console/TopBar';
-import SearchPauseBar from './components/console/SearchPauseBar';
 import BottomTabBar from './components/console/BottomTabBar';
 import MapScreen from './screens/MapScreen';
 import StopsScreen from './screens/StopsScreen';
@@ -22,7 +21,6 @@ import NotificationsSheet from './components/console/NotificationsSheet';
 import SearchScreen from './components/console/SearchScreen';
 
 const HEADER_H = 60; // px — matches TopBar content height
-const TABBAR_H = 72; // px — matches BottomTabBar height
 
 export default function HaulerDashboard() {
   const { initializeSession, startGpsTracking } = useDriverSession();
@@ -53,9 +51,6 @@ export default function HaulerDashboard() {
         {activeTab === 'progress' && <ProgressScreen />}
         {activeTab === 'activity' && <ActivityScreen />}
         {activeTab === 'more' && <MoreScreen />}
-
-        {/* Search/pause overlays the map only */}
-        {activeTab === 'map' && <SearchPauseBar headerHeight={HEADER_H} />}
       </main>
 
       {/* ── Fixed bottom navigation ── */}
@@ -66,14 +61,14 @@ export default function HaulerDashboard() {
         <BottomTabBar />
       </nav>
 
-      {/* Global modals/sheets — unchanged */}
+      {/* Global modals/sheets — mounted once, survive screen/tab changes */}
       <SkipReasonModal />
       <DriverReportModal />
       <DeviationAlert />
       <EndShiftModal />
       <PauseReasonModal />
       <NotificationsSheet />
-            <SearchScreen />
+      <SearchScreen />
       <EvidenceCapture
         open={evidence.open}
         onClose={closeEvidence}
