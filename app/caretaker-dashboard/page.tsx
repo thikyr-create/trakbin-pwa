@@ -89,9 +89,11 @@ export default function CaretakerDashboard() {
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
   if (!building) return null;
-  const isActive = !!activeAssignment && !!companyProfile;
+    const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
-  const assignedCompany = !!building?.company_id;
+  // A building counts as assigned if company_id is set OR there's an active assignment row
+  // (repairs past activations that failed to update Buildings.company_id due to race/policy)
+  const assignedCompany = !!building?.company_id || !!activeAssignment;
   const autopayOn = !!building?.autopay_enabled;
   const provider = companyProfile?.business_name || 'your waste provider';
   const needsPay = false; // billing surfaces its own state; no dot needed here

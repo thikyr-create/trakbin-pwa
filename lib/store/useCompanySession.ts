@@ -221,19 +221,29 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
-      const { data: request } = await supabase.from('service_requests').select('building_id').eq('id', requestId).single();
+      // Fetch request WITH company_id so we can tell targeted vs opportunistic
+      const { data: request } = await supabase
+        .from('service_requests')
+        .select('building_id, company_id')
+        .eq('id', requestId)
+        .single();
       if (!request) throw new Error('Request not found');
 
-      // ZONE GATE: a company may only accept buildings inside its defined coverage
-      const [{ data: buildingRow }, { data: myZones }] = await Promise.all([
-        supabase.from('Buildings').select('custom_id, latitude, longitude, estate, address').eq('custom_id', request.building_id).maybeSingle(),
-        supabase.from('company_zones').select('id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active').eq('company_id', cid).neq('is_active', false),
-      ]);
+      // Targeted = pre-assigned to this company by dispatch/system — already vetted, no re-check
+      const isTargeted = request.company_id === cid;
 
-      const coverage = buildingRow ? resolveBuildingZone(buildingRow as any, (myZones || []) as any) : null;
-      if (!coverage || coverage.confidence === 'low') {
-        get().addNotification('❌ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
-        return;
+      // ZONE GATE: hard-block only opportunistic (company_id IS NULL) requests
+      if (!isTargeted) {
+        const [{ data: buildingRow }, { data: myZones }] = await Promise.all([
+          supabase.from('Buildings').select('custom_id, latitude, longitude, estate, address').eq('custom_id', request.building_id).maybeSingle(),
+          supabase.from('company_zones').select('id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active').eq('company_id', cid).neq('is_active', false),
+        ]);
+
+        const coverage = buildingRow ? resolveBuildingZone(buildingRow as any, (myZones || []) as any) : null;
+        if (!coverage || coverage.confidence === 'low') {
+          get().addNotification('❌ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
+          return;
+        }
       }
 
       const now = new Date().toISOString();

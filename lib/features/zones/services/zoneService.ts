@@ -315,12 +315,15 @@ export async function createZone(
     addresses?: string[];
   }
 ): Promise<{ ok: boolean; error?: string; duplicate?: { zoneId: string; zoneName: string } }> {
-  // Check for duplicate zone name
+  // Normalize: trim on both check AND insert so "Zone 12 " and "Zone 12" collide
+  const trimmedName = payload.zone_name.trim();
+  if (!trimmedName) return { ok: false, error: 'zone_name_required' };
+
   const { data: existing } = await supabase
     .from('company_zones')
     .select('id, zone_name')
     .eq('company_id', company_id)
-    .ilike('zone_name', payload.zone_name.trim())
+    .ilike('zone_name', trimmedName)
     .maybeSingle();
 
   if (existing) {
@@ -334,7 +337,7 @@ export async function createZone(
   const { error } = await supabase.from('company_zones').insert([
     {
       company_id,
-      zone_name: payload.zone_name,
+      zone_name: trimmedName,
       center_lat: payload.center_lat ?? null,
       center_lng: payload.center_lng ?? null,
       radius_km: payload.radius_km ?? null,
@@ -438,10 +441,14 @@ export async function setAutoAssignFlag(
   return { ok: true };
 }
 
-/** Merge new coverage details into an existing zone (union, never overwrite). */
+/**
+ * Merge new coverage details into an existing zone (union, never overwrite).
+ * Optional: caller can also rename the zone — cascades to service_assignments.zone_id.
+ */
 export async function mergeIntoZone(
   zone_id: string,
   payload: {
+    zone_name?: string;
     center_lat?: number | null;
     center_lng?: number | null;
     radius_km?: number | null;
@@ -469,6 +476,27 @@ export async function mergeIntoZone(
   if (payload.center_lat != null) patch.center_lat = payload.center_lat;
   if (payload.center_lng != null) patch.center_lng = payload.center_lng;
   if (payload.radius_km != null) patch.radius_km = payload.radius_km;
+
+  // Rename support: cascade to service_assignments.zone_id (which stores the name string)
+  if (payload.zone_name && payload.zone_name.trim() && payload.zone_name.trim() !== zone.zone_name) {
+    const newName = payload.zone_name.trim();
+    // Collision check
+    const { data: collision } = await supabase
+      .from('company_zones')
+      .select('id')
+      .eq('company_id', zone.company_id)
+      .ilike('zone_name', newName)
+      .maybeSingle();
+    if (collision) return { ok: false, error: 'zone_name_exists' };
+
+    const { error: assignErr } = await supabase
+      .from('service_assignments')
+      .update({ zone_id: newName })
+      .eq('zone_id', zone.zone_name)
+      .eq('company_id', zone.company_id);
+    if (assignErr) return { ok: false, error: 'Could not re-point assignments: ' + assignErr.message };
+    patch.zone_name = newName;
+  }
 
   const { error } = await supabase.from('company_zones').update(patch).eq('id', zone_id);
   if (error) return { ok: false, error: error.message };
