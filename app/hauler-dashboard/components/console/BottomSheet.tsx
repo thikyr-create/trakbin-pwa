@@ -3,26 +3,27 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronDown, Camera, SkipForward, Flag, MapPin, Package, DollarSign, Building2, Pause, Play, Search } from 'lucide-react';
+import { ChevronDown, Camera, SkipForward, Flag, MapPin, Package, DollarSign, Building2, Pause, Play } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 import { calculateDistanceInMeters } from '../../utils/geo';
 import NextStopCard from './NextStopCard';
 
-const VISIBLE_ACTIVE = 272;  // handle + next-stop card + pause button
-const VISIBLE_IDLE = 176;    // handle + idle card + search button
+const VISIBLE_ACTIVE = 272; // handle + next-stop card + pause button
+const VISIBLE_IDLE = 44;    // handle + peek — drag up to reveal
 
 export default function BottomSheet() {
   const {
     currentStop, isArrived, isRoutePaused, gpsLocation,
     completePickup, setShowSkipModal, setShowReportModal, toggleRoutePause,
   } = useDriverSession();
-  const { sheetState, setSheetState, openEvidence, setPauseModalOpen, setSearchOpen } = useConsoleStore();
+  const { sheetState, setSheetState, openEvidence, setPauseModalOpen } = useConsoleStore();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [collapsedY, setCollapsedY] = useState(300);
 
   const mode: 'idle' | 'paused' | 'active' = !currentStop ? 'idle' : isRoutePaused ? 'paused' : 'active';
-  const visiblePx = mode === 'active' ? VISIBLE_ACTIVE : VISIBLE_IDLE;
+  // paused stays fully visible (critical state); idle collapses to a grab bar; active shows the task card
+  const visiblePx = mode === 'active' ? VISIBLE_ACTIVE : mode === 'idle' ? VISIBLE_IDLE : 9999;
 
   useLayoutEffect(() => {
     const h = sheetRef.current?.offsetHeight ?? 0;
@@ -71,30 +72,24 @@ export default function BottomSheet() {
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
       className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-200 will-change-transform"
     >
+      {/* Drag handle — always a drag source */}
       <div className="w-full flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
         <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
       </div>
 
+      {/* When expanded, inner scroll owns the pointer; when collapsed, whole sheet drags */}
       <div
         className="px-5 pb-5 overflow-y-auto max-h-[58vh]"
         onPointerDown={sheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
       >
         {mode === 'idle' && (
           /* ── Off shift: always-visible idle surface ── */
-          <div className="space-y-2">
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-400 shrink-0" />
-              <div>
-                <p className="text-sm font-black text-gray-800">Off shift</p>
-                <p className="text-xs text-gray-500">No active stop. Your next stop appears here when dispatch assigns a route.</p>
-              </div>
+          <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-gray-400 shrink-0" />
+            <div>
+              <p className="text-sm font-black text-gray-800">Off shift</p>
+              <p className="text-xs text-gray-500">No active stop. Your next stop appears here when dispatch assigns a route.</p>
             </div>
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-white text-gray-700 border border-gray-200 font-bold rounded-xl text-sm uppercase active:scale-95 transition-all"
-            >
-              <Search size={16} /> Search places
-            </button>
           </div>
         )}
 
@@ -117,7 +112,7 @@ export default function BottomSheet() {
           </div>
         )}
 
-                {mode === 'active' && currentStop && (
+        {mode === 'active' && currentStop && (
           /* ── Active: Navigate / Confirm Pickup / Pause ── */
           <>
             <NextStopCard
