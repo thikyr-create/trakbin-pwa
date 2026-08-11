@@ -15,6 +15,7 @@ export default function RootLayout({
 
   // Hide the public "Login/Join" navbar on all dashboard and auth pages
     const hideNavbar = 
+    pathname === '/' ||
     pathname?.startsWith('/admin-dashboard') || 
     pathname?.startsWith('/admin') ||
     pathname?.startsWith('/government-portal') || 
