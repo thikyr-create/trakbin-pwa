@@ -15,12 +15,14 @@ interface ConsoleState {
   selectedStopId: string | null;
   evidence: EvidenceModalState;
   pauseModalOpen: boolean;
+  notifOpen: boolean;
   setActiveTab: (tab: ConsoleTab) => void;
   setSheetState: (state: SheetState) => void;
   setSelectedStopId: (id: string | null) => void;
   openEvidence: (type: EvidenceModalState['type'], buildingId: string | null, label: string) => void;
   closeEvidence: () => void;
   setPauseModalOpen: (open: boolean) => void;
+  setNotifOpen: (open: boolean) => void;
 }
 
 export const useConsoleStore = create<ConsoleState>((set) => ({
@@ -29,10 +31,12 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
   selectedStopId: null,
   evidence: { open: false, type: 'pickup', buildingId: null, label: '' },
   pauseModalOpen: false,
+  notifOpen: false,
   setActiveTab: (tab) => set({ activeTab: tab }),
   setSheetState: (state) => set({ sheetState: state }),
   setSelectedStopId: (id) => set({ selectedStopId: id }),
   openEvidence: (type, buildingId, label) => set({ evidence: { open: true, type, buildingId, label } }),
   closeEvidence: () => set((s) => ({ evidence: { ...s.evidence, open: false } })),
   setPauseModalOpen: (open) => set({ pauseModalOpen: open }),
+  setNotifOpen: (open) => set({ notifOpen: open }),
 }));

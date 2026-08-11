@@ -3,15 +3,23 @@
 
 import { Menu, Bell, LogOut } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
+import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
+import { useDriverNotifications } from '@/lib/features/driver-console/hooks/useDriverNotifications';
 
 export default function TopBar() {
   const { route, isRoutePaused } = useDriverSession();
+  const { setActiveTab, setNotifOpen } = useConsoleStore();
+  const { unread } = useDriverNotifications();
   const onShift = !!route && route.status !== 'completed';
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
+    <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm">
       <div className="flex items-center gap-3">
-        <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+        <button
+          onClick={() => setActiveTab('more')}
+          className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          title="Menu"
+        >
           <Menu size={22} className="text-gray-700" />
         </button>
         <div
@@ -33,8 +41,17 @@ export default function TopBar() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors relative">
+        <button
+          onClick={() => setNotifOpen(true)}
+          className="relative p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          title="Notifications"
+        >
           <Bell size={20} className="text-gray-700" />
+          {unread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
         </button>
         <button
           onClick={() => {

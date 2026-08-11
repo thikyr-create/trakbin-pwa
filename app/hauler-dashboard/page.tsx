@@ -18,6 +18,7 @@ import DeviationAlert from './components/DeviationAlert';
 import EndShiftModal from './components/EndShiftModal';
 import EvidenceCapture from './components/EvidenceCapture';
 import PauseReasonModal from './components/console/PauseReasonModal';
+import NotificationsSheet from './components/console/NotificationsSheet';
 
 export default function HaulerDashboard() {
   const { initializeSession, startGpsTracking } = useDriverSession();
@@ -46,6 +47,7 @@ export default function HaulerDashboard() {
 
       {/* Global modals — mounted once, survive screen/tab changes */}
       <SkipReasonModal />
+      <NotificationsSheet />
       <DriverReportModal />
       <DeviationAlert />
       <PauseReasonModal />
