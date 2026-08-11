@@ -31,7 +31,7 @@ export default function ActivityScreen() {
   }, [events]);
 
   return (
-    <div className="absolute inset-0 bg-gray-50 pt-16 pb-20 overflow-y-auto">
+    <div className="absolute inset-0 bg-gray-50 overflow-y-auto">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black text-gray-900">Activity</h2>

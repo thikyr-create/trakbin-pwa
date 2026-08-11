@@ -19,7 +19,7 @@ export default function StopsScreen() {
 
   if (!route) {
     return (
-      <div className="absolute inset-0 bg-gray-50 pt-16 pb-20 flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-gray-50 flex items-center justify-center p-6">
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-gray-200">
             <Package size={26} className="text-gray-500" />
@@ -32,7 +32,7 @@ export default function StopsScreen() {
   }
 
   return (
-    <div className="absolute inset-0 bg-gray-50 pt-16 pb-20 overflow-y-auto">
+    <div className="absolute inset-0 bg-gray-50 overflow-y-auto">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black text-gray-900">Stops</h2>

@@ -20,6 +20,9 @@ import EvidenceCapture from './components/EvidenceCapture';
 import PauseReasonModal from './components/console/PauseReasonModal';
 import NotificationsSheet from './components/console/NotificationsSheet';
 
+const HEADER_H = 60; // px — matches TopBar content height
+const TABBAR_H = 72; // px — matches BottomTabBar height
+
 export default function HaulerDashboard() {
   const { initializeSession, startGpsTracking } = useDriverSession();
   const { activeTab, evidence, closeEvidence } = useConsoleStore();
@@ -30,28 +33,45 @@ export default function HaulerDashboard() {
   }, []);
 
   return (
-    <div className="relative h-screen w-full bg-gray-50 overflow-hidden">
-      {activeTab === 'map' && (
-        <>
-          <MapScreen />
-          <SearchPauseBar />
-        </>
-      )}
-      {activeTab === 'stops' && <StopsScreen />}
-      {activeTab === 'progress' && <ProgressScreen />}
-      {activeTab === 'activity' && <ActivityScreen />}
-      {activeTab === 'more' && <MoreScreen />}
+    <div
+      className="relative w-full overflow-hidden bg-gray-50 flex flex-col"
+      style={{ height: 'var(--app-h, 100dvh)' }}
+    >
+      {/* ── Fixed header ── */}
+      <header
+        className="relative z-30 shrink-0 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm"
+        style={{ height: HEADER_H, paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <TopBar />
+      </header>
 
-      <TopBar />
-      <BottomTabBar />
+      {/* ── Flexible main viewport (map gets exactly the leftover space) ── */}
+      <main className="relative flex-1 min-h-0 overflow-hidden">
+        {activeTab === 'map' && <MapScreen />}
+        {activeTab === 'stops' && <StopsScreen />}
+        {activeTab === 'progress' && <ProgressScreen />}
+        {activeTab === 'activity' && <ActivityScreen />}
+        {activeTab === 'more' && <MoreScreen />}
 
-      {/* Global modals — mounted once, survive screen/tab changes */}
+        {/* Search/pause overlays the map only */}
+        {activeTab === 'map' && <SearchPauseBar headerHeight={HEADER_H} />}
+      </main>
+
+      {/* ── Fixed bottom navigation ── */}
+      <nav
+        className="relative z-40 shrink-0 bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <BottomTabBar />
+      </nav>
+
+      {/* Global modals/sheets — unchanged */}
       <SkipReasonModal />
-      <NotificationsSheet />
       <DriverReportModal />
       <DeviationAlert />
-      <PauseReasonModal />
       <EndShiftModal />
+      <PauseReasonModal />
+      <NotificationsSheet />
       <EvidenceCapture
         open={evidence.open}
         onClose={closeEvidence}

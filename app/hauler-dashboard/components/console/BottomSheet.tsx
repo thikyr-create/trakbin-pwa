@@ -68,7 +68,7 @@ export default function BottomSheet() {
       initial={false}
       animate={{ y: sheetState === 'collapsed' ? collapsedY : 0 }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="absolute bottom-[72px] left-0 right-0 z-20 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-200 will-change-transform"
+      className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-200 will-change-transform"
     >
       {/* Drag handle — always a drag source */}
       <div className="w-full flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">

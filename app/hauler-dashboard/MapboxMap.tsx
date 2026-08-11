@@ -29,7 +29,7 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const stopMarkersRef = useRef<mapboxgl.Marker[]>([]);
 
-  const { routeStops, cameraMode, targetLocation, gpsLocation, highlightedNodeId, flyToLocation } = useDriverSession();
+  const { routeStops, cameraMode, targetLocation, gpsLocation, highlightedNodeId } = useDriverSession();
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -60,6 +60,22 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     if (onMapReady) onMapReady(map);
 
     return () => { map.remove(); mapRef.current = null; };
+  }, []);
+
+  // Recalculate canvas when the visible viewport changes (Safari chrome, orientation)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const resize = () => map.resize();
+    const onOrientation = () => setTimeout(resize, 150);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', onOrientation);
+    window.addEventListener('resize', resize);
+    return () => {
+      if (window.visualViewport) window.visualViewport.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', onOrientation);
+      window.removeEventListener('resize', resize);
+    };
   }, []);
 
   const drawRoute = () => {
