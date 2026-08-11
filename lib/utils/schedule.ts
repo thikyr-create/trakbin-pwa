@@ -3,12 +3,27 @@
 // can never disagree. Pure + tested-by-construction; no Supabase here.
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+const ABBREV_TO_FULL: Record<string, string> = {
+  sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
+  thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
+};
 
 /** Accept either a TEXT[] (service_assignments.pickup_days) or a comma
- *  string (collection_schedules.pickup_day) and return clean weekday names. */
+ *  string (collection_schedules.pickup_day) and return clean weekday names.
+ *  Normalizes abbreviations (Mon → Monday) so every consumer agrees. */
 export function parseDays(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.map((d) => String(d).trim()).filter(Boolean);
-  if (typeof raw === 'string' && raw.trim()) return raw.split(',').map((d) => d.trim()).filter(Boolean);
+  if (Array.isArray(raw)) {
+    return raw.map((d) => {
+      const trimmed = String(d).trim().toLowerCase();
+      return ABBREV_TO_FULL[trimmed] || trimmed;
+    }).filter(Boolean);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.split(',').map((d) => {
+      const trimmed = d.trim().toLowerCase();
+      return ABBREV_TO_FULL[trimmed] || trimmed;
+    }).filter(Boolean);
+  }
   return [];
 }
 

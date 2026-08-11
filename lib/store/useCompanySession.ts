@@ -215,13 +215,12 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     } catch (e: any) { return { ok: false, error: e?.message }; }
   },
 
-  activateService: async (requestId, zoneId, scheduleData) => {
+    activateService: async (requestId, zoneId, scheduleData) => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     const { data: haulerRow } = await supabase.from('haulers').select('*').eq('id', cid).maybeSingle();
     if (haulerRow && !canOperate(haulerRow)) { get().addNotification('Confirm your email and complete your profile before accepting buildings.', 'warning'); return; }
     try {
-      // Fetch request WITH company_id so we can tell targeted vs opportunistic
       const { data: request } = await supabase
         .from('service_requests')
         .select('building_id, company_id')
@@ -229,16 +228,13 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         .single();
       if (!request) throw new Error('Request not found');
 
-      // Targeted = pre-assigned to this company by dispatch/system — already vetted, no re-check
       const isTargeted = request.company_id === cid;
 
-      // ZONE GATE: hard-block only opportunistic (company_id IS NULL) requests
       if (!isTargeted) {
         const [{ data: buildingRow }, { data: myZones }] = await Promise.all([
           supabase.from('Buildings').select('custom_id, latitude, longitude, estate, address').eq('custom_id', request.building_id).maybeSingle(),
           supabase.from('company_zones').select('id, zone_name, center_lat, center_lng, radius_km, polygon, estates, streets, addresses, is_active').eq('company_id', cid).neq('is_active', false),
         ]);
-
         const coverage = buildingRow ? resolveBuildingZone(buildingRow as any, (myZones || []) as any) : null;
         if (!coverage || coverage.confidence === 'low') {
           get().addNotification('❌ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
@@ -246,24 +242,44 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         }
       }
 
+      // zone_id is a NAME-keyed join column everywhere else — normalize UUID → name here
+      const { data: zoneRow } = await supabase
+        .from('company_zones')
+        .select('zone_name')
+        .eq('id', zoneId)
+        .maybeSingle();
+      const zoneKey = zoneRow?.zone_name ?? zoneId;
+
       const now = new Date().toISOString();
       await supabase.from('service_requests').update({ status: 'activated', company_id: cid, activated_at: now }).eq('id', requestId);
-      await supabase.from('service_assignments').insert([{ building_id: request.building_id, company_id: cid, zone_id: zoneId, schedule_template: scheduleData.frequency, pickup_days: scheduleData.days, time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now }]);
-      await supabase.from('collection_schedules').insert([{ company_id: cid, building_id: request.building_id, frequency: scheduleData.frequency, pickup_day: scheduleData.days.join(', '), time_window: scheduleData.timeWindow, is_active: true }]);
+      await supabase.from('service_assignments').insert([{ building_id: request.building_id, company_id: cid, zone_id: zoneKey, schedule_template: scheduleData.frequency, pickup_days: scheduleData.days, time_window: scheduleData.timeWindow, service_status: 'active', activated_at: now }]);
+            // Compute next_pickup_date from the pickup days
+      const { nextPickupFromDays, parseDays } = require('@/lib/utils/schedule');
+      const parsedDays = parseDays(scheduleData.days);
+      const nextPickup = nextPickupFromDays(parsedDays);
+      const nextPickupDate = nextPickup ? nextPickup.date.toISOString().split('T')[0] : null;
+
+      const { error: schedError } = await supabase.from('collection_schedules').insert([{
+        company_id: cid,
+        building_id: request.building_id,
+        frequency: scheduleData.frequency,
+        next_pickup_date: nextPickupDate,
+        time_window: scheduleData.timeWindow,
+        status: 'active',
+      }]);
+      if (schedError) console.warn('collection_schedules insert failed:', schedError.message);
       await supabase.from('Buildings').update({ company_id: cid, status: 'active' }).eq('custom_id', request.building_id);
       const { data: hauler } = await supabase.from('haulers').select('contact_number').eq('id', cid).maybeSingle();
-      await supabase.from('company_profiles').upsert({ id: cid, contact_numbers:hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
+      await supabase.from('company_profiles').upsert({ id: cid, contact_numbers: hauler?.contact_number ? [{ type: 'call', label: 'Main Line', value: hauler.contact_number }] : [] }, { onConflict: 'id', ignoreDuplicates: true });
       await supabase.from('environmental_issue_history').insert([{ issue_id: null, action: 'SERVICE_ACTIVATED', performed_by: `company_${cid}`, metadata: { request_id: requestId, building_id: request.building_id } }]);
       get().addDispatchEvent({ type: 'service_activated', truck_id: 'N/A', driver_name: 'System', building_id: request.building_id, message: `Service activated for building ${request.building_id}` });
 
-      // EVENT BUS: broadcast activation to all engines
       ServicePublisher.publish('SERVICE_ACTIVATED', { buildingId: request.building_id, companyId: cid });
       BuildingPublisher.publish('BUILDING_UPDATED', { buildingId: request.building_id });
 
       await get().fetchServiceRequests(); get().setIsDrawerOpen(false); get().addNotification('Service activated successfully!', 'success');
     } catch (e) { console.error('Activation failed:', e); get().addNotification('Failed to activate service.', 'error'); }
   },
-
   updateTruckStatus: (truckId, status) => set((s) => ({ trucks: s.trucks.map((t)=> (t.id === truckId ? { ...t, status } : t)) })),
   addDispatchEvent: (event) => { const e: DispatchEvent = { ...event, id: `event-${Date.now()}`, timestamp: new Date().toISOString() }; set((s) => ({ dispatchTimeline: [e, ...s.dispatchTimeline].slice(0, 100) })); },
   addNotification: (message, type) => { const n = { id: `notif-${Date.now()}`, message, timestamp: new Date().toISOString(), type }; set((s) => ({ activeNotifications: [n, ...s.activeNotifications].slice(0, 10) })); setTimeout(() => get().clearNotification(n.id), 5000); },
