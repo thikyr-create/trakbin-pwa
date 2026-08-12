@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Trakbin</string>
+    <string name="title_activity_main">Trakbin</string>
+    <string name="package_name">com.trakbin.app</string>
+    <string name="custom_url_scheme">com.trakbin.app</string>
+</resources>

@@ -1,8 +1,10 @@
+// app/layout.tsx
 "use client";
 
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { usePathname } from "next/navigation";
+import NativeSplashGate from "./components/NativeSplashGate";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -14,21 +16,23 @@ export default function RootLayout({
   const pathname = usePathname();
 
   // Hide the public "Login/Join" navbar on all dashboard and auth pages
-    const hideNavbar = 
+  const hideNavbar =
     pathname === '/' ||
-    pathname?.startsWith('/admin-dashboard') || 
+    pathname?.startsWith('/admin-dashboard') ||
     pathname?.startsWith('/admin') ||
-    pathname?.startsWith('/government-portal') || 
+    pathname?.startsWith('/government-portal') ||
     pathname?.startsWith('/government') ||
-    pathname?.startsWith('/waste-company-dashboard') || 
-    pathname?.startsWith('/hauler-dashboard') || 
+    pathname?.startsWith('/waste-company-dashboard') ||
+    pathname?.startsWith('/hauler-dashboard') ||
     pathname?.startsWith('/caretaker-dashboard') ||
     pathname?.startsWith('/auth');
 
   return (
     <html lang="en">
       <body className={inter.className}>
-        
+        {/* Native splash dismissal — renders nothing, no-op on web */}
+        <NativeSplashGate />
+
         {/* ONLY SHOW THE PUBLIC NAVBAR IF WE ARE NOT ON A DASHBOARD */}
         {!hideNavbar && (
           <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
