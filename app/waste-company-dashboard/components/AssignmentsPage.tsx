@@ -88,15 +88,17 @@ export default function AssignmentsPage() {
   const driver = drivers.find((d) => d.id === driverId);
   const truck = trucks.find((t) => t.id === truckId);
 
-  const assign = async () => {
+    const assign = async () => {
     if (!cid) return;
     setSaving(true);
-    // Use the preview's optimized ordering (legacy shape for AssignmentEngine)
     const selectedStops = preview.ordered.map((s) => ({
       building_id: s.buildingId,
       lat: s.latitude,
       lng: s.longitude,
     }));
+    // Coerce to string: Supabase bigint (number) vs DOM option value (string)
+    const driver = drivers.find((d) => String(d.id) === String(driverId));
+    const truck = trucks.find((t) => String(t.id) === String(truckId));
     const res = await AssignmentEngine.assign({ companyId: cid, driver, truck, stops: selectedStops, assignedBy: 'dispatcher' });
     setSaving(false);
     if (!res.ok) { addNotification(res.errors?.join(' ') || 'Could not assign.', 'error'); return; }
