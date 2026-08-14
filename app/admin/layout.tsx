@@ -6,34 +6,13 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
-import {
-  LayoutGrid, Building2, Network, CreditCard, Wallet, BookOpen,
-  Crown, Eye, Mail, CheckSquare, Users, BarChart3, Activity, Shield,
-  Settings, LogOut, Radio,
-} from 'lucide-react';
+import { LogOut, Radio, Shield } from 'lucide-react';
+import { ADMIN_NAV } from '@/lib/super-admin/config/navigation';
 import { useAdminSession } from '@/lib/store/useAdminSession';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
-
-export const ADMIN_NAV = [
-  { key: 'overview',     label: 'Overview',            href: '/admin',                    Icon: LayoutGrid },
-  { key: 'organizations',label: 'Organizations',       href: '/admin/organizations',      Icon: Building2 },
-  { key: 'network',      label: 'Network',             href: '/admin/network',            Icon: Network },
-  { key: 'payments',     label: 'Payments',            href: '/admin/payments',           Icon: CreditCard },
-  { key: 'settlements',  label: 'Settlements',         href: '/admin/settlements',        Icon: Wallet },
-    { key: 'ledger',       label: 'Financial Ledger',    href: '/admin/ledger',             Icon: BookOpen },
-  { key: 'subscriptions',label: 'Subscriptions',       href: '/admin/subscriptions',      Icon: Crown },
-  { key: 'field',        label: 'Field Intelligence',  href: '/admin/field-intelligence', Icon: Eye },
-  { key: 'comms',        label: 'Communications',      href: '/admin/communications',     Icon: Mail },
-  { key: 'approvals',    label: 'Approvals',           href: '/admin/approvals',          Icon: CheckSquare },
-  { key: 'users',        label: 'Users & Access',      href: '/admin/users',              Icon: Users },
-  { key: 'analytics',    label: 'Analytics',           href: '/admin/analytics',          Icon: BarChart3 },
-  { key: 'health',       label: 'Platform Health',     href: '/admin/health',             Icon: Activity },
-  { key: 'audit',        label: 'Audit & Governance',  href: '/admin/audit',              Icon: Shield },
-  { key: 'settings',     label: 'Settings',            href: '/admin/settings',           Icon: Settings },
-] as const;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -57,6 +36,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className={`${body.className} ${display.variable} ${mono.variable} relative min-h-screen bg-[#0c1411] text-gray-100`}>
+      {/* ambient field */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 opacity-[0.5]"
           style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.12) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
@@ -64,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <div className="relative z-10 flex min-h-screen">
+        {/* SIDEBAR — the 13 surfaces, config-driven */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-[#0a110e]/60 px-4 py-5 backdrop-blur lg:flex">
           <div className="mb-6 flex items-center gap-3 px-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500">
@@ -111,6 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </aside>
 
+        {/* MAIN */}
         <main className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0c1411]/80 backdrop-blur">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
