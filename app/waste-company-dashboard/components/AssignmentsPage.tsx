@@ -1,3 +1,4 @@
+// app/waste-company-dashboard/components/AssignmentsPage.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
@@ -85,10 +86,8 @@ export default function AssignmentsPage() {
   }, [eligible, selected]);
 
   const toggle = (id: string) => setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
-  const driver = drivers.find((d) => d.id === driverId);
-  const truck = trucks.find((t) => t.id === truckId);
 
-      const assign = async () => {
+  const assign = async () => {
     if (!cid) return;
     setSaving(true);
     try {
@@ -97,6 +96,7 @@ export default function AssignmentsPage() {
         lat: s.latitude,
         lng: s.longitude,
       }));
+      // Coerce to string: Supabase integer ids vs DOM option values (strings)
       const driver = drivers.find((d) => String(d.id) === String(driverId));
       const truck = trucks.find((t) => String(t.id) === String(truckId));
       if (!driver || !truck) { addNotification('Select a driver and a truck.', 'error'); return; }
@@ -109,7 +109,7 @@ export default function AssignmentsPage() {
     } catch (e: any) {
       addNotification(e?.message || 'Could not assign.', 'error');
     } finally {
-      setSaving(false);
+      setSaving(false); // spinner can never strand
     }
   };
 
@@ -177,8 +177,9 @@ export default function AssignmentsPage() {
         {assignments.length === 0 ? <p className="px-5 py-10 text-center text-sm font-semibold text-gray-400">No active assignments yet.</p> : (
           <ul className="divide-y divide-gray-100">
             {assignments.map((a) => {
-              const d = drivers.find((x) => x.id === a.driver_id);
-              const t = trucks.find((x) => x.id === a.truck_id);
+              // Coerce: drivers.id/trucks.id are integers, assignments.* is now text
+              const d = drivers.find((x) => String(x.id) === String(a.driver_id));
+              const t = trucks.find((x) => String(x.id) === String(a.truck_id));
               return (
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
@@ -190,12 +191,24 @@ export default function AssignmentsPage() {
                       <option value="">Reassign truck…</option>
                       {trkAvail.map((x) => (<option key={x.id} value={x.id}>{x.truck_id}</option>))}
                     </select>
-                    <button onClick={async () => { const nt = trucks.find((x) => x.id === reTruck[a.id]); if (nt) { await AssignmentEngine.reassignTruck(a.id, nt); addNotification(`Truck reassigned to ${nt.truck_id}`, 'success'); load(); } }} className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-gray-800"><RefreshCw className="h-3 w-3" /> Truck</button>
+                    <button onClick={async () => {
+                      const nt = trucks.find((x) => String(x.id) === String(reTruck[a.id]));
+                      if (!nt) return;
+                      const r = await AssignmentEngine.reassignTruck(a.id, nt);
+                      if (!r.ok) { addNotification(r.errors?.join(' ') || 'Reassign failed.', 'error'); return; }
+                      addNotification(`Truck reassigned to ${nt.truck_id}`, 'success'); load();
+                    }} className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-gray-800"><RefreshCw className="h-3 w-3" /> Truck</button>
                     <select value={reDriver[a.id] || ''} onChange={(e) => setReDriver((p) => ({ ...p, [a.id]: e.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-semibold outline-none">
                       <option value="">Reassign driver…</option>
                       {drvAvail.map((x) => (<option key={x.id} value={x.id}>{x.full_name}</option>))}
                     </select>
-                    <button onClick={async () => { const nd = drivers.find((x) => x.id === reDriver[a.id]); if (nd) { await AssignmentEngine.reassignDriver(a.id, nd); addNotification(`Driver reassigned to ${nd.full_name}`, 'success'); load(); } }} className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-gray-800"><RefreshCw className="h-3 w-3" /> Driver</button>
+                    <button onClick={async () => {
+                      const nd = drivers.find((x) => String(x.id) === String(reDriver[a.id]));
+                      if (!nd) return;
+                      const r = await AssignmentEngine.reassignDriver(a.id, nd);
+                      if (!r.ok) { addNotification(r.errors?.join(' ') || 'Reassign failed.', 'error'); return; }
+                      addNotification(`Driver reassigned to ${nd.full_name}`, 'success'); load();
+                    }} className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-gray-800"><RefreshCw className="h-3 w-3" /> Driver</button>
                   </div>
                 </li>
               );
