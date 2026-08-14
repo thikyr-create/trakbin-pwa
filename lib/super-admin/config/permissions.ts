@@ -25,3 +25,6 @@ export function can(role: PlatformRole | null | undefined, cap: PlatformCapabili
   if (!role) return false;
   return (MATRIX[role] || []).includes(cap);
 }
+export function capabilitiesFor(role: PlatformRole): PlatformCapability[] {
+  return MATRIX[role] || [];
+}
