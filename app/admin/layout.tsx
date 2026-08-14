@@ -48,11 +48,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => { loadTenantContext(); }, []);
 
-  const allowed = isAllowed(tenant.role);
+    const allowed = isAllowed(tenant.role);
 
-    useEffect(() => {
-    if (tenant.loaded && !allowed) router.replace('/admin/login');
-  }, [tenant.loaded, allowed, router]);
+  useEffect(() => {
+    if (tenant.loaded && !allowed && !pathname.startsWith('/admin/login')) {
+      router.replace('/admin/login');
+    }
+  }, [tenant.loaded, allowed, router, pathname]);
+
+  // Login page renders standalone — no shell, no gate
+  if (pathname.startsWith('/admin/login')) {
+    return <>{children}</>;
+  }
   if (!tenant.loaded) {
     return (
       <div className={`${body.className} flex min-h-screen items-center justify-center bg-[#0c1411]`}>
