@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
   Building2, Truck, Users, MapPin, ChevronDown, ChevronRight, Search,
-  ShieldCheck, Crown, Receipt, Wallet, Activity, Store,
+  ShieldCheck, Crown, Wallet, Activity, Store,
 } from 'lucide-react';
 import { useOrganizations } from '@/lib/super-admin/hooks/useOrganizations';
 
@@ -26,10 +26,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'agencies', label: 'Waste Agencies' },
   { key: 'verification', label: 'Verification' },
 ];
-
-function A7Tag() {
-  return <span className={`${mono.className} ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald-100/50`}>A7R</span>;
-}
 
 export default function AdminOrganizationsPage() {
   const { orgs, properties, verifications, loading, openId, profile, toggle } = useOrganizations();
@@ -88,7 +84,7 @@ export default function AdminOrganizationsPage() {
         </div>
       </div>
 
-      {/* ORGS (all + operators) */}
+      {/* ORGS */}
       {(tab === 'all' || tab === 'operators') && (
         <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
           className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03]">
@@ -130,40 +126,87 @@ export default function AdminOrganizationsPage() {
                             <motion.div className="h-6 w-6 rounded-full border-b-2 border-emerald-400" animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><ShieldCheck className="h-3 w-3" /> Status</p>
-                              <p className="mt-1 text-sm font-extrabold text-emerald-300">{profile.status}</p>
+                          <div className="space-y-5">
+                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Status</p>
+                                <p className="mt-1 text-sm font-extrabold text-emerald-300">{profile.status}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Users</p>
+                                <p className="mt-1 text-sm font-extrabold text-white">{profile.users}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Gross collected</p>
+                                <p className="mt-1 text-sm font-extrabold text-white">{formatN(profile.grossCollected)}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Net payable</p>
+                                <p className="mt-1 text-sm font-extrabold text-emerald-300">{formatN(profile.netPayable)}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Outstanding</p>
+                                <p className={`mt-1 text-sm font-extrabold ${profile.outstanding > 0 ? 'text-amber-300' : 'text-white'}`}>{formatN(profile.outstanding)}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Settled out</p>
+                                <p className="mt-1 text-sm font-extrabold text-white">{formatN(profile.settled)}</p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Plan / Subscription</p>
+                                <p className="mt-1 text-sm font-extrabold text-white">—<span className={`${mono.className} ml-1 text-[8px] uppercase text-emerald-100/50`}>lives in Subscriptions</span></p>
+                              </div>
+                              <div>
+                                <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Last activity</p>
+                                <p className="mt-1 text-sm font-extrabold text-white">
+                                  {profile.lastActivityAt ? new Date(profile.lastActivityAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' }) : '—'}
+                                </p>
+                              </div>
                             </div>
+
                             <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Crown className="h-3 w-3" /> Plan<A7Tag /></p>
-                              <p className="mt-1 text-sm font-extrabold text-white">—</p>
+                              <p className={`${mono.className} mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>Connected properties ({profile.connectedProperties.length})</p>
+                              {profile.connectedProperties.length === 0 ? <p className="text-xs font-semibold text-emerald-100/40">None connected.</p> : (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {profile.connectedProperties.slice(0, 12).map((p) => (
+                                    <span key={p.custom_id} className={`rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ${
+                                      p.payment_status === 'paid' ? 'bg-emerald-400/10 text-emerald-300 ring-emerald-300/30'
+                                      : p.payment_status === 'overdue' ? 'bg-rose-400/10 text-rose-300 ring-rose-300/30'
+                                      : 'bg-amber-400/10 text-amber-300 ring-amber-300/30'
+                                    }`}>{p.custom_id}</span>
+                                  ))}
+                                  {profile.connectedProperties.length > 12 && (
+                                    <span className="rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold text-emerald-100/50 ring-1 ring-white/10">+{profile.connectedProperties.length - 12} more</span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Crown className="h-3 w-3" /> Subscription<A7Tag /></p>
-                              <p className="mt-1 text-sm font-extrabold text-white">—</p>
-                            </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Users className="h-3 w-3" /> Users</p>
-                              <p className="mt-1 text-sm font-extrabold text-white">{profile.users}</p>
-                            </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Receipt className="h-3 w-3" /> Monthly fee<A7Tag /></p>
-                              <p className="mt-1 text-sm font-extrabold text-white">{formatN(0)}</p>
-                            </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Wallet className="h-3 w-3" /> Gross collected</p>
-                              <p className="mt-1 text-sm font-extrabold text-white">{formatN(profile.grossCollected)}</p>
-                            </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Wallet className="h-3 w-3" /> Net payable</p>
-                              <p className="mt-1 text-sm font-extrabold text-emerald-300">{formatN(profile.netPayable)}</p>
-                            </div>
-                            <div>
-                              <p className={`${mono.className} flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}><Activity className="h-3 w-3" /> Last activity</p>
-                              <p className="mt-1 text-sm font-extrabold text-white">
-                                {profile.lastActivityAt ? new Date(profile.lastActivityAt).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' }) : '—'}
-                              </p>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                              <div>
+                                <p className={`${mono.className} mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>Communication history</p>
+                                {profile.commsHistory.length === 0 ? <p className="text-xs font-semibold text-emerald-100/40">No org-targeted announcements yet.</p> : (
+                                  <ul className="space-y-1.5">
+                                    {profile.commsHistory.map((c) => (
+                                      <li key={c.id} className="truncate text-xs font-bold text-white">{c.title}
+                                        <span className={`${mono.className} ml-2 text-[9px] text-emerald-100/40`}>{c.at ? new Date(c.at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' }) : ''}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              <div>
+                                <p className={`${mono.className} mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>Audit history</p>
+                                {profile.auditHistory.length === 0 ? <p className="text-xs font-semibold text-emerald-100/40">No org-scoped audit events yet — subscription and settlement actions emit here.</p> : (
+                                  <ul className="space-y-1.5">
+                                    {profile.auditHistory.map((a) => (
+                                      <li key={a.id} className="truncate text-xs font-bold text-white">{a.action}
+                                        <span className={`${mono.className} ml-2 text-[9px] text-emerald-100/40`}>{new Date(a.at).toLocaleString('en-NG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}

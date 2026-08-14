@@ -10,6 +10,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePlatformOverview } from '@/lib/super-admin/hooks/usePlatformOverview';
+import { usePlatformAnalytics } from '@/lib/super-admin/hooks/usePlatformAnalytics';
+import { useSubscriptions } from '@/lib/super-admin/hooks/useSubscriptions';
+import { useIntelligence } from '@/lib/super-admin/hooks/useIntelligence';
+import type { SeriesPoint } from '@/lib/super-admin/services/platform-analytics.service';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -31,6 +35,9 @@ function PendingTag() {
 
 export default function AdminOverviewPage() {
   const { overview: o, attention, activity, loading } = usePlatformOverview();
+  const { a: pa } = usePlatformAnalytics();
+  const { subs } = useSubscriptions();
+  const { intel } = useIntelligence();
 
   if (loading || !o) {
     return (
@@ -41,9 +48,14 @@ export default function AdminOverviewPage() {
     );
   }
 
+  const expiringCount = subs.filter((s) =>
+    s.status === 'expiring' ||
+    (s.periodEnd && ['active', 'trial'].includes(s.status) && new Date(s.periodEnd).getTime() - Date.now() < 7 * 864e5)).length;
+  const mrr = subs.filter((s) => s.status === 'active').reduce((s, x) => s + x.monthlyFee, 0);
+
   return (
     <div className="space-y-6">
-      {/* HERO — 30-second picture */}
+      {/* HERO */}
       <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: EASE }}
         className="relative overflow-hidden rounded-[26px] border border-emerald-400/20 bg-gradient-to-br from-emerald-950 to-[#0c1411] p-8">
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.16]"
@@ -77,7 +89,7 @@ export default function AdminOverviewPage() {
         </div>
       </motion.section>
 
-      {/* ATTENTION REQUIRED — operational, not decorative */}
+      {/* ATTENTION REQUIRED */}
       {attention.length > 0 && (
         <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08, ease: EASE }}
           className="overflow-hidden rounded-[24px] border border-amber-400/30 bg-amber-400/[0.06]">
@@ -104,7 +116,7 @@ export default function AdminOverviewPage() {
         </motion.section>
       )}
 
-      {/* KPI BENTO — varied, not equal cards */}
+      {/* KPI BENTO */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { Icon: Building2, label: 'Organizations', value: o.organizations, href: '/admin/organizations' },
@@ -131,6 +143,33 @@ export default function AdminOverviewPage() {
             </Link>
           </motion.div>
         ))}
+      </div>
+
+      {/* GROWTH + HEALTH STRIPS */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <SparkCard title="Platform growth" series={pa?.orgSeries || []} value={o.organizations} suffix="orgs" />
+        <SparkCard title="Network growth" series={pa?.propertySeries || []} value={o.properties} suffix="properties" />
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2, ease: EASE }}
+          className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+          <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/70`}>Subscription health</p>
+          <div className="mt-3 flex items-center gap-4">
+            <span className="text-xs font-bold text-emerald-300">{subs.filter((s) => s.status === 'active').length} active</span>
+            <span className="text-xs font-bold text-blue-300">{subs.filter((s) => s.status === 'trial').length} trial</span>
+            <span className="text-xs font-bold text-amber-300">{expiringCount} expiring</span>
+          </div>
+          <p className={`${display.className} mt-3 text-2xl font-black text-white`}>{formatN(mrr)}<span className="ml-1 text-[10px] text-emerald-100/50">MRR</span></p>
+        </motion.section>
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.24, ease: EASE }}
+          className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+          <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/70`}>Field intelligence snapshot</p>
+          <div className="mt-3 flex items-center gap-4">
+            <span className="text-xs font-bold text-white">{intel?.totals.observations ?? 0} obs</span>
+            <span className="text-xs font-bold text-emerald-300">{intel?.totals.corrections ?? 0} corrections</span>
+          </div>
+          <p className={`${display.className} mt-3 text-2xl font-black text-white`}>
+            {intel && intel.totals.observations ? Math.round((intel.confidence.high / intel.totals.observations) * 100) : 0}%<span className="ml-1 text-[10px] text-emerald-100/50">high confidence</span>
+          </p>
+        </motion.section>
       </div>
 
       {/* REVENUE SNAPSHOT + RECENT ACTIVITY */}
@@ -194,5 +233,22 @@ export default function AdminOverviewPage() {
         </span>
       </motion.footer>
     </div>
+  );
+}
+
+function SparkCard({ title, series, value, suffix }: { title: string; series: SeriesPoint[]; value: number; suffix: string }) {
+  const max = Math.max(1, ...series.map((s) => s.total));
+  const pts = series.map((s, i) => `${(i * 100) / Math.max(1, series.length - 1)},${30 - (s.total / max) * 26}`).join(' ');
+  return (
+    <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.18, ease: EASE }}
+      className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+      <div className="flex items-baseline justify-between">
+        <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-300/70`}>{title}</p>
+        <p className={`${display.className} text-xl font-black text-white`}>{value}<span className="ml-1 text-[10px] text-emerald-100/50">{suffix}</span></p>
+      </div>
+      <svg viewBox="0 0 100 32" className="mt-3 h-10 w-full overflow-visible">
+        <polyline points={pts} fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </motion.section>
   );
 }

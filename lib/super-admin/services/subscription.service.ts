@@ -2,6 +2,7 @@
 import { adminSupabase as supabase } from '../supabase/client';
 import { resolvePlan } from '@/lib/core/finance/subscription-engine/plan-resolver';
 import { emitSubscriptionEvent } from '@/lib/core/finance/subscription-engine/subscription-events';
+import { emitSettlementEvent } from '@/lib/core/finance/settlement-engine/settlement-events';
 
 export interface SubscriptionRow {
   id: string; companyId: number; orgName: string;
@@ -30,6 +31,7 @@ export async function grantSubscription(companyId: number, plan: string, status:
     .select().single();
   if (error) throw new Error(error.message);
   await emitSubscriptionEvent(supabase, { subscriptionId: data.id, companyId, type: 'created', metadata: { plan, status } });
+  await emitSettlementEvent(supabase, { action: `subscription.${status === 'trial' ? 'created_trial' : 'activated'}`, companyId }).catch(() => {});
   return data;
 }
 
@@ -41,6 +43,7 @@ export async function renewSubscription(id: string, companyId: number) {
     .eq('id', id);
   if (error) throw new Error(error.message);
   await emitSubscriptionEvent(supabase, { subscriptionId: id, companyId, type: 'renewed', metadata: { periodEnd } });
+  await emitSettlementEvent(supabase, { action: 'subscription.renewed', companyId }).catch(() => {});
 }
 
 export async function cancelSubscription(id: string, companyId: number) {
@@ -50,6 +53,7 @@ export async function cancelSubscription(id: string, companyId: number) {
     .eq('id', id);
   if (error) throw new Error(error.message);
   await emitSubscriptionEvent(supabase, { subscriptionId: id, companyId, type: 'cancelled', metadata: {} });
+  await emitSettlementEvent(supabase, { action: 'subscription.cancelled', companyId }).catch(() => {});
 }
 
 export async function listSubscriptionEvents(): Promise<any[]> {

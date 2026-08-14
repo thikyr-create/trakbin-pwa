@@ -4,7 +4,7 @@
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
-  Eye, Radio, Gauge, Wrench, TrendingUp, Sparkles, ArrowRight,
+  Eye, Radio, Gauge, Wrench, TrendingUp, Sparkles, ArrowRight, ScrollText,
 } from 'lucide-react';
 import { useIntelligence } from '@/lib/super-admin/hooks/useIntelligence';
 
@@ -37,6 +37,9 @@ export default function AdminFieldIntelligencePage() {
   const t = n.totals;
   const confTotal = n.confidence.high + n.confidence.medium + n.confidence.low + n.confidence.unknown;
   const pct = (x: number) => (confTotal ? Math.round((x / confTotal) * 100) : 0);
+  const scored = n.observations.filter((x) => x.confidence != null);
+  const meanConf = scored.length ? Math.round((scored.reduce((s, x) => s + (x.confidence || 0), 0) / scored.length) * 100) : 0;
+  const feedbackRows = (n as any).feedbackRows || [];
 
   return (
     <div className="space-y-6">
@@ -52,7 +55,6 @@ export default function AdminFieldIntelligencePage() {
           <h1 className={`${display.className} mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl`}>
             How the network learns
           </h1>
-          {/* the loop */}
           <div className="mt-5 flex flex-wrap items-center gap-2">
             {LOOP.map((step, i) => (
               <div key={step} className="flex items-center gap-2">
@@ -227,6 +229,61 @@ export default function AdminFieldIntelligencePage() {
           </ul>
         )}
       </motion.section>
+
+      {/* MODEL PERFORMANCE + INTELLIGENCE AUDIT */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3, ease: EASE }}
+          className="rounded-[24px] border border-white/10 bg-white/[0.03] p-6">
+          <p className={`${mono.className} text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300/70`}>Model performance</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div>
+              <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Mean confidence</p>
+              <p className={`${display.className} mt-1 text-xl font-black text-white`}>{meanConf}%</p>
+            </div>
+            <div>
+              <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>High-conf share</p>
+              <p className={`${display.className} mt-1 text-xl font-black text-emerald-300`}>
+                {n.totals.observations ? Math.round((n.confidence.high / n.totals.observations) * 100) : 0}%
+              </p>
+            </div>
+            <div>
+              <p className={`${mono.className} text-[9px] font-bold uppercase tracking-wider text-emerald-100/40`}>Correction rate</p>
+              <p className={`${display.className} mt-1 text-xl font-black text-white`}>
+                {n.totals.observations ? Math.round((n.quality.correctionsApplied / n.totals.observations) * 100) : 0}%
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-xs font-semibold text-emerald-100/40">
+            The engine is improving when mean confidence rises and correction rate falls.
+          </p>
+        </motion.section>
+
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.34, ease: EASE }}
+          className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+            <p className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300/70`}>
+              <ScrollText className="h-4 w-4" /> Intelligence audit · feedback trail
+            </p>
+            <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>{feedbackRows.length}</span>
+          </div>
+          {feedbackRows.length === 0 ? (
+            <p className="px-6 py-12 text-center text-sm font-semibold text-emerald-100/50">No field feedback yet — the loop closes when operators confirm or correct observations.</p>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {feedbackRows.map((f: any, i: number) => (
+                <motion.li key={String(f.id ?? i)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02, ease: EASE }}
+                  className="flex flex-wrap items-center justify-between gap-2 px-6 py-3">
+                  <span className="text-xs font-bold text-white">{String(f.type ?? f.action ?? 'feedback')}</span>
+                  <span className="text-xs font-semibold text-emerald-100/50">{String(f.building_id ?? f.node_id ?? '')}</span>
+                  <span className={`${mono.className} text-[10px] font-bold text-emerald-100/40`}>
+                    {f.created_at ? new Date(f.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' }) : ''}
+                  </span>
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </motion.section>
+      </div>
 
       <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }}
         className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6">

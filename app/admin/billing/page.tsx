@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { useBilling } from '@/lib/super-admin/hooks/useBilling';
 import { getConfig, type PlatformConfig } from '@/lib/super-admin/services/settings.service';
+import { classifySettlement } from '@/lib/core/finance/settlement-engine/rules';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -204,14 +205,21 @@ export default function AdminBillingPage() {
         </Section>
       )}
 
-      {/* SETTLEMENTS */}
+      {/* SETTLEMENTS — with live classification */}
       {tab === 'settlements' && (
         <Section title="Payout requests · state machine" Icon={Wallet} count={b.payouts.length}>
           {b.payouts.length === 0 ? <Empty label="No settlement requests yet. Requested → Approved → Processing → Processor confirmed → Completed." /> : b.payouts.map((p: any) => (
             <Row key={p.id}
               left={<><p className="text-sm font-extrabold text-white">{formatN(Number(p.amount) || 0)}</p>
                 <p className={`${mono.className} mt-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>{p.recipient_bank_name || '—'} ····{p.recipient_account_last4 || '—'}</p></>}
-              right={<span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${payTone(p.status === 'completed' ? 'success' : p.status)}`}>{p.status}</span>}
+              right={
+                <span className="flex items-center gap-2">
+                  <span className={`${mono.className} rounded-full bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100/60 ring-1 ring-white/10`}>
+                    {classifySettlement({ auto: cfg?.tiers.auto ?? 500000, review: cfg?.tiers.review ?? 5000000 }, Number(p.amount) || 0)}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ring-1 ${payTone(p.status === 'completed' ? 'success' : p.status)}`}>{p.status}</span>
+                </span>
+              }
               badge={null}
               meta={new Date(p.created_at).toLocaleString('en-NG', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} />
           ))}
@@ -268,7 +276,7 @@ export default function AdminBillingPage() {
         </Section>
       )}
 
-      {/* SETTINGS — config-driven */}
+      {/* SETTINGS */}
       {tab === 'settings' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}

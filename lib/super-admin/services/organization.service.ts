@@ -2,13 +2,26 @@
 import { adminSupabase as supabase } from '../supabase/client';
 import type { Organization } from '../types/organization';
 
+export interface ConnectedProperty {
+  custom_id: string;
+  address: string | null;
+  status: string | null;
+  payment_status: string | null;
+}
+export interface OrgCommEvent { id: string; title: string; at: string | null }
+export interface OrgAuditEvent { id: string; action: string; at: string }
+
 export interface OrganizationProfile extends Organization {
   users: number;
   grossCollected: number;
   commission: number;
   netPayable: number;
   settled: number;
+  outstanding: number;
   lastActivityAt: string | null;
+  connectedProperties: ConnectedProperty[];
+  commsHistory: OrgCommEvent[];
+  auditHistory: OrgAuditEvent[];
 }
 
 export async function listOrganizations(): Promise<Organization[]> {
@@ -34,12 +47,17 @@ export async function listOrganizations(): Promise<Organization[]> {
 }
 
 export async function getOrganizationProfile(id: number): Promise<OrganizationProfile> {
-  const [orgs, u, lt, po] = await Promise.all([
+  const [orgs, u, lt, po, inv, bld, notices, audits] = await Promise.all([
     listOrganizations(),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('company_id', id),
     supabase.from('ledger_transactions').select('gross, commission, net, created_at').eq('company_id', id).order('created_at', { ascending: false }),
     supabase.from('payouts').select('amount, status').eq('company_id', id),
+    supabase.from('invoices').select('amount, status').eq('company_id', id),
+    supabase.from('Buildings').select('custom_id, address, status, payment_status').eq('company_id', id).order('custom_id', { ascending: true }),
+    supabase.from('notices').select('id, title, created_at').eq('company_id', id).order('created_at', { ascending: false }).limit(5),
+    supabase.from('audit_events').select('id, action, created_at').eq('target', `org:${id}`).order('created_at', { ascending: false }).limit(8),
   ]);
+
   const base = orgs.find((o) => o.id === id);
   const ledger = lt.data || [];
   return {
@@ -52,7 +70,13 @@ export async function getOrganizationProfile(id: number): Promise<OrganizationPr
     commission: ledger.reduce((s: number, t: any) => s + (Number(t.commission) || 0), 0),
     netPayable: ledger.reduce((s: number, t: any) => s + (Number(t.net) || 0), 0),
     settled: (po.data || []).filter((p: any) => !['rejected', 'failed'].includes(p.status)).reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0),
+    outstanding: (inv.data || []).filter((i: any) => i.status !== 'paid').reduce((s: number, i: any) => s + (Number(i.amount) || 0), 0),
     lastActivityAt: ledger[0]?.created_at || null,
+    connectedProperties: (bld.data || []).map((x: any) => ({
+      custom_id: x.custom_id, address: x.address, status: x.status, payment_status: x.payment_status,
+    })),
+    commsHistory: (notices.data || []).map((x: any) => ({ id: x.id, title: x.title, at: x.created_at })),
+    auditHistory: (audits.data || []).map((x: any) => ({ id: x.id, action: x.action, at: x.created_at })),
   };
 }
 
