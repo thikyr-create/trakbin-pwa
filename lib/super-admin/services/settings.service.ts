@@ -1,5 +1,6 @@
 // lib/super-admin/services/settings.service.ts
 import { adminSupabase as supabase } from '../supabase/client';
+import { validateCommissionBps, validateSettlementTiers } from '../validators/billing';
 
 export interface PlatformConfig {
   commissionBps: number;
@@ -34,11 +35,23 @@ export async function getConfig(): Promise<PlatformConfig> {
 }
 
 export async function saveConfig(patch: Partial<PlatformConfig>, actorId?: string | null) {
+  // Validate before any write — economics never enter the store unchecked
+  if (patch.commissionBps != null) {
+    const v = validateCommissionBps(patch.commissionBps);
+    if (!v.ok) throw new Error(v.error);
+    patch = { ...patch, commissionBps: v.value };
+  }
+  if (patch.tiers) {
+    const v = validateSettlementTiers(patch.tiers);
+    if (!v.ok) throw new Error(v.error);
+  }
+
   const writes: { key: string; value: any }[] = [];
   if (patch.commissionBps != null) writes.push({ key: 'commission', value: { bps: patch.commissionBps } });
   if (patch.tiers) writes.push({ key: 'settlement_tiers', value: patch.tiers });
   if (patch.flags) writes.push({ key: 'feature_flags', value: patch.flags });
   if (patch.defaults) writes.push({ key: 'defaults', value: patch.defaults });
+
   for (const w of writes) {
     const { error } = await supabase
       .from('platform_config')
