@@ -62,6 +62,8 @@ export const AssignmentEngine = {
       if (abErr) return { ok: false, errors: ['assignment_buildings: ' + abErr.message] };
 
       // Also write to route_stops so the driver console sees the stops
+            // route_stops carries no coordinates — the driver console merges
+      // lat/lng from Buildings by building_id (single source of truth)
       const { error: rsErr } = await supabase.from('route_stops').insert(
         args.stops.map((s, i) => ({
           route_id: route.id,
@@ -69,8 +71,6 @@ export const AssignmentEngine = {
           building_id: s.building_id,
           sequence: i + 1,
           status: 'pending',
-          latitude: s.lat,
-          longitude: s.lng,
         }))
       );
       if (rsErr) return { ok: false, errors: ['route_stops: ' + rsErr.message] };
