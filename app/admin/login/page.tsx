@@ -1,7 +1,7 @@
 // app/admin/login/page.tsx
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
@@ -17,57 +17,40 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [checking, setChecking] = useState(true);
-  const [adminExists, setAdminExists] = useState(true);
+  const [mode, setMode] = useState<'signin' | 'bootstrap'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    (async () => {
-      const { count } = await supabase
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('role', 'admin');
-      setAdminExists((count || 0) > 0);
-      setChecking(false);
-    })();
-  }, []);
-
-  const readRole = async (uid: string) => {
-    const { data } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-    return data?.role ?? null;
-  };
+  const [info, setInfo] = useState('');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setBusy(true);
+    setError(''); setInfo(''); setBusy(true);
     try {
-      if (!adminExists) {
-        // BOOTSTRAP: metadata flows to on_auth_user_created trigger → profile created with role=admin
-        const { data, error } = await supabase.auth.signUp({
+      if (mode === 'bootstrap') {
+        const { error } = await supabase.auth.signUp({
           email, password,
           options: { data: { role: 'admin' } },
         });
         if (error) { setError(error.message); return; }
-        if (data.session && data.user) {
-          const role = await readRole(data.user.id);
-          if (role === 'admin') { router.replace('/admin'); return; }
-          setError('Account created. Confirm your email, then sign in here to enter.');
-          return;
-        }
-        setError('Account created. Confirm your email, then sign in here to enter.');
+        setInfo('Account created. Confirm your email, then switch to sign in.');
+        setMode('signin');
         return;
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) { setError(error.message); return; }
-      const role = await readRole(data.user!.id);
-      if (role !== 'admin') {
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user!.id)
+        .maybeSingle();
+
+      if (prof?.role !== 'admin') {
         await supabase.auth.signOut();
-        setError('This account is not an admin.');
+        setError('This account does not have the admin role yet.');
         return;
       }
       router.replace('/admin');
@@ -75,15 +58,6 @@ export default function AdminLoginPage() {
       setBusy(false);
     }
   };
-
-  if (checking) {
-    return (
-      <div className={`${body.className} flex min-h-screen items-center justify-center bg-[#0c1411]`}>
-        <motion.div className="h-10 w-10 rounded-full border-b-2 border-emerald-400"
-          animate={{ rotate: 360 }} transition={{ duration: 0.9, repeat: Infinity, ease: 'linear' }} />
-      </div>
-    );
-  }
 
   return (
     <div className={`${body.className} relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0c1411] p-6 text-emerald-50`}>
@@ -97,10 +71,10 @@ export default function AdminLoginPage() {
           <Shield className="h-6 w-6 text-emerald-950" />
         </div>
         <h1 className={`${display.className} mt-4 text-2xl font-black tracking-tight text-white`}>
-          {adminExists ? 'Admin sign in' : 'Create the first admin'}
+          {mode === 'signin' ? 'Admin sign in' : 'Create the first admin'}
         </h1>
         <p className={`${mono.className} mt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300/70`}>
-          {adminExists ? 'Platform control plane' : 'Self-closing bootstrap · disappears once an admin exists'}
+          Platform control plane
         </p>
 
         <form onSubmit={submit} className="mt-6 space-y-4">
@@ -123,19 +97,25 @@ export default function AdminLoginPage() {
               {error}
             </motion.p>
           )}
+          {info && (
+            <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+              className="rounded-xl bg-emerald-400/10 px-4 py-2.5 text-xs font-bold text-emerald-200 ring-1 ring-emerald-300/30">
+              {info}
+            </motion.p>
+          )}
 
           <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 py-3 text-sm font-extrabold text-emerald-950 shadow-lg shadow-emerald-400/25 transition-colors hover:bg-emerald-300 disabled:bg-white/10 disabled:text-white/40">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : adminExists ? <KeyRound className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-            {busy ? 'Working…' : adminExists ? 'Sign in' : 'Create admin'}
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'signin' ? <KeyRound className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+            {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create admin'}
           </motion.button>
         </form>
 
-        <p className="mt-5 text-center text-[11px] font-semibold text-emerald-100/40">
-          {adminExists
-            ? 'Access is limited to accounts with the admin role.'
-            : 'No admin exists yet. This form creates the first one — then it locks itself.'}
-        </p>
+        <button type="button"
+          onClick={() => { setMode((m) => (m === 'signin' ? 'bootstrap' : 'signin')); setError(''); setInfo(''); }}
+          className="mt-5 w-full text-center text-[11px] font-bold text-emerald-300/70 transition-colors hover:text-emerald-200">
+          {mode === 'signin' ? 'No admin account yet? Create the first one' : 'Already have an admin? Sign in'}
+        </button>
       </motion.div>
     </div>
   );
