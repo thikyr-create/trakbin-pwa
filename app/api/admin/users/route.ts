@@ -1,6 +1,7 @@
 // app/api/admin/users/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { emitAudit } from '@/lib/core/audit/audit-engine';
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,6 +28,12 @@ export async function POST(req: Request) {
 
     const { error } = await admin.from('profiles').update({ platform_role: platformRole }).eq('id', userId);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    await emitAudit(admin, {
+      category: 'PERMISSION_CHANGE', actorId: user.id, actorEmail: user.email,
+      action: 'platform_role.set', target: userId, metadata: { platformRole },
+    }).catch(() => {});
+
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'Failed' }, { status: 500 });
