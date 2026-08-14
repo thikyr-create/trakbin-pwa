@@ -1,7 +1,7 @@
 // app/api/admin/settlements/route.ts
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { emitAudit } from '@/lib/core/audit/audit-engine';
+import { emitSettlementEvent } from '@/lib/core/finance/settlement-engine/settlement-events';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,9 +48,13 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-    await emitAudit(supabaseAdmin, {
-      category: 'BILLING_EVENT', actorId: user.id, actorEmail: user.email,
-      action: `settlement.${action}`, target: id, metadata: { to: t.to },
+    // Audit record + bus reaction (org notification on complete, etc.)
+    await emitSettlementEvent(supabaseAdmin, {
+      actorId: user.id, actorEmail: user.email,
+      action: `settlement.${action}`,
+      companyId: Number((data as any).company_id) || 0,
+      amount: Number((data as any).amount) || 0,
+      metadata: { to: t.to },
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, payout: data });

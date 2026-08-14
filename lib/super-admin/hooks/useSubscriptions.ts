@@ -8,6 +8,7 @@ import {
   type SubscriptionRow,
 } from '../services/subscription.service';
 import { adminSupabase as supabase } from '../supabase/client';
+import { detectExpiringSubscriptions } from '@/lib/core/finance/subscription-engine/expiration-manager';
 
 export function useSubscriptions() {
   const [subs, setSubs] = useState<SubscriptionRow[]>([]);
@@ -17,6 +18,9 @@ export function useSubscriptions() {
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    // Lifecycle first: flip due-soon subscriptions to expiring (emits + notifies)
+    await detectExpiringSubscriptions(supabase).catch(() => {});
+
     const [s, e, u, h] = await Promise.all([
       listSubscriptions(), listSubscriptionEvents(), usageForSubscriptions(),
       supabase.from('haulers').select('id, business_name'),

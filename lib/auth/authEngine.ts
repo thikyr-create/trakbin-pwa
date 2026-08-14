@@ -3,6 +3,10 @@ import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
 import { BuildingPublisher } from '@/lib/core/event-bus';
+import { publish } from '@/lib/core/event-bus/platform-bus';
+import { TOPICS } from '@/lib/core/event-bus/topics';
+import { ensurePlatformSubscribers } from '@/lib/core/event-bus/subscribers';
+import { emitAudit } from '@/lib/core/audit/audit-engine';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
 
 const KEYS = { caretaker: 'trakbin_caretaker', company: 'trakbin_company', driver: 'trakbin_driver' } as const;
@@ -32,7 +36,6 @@ export const authEngine = {
         return { ok: false, message: '❌ Invalid Building ID or Passcode' };
       }
 
-      // Mint a REAL Supabase session from the synthetic identity
       const { error } = await supabaseAuth.signInWithPassword(data.email, data.password);
       if (error) {
         return { ok: false, message: '❌ Session error: ' + error.message };
@@ -44,7 +47,6 @@ export const authEngine = {
     }
 
     // ── DRIVER: employee ID + password → real session via API ──
-    // (Caretaker already returned above, so only company/driver reach here)
     const idOrEmail = (input.email || '').trim();
     if (/^DRV-/i.test(idOrEmail)) {
       const res = await fetch('/api/auth/driver-login', {
@@ -71,13 +73,11 @@ export const authEngine = {
     const email = idOrEmail;
     const password = (input.password || '').trim();
 
-    // 1) Supabase Auth first (hashed password, real session)
     try {
       const { data, error } = await supabaseAuth.signInWithPassword(email, password);
       if (error) {
         if (/confirm/i.test(error.message)) return { ok: false, message: '⚠️ Please confirm your email before signing in — check your inbox.' };
       } else if (data.user) {
-        // Verified identity: profiles is the server-side source of truth
         const { data: profile } = await supabaseAuth.client
           .from('profiles')
           .select('company_id, role')
@@ -85,8 +85,6 @@ export const authEngine = {
           .maybeSingle();
 
         // ADMIN: platform plane — hard-redirect to the admin console.
-        // The returned role is inert: window.location wins the navigation race,
-        // and admins never hold a tenant session in authStore.
         if (profile?.role === 'admin') {
           if (typeof window !== 'undefined') window.location.href = '/admin';
           return { ok: true, message: '✅ Admin detected — redirecting...', role: 'driver' };
@@ -96,8 +94,6 @@ export const authEngine = {
         const companyId = res?.user?.company_id ?? profile?.company_id ?? null;
         const accountType = res?.accountType || (profile?.role === 'driver' ? 'Driver' : 'WasteCompany');
 
-        // NORMALIZED row: id = company id (numeric). Never the auth UUID,
-        // never the legacy users.id. Every downstream engine reads .id
         const row = { ...(res?.user || { email }), id: companyId, company_id: companyId };
 
         if (data.user.email_confirmed_at && companyId) {
@@ -142,8 +138,8 @@ export const authEngine = {
 
     let number_of_units = 1; let unit_type = 'unit';
     if (input.buildingType === 'Residential Multi-Unit') { number_of_units = parseInt(input.numberOfFlats || '1'); unit_type = 'flats'; }
-    
     else if (input.buildingType === 'Commercial') { number_of_units = parseInt(input.numberOfShops || '1'); unit_type = 'shops'; }
+
     const buildingRow = {
       custom_id: generatedId, passcode: input.passcode, building_type: input.buildingType,
       address: input.officialAddress, estate: input.estate || null, gps_location_address: input.gpsAddress,
@@ -160,7 +156,6 @@ export const authEngine = {
     const matchedCompanyId = await authAdapter.matchBuilding({ officialAddress: input.officialAddress, estate: input.estate, coords: { lat: input.latitude, lon: input.longitude } });
     if (matchedCompanyId) await authAdapter.assignServiceRequest(generatedId, matchedCompanyId);
 
-    // EVENT BUS: notify engines a new building entered the platform
     BuildingPublisher.publish('BUILDING_REGISTERED', { buildingId: generatedId });
 
     return { ok: true, message: '✅ Building registered successfully!', buildingId: generatedId };
@@ -176,8 +171,6 @@ export const authEngine = {
     });
     if (haulerError || !haulerData) return { ok: false, message: '❌ Failed to create company: ' + (haulerError?.message || 'unknown') };
 
-    // Supabase Auth signup. Metadata flows to the on_auth_user_created trigger,
-    // which creates the profiles row with company_id + role.
     let authId: string | null = null; let needsConfirm = false;
     try {
       const { data, error } = await supabaseAuth.signUp(input.email, input.password, {
@@ -196,6 +189,15 @@ export const authEngine = {
       license_number: input.licenseNumber, company_id: haulerData.id,
     });
     if (userError) return { ok: false, message: 'Registration failed: ' + userError.message };
+
+    // EVENT BUS: organization entered the platform → audit + future subscribers
+    ensurePlatformSubscribers(supabaseAuth.client);
+    publish(TOPICS.ORGANIZATION_CREATED, { companyId: haulerData.id, name: input.companyName });
+    emitAudit(supabaseAuth.client, {
+      category: 'ADMIN_ACTION', action: 'organization.created',
+      target: `org:${haulerData.id}`, metadata: { name: input.companyName },
+    }).catch(() => {});
+
     return {
       ok: true, companyId: haulerData.id,
       message: needsConfirm ? '✅ Account created! Check your email to confirm your address, then sign in.' : '✅ Waste Company account created!',
