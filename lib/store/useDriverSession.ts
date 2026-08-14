@@ -142,15 +142,21 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
     set({ isLoading: true });
     try {
+            console.log('[driver-console] auth uid:', user.id);
+      console.log('[driver-console] driver row:', driver);
+      console.log('[driver-console] querying routes:', { cid, driver_id: String(driver.id) });
+
       const { data: routeData, error: routeError } = await supabase
         .from('routes')
         .select('*')
         .eq('company_id', cid)
-        .eq('driver_id', String(driver.employee_id || driver.id))
+        .eq('driver_id', String(driver.id))
         .in('status', ['assigned', 'active', 'paused'])
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+
+      console.log('[driver-console] route query result:', { routeData, routeError });
 
       if (routeError || !routeData) {
         set({ route: null, routeStops: [], isLoading: false });
