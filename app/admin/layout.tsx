@@ -50,10 +50,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const allowed = isAllowed(tenant.role);
 
-  useEffect(() => {
-    if (tenant.loaded && !allowed) router.replace('/auth');
+    useEffect(() => {
+    if (tenant.loaded && !allowed) router.replace('/admin/login');
   }, [tenant.loaded, allowed, router]);
-
   if (!tenant.loaded) {
     return (
       <div className={`${body.className} flex min-h-screen items-center justify-center bg-[#0c1411]`}>
