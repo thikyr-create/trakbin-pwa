@@ -420,10 +420,15 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     deviationDetector.reset();
 
     try {
-      await supabase.from('routes').update({
+            await supabase.from('routes').update({
         status: 'completed',
         ended_at: new Date().toISOString()
       }).eq('id', route.id).eq('company_id', cid);
+
+      // Close the work order and release driver + truck back to the available pool
+      await supabase.from('assignments').update({ status: 'completed' }).eq('route_id', route.id).eq('company_id', cid);
+      await supabase.from('drivers').update({ status: 'available', current_assignment_id: null }).eq('id', Number(route.driver_id));
+      await supabase.from('trucks').update({ status: 'available', current_driver: null }).eq('id', Number(route.truck_id));
 
       stopGpsTracking();
 
