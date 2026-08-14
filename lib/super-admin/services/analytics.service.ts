@@ -1,9 +1,10 @@
 // lib/super-admin/services/analytics.service.ts
 import { adminSupabase as supabase } from '../supabase/client';
+import { resolvePlan } from '@/lib/core/finance/subscription-engine/plan-resolver';
 import type { PlatformOverview, AttentionItem, ActivityEvent } from '../types/analytics';
 
 export async function getPlatformOverview(): Promise<PlatformOverview> {
-  const [orgs, props, zones, drivers, pays, ltx, outs, obs, issues, overdue] = await Promise.all([
+  const [orgs, props, zones, drivers, pays, ltx, outs, obs, issues, overdue, subs] = await Promise.all([
     supabase.from('haulers').select('*', { count: 'exact', head: true }),
     supabase.from('Buildings').select('*', { count: 'exact', head: true }),
     supabase.from('company_zones').select('*', { count: 'exact', head: true }),
@@ -14,6 +15,7 @@ export async function getPlatformOverview(): Promise<PlatformOverview> {
     supabase.from('field_observations').select('*', { count: 'exact', head: true }),
     supabase.from('environmental_issues').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('invoices').select('*', { count: 'exact', head: true }).eq('status', 'overdue'),
+    supabase.from('subscriptions').select('plan, status'),
   ]);
 
   const payments = pays.data || [];
@@ -23,11 +25,14 @@ export async function getPlatformOverview(): Promise<PlatformOverview> {
     .filter((p: any) => !['rejected', 'failed'].includes(p.status))
     .reduce((s: number, p: any) => s + (Number(p.amount) || 0), 0);
 
+  const subRows = (subs.data as any[]) || [];
+  const activeSubs = subRows.filter((s: any) => s.status === 'active');
+
   return {
     organizations: orgs.count || 0,
-    activeSubscriptions: 0,            // subscriptions table lands in A7R — real zero until then
-    mrr: 0,                            // derived from subscriptions, never hardcoded
-    outstandingPlatformInvoices: 0,    // platform billing engine lands in A6R
+    activeSubscriptions: activeSubs.length,
+    mrr: activeSubs.reduce((s: number, x: any) => s + resolvePlan(x.plan).monthlyFee, 0),
+    outstandingPlatformInvoices: 0,    // platform billing engine hardening lands later
     properties: props.count || 0,
     zones: zones.count || 0,
     activeOperators: orgs.count || 0,
