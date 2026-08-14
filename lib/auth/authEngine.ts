@@ -1,3 +1,4 @@
+// lib/auth/authEngine.ts
 import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
@@ -43,7 +44,6 @@ export const authEngine = {
     }
 
     // ── DRIVER: employee ID + password → real session via API ──
-      // ── DRIVER: employee ID + password → real session via API ──
     // (Caretaker already returned above, so only company/driver reach here)
     const idOrEmail = (input.email || '').trim();
     if (/^DRV-/i.test(idOrEmail)) {
@@ -67,7 +67,7 @@ export const authEngine = {
       return { ok: true, message: '✅ Login successful! Redirecting...', role: 'driver' };
     }
 
-    // ── COMPANY / DRIVER(by email): email + password ──
+    // ── COMPANY / DRIVER(by email) / ADMIN: email + password ──
     const email = idOrEmail;
     const password = (input.password || '').trim();
 
@@ -83,6 +83,14 @@ export const authEngine = {
           .select('company_id, role')
           .eq('id', data.user.id)
           .maybeSingle();
+
+        // ADMIN: platform plane — hard-redirect to the admin console.
+        // The returned role is inert: window.location wins the navigation race,
+        // and admins never hold a tenant session in authStore.
+        if (profile?.role === 'admin') {
+          if (typeof window !== 'undefined') window.location.href = '/admin';
+          return { ok: true, message: '✅ Admin detected — redirecting...', role: 'driver' };
+        }
 
         const res = await authAdapter.queryUserByAuthOrEmail(data.user.id, email);
         const companyId = res?.user?.company_id ?? profile?.company_id ?? null;
@@ -134,8 +142,8 @@ export const authEngine = {
 
     let number_of_units = 1; let unit_type = 'unit';
     if (input.buildingType === 'Residential Multi-Unit') { number_of_units = parseInt(input.numberOfFlats || '1'); unit_type = 'flats'; }
+    
     else if (input.buildingType === 'Commercial') { number_of_units = parseInt(input.numberOfShops || '1'); unit_type = 'shops'; }
-
     const buildingRow = {
       custom_id: generatedId, passcode: input.passcode, building_type: input.buildingType,
       address: input.officialAddress, estate: input.estate || null, gps_location_address: input.gpsAddress,
@@ -197,7 +205,7 @@ export const authEngine = {
   async resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
     const building = await authAdapter.queryBuildingByIdAndAddress(buildingId.trim(), officialAddress.trim());
     if (!building) return { ok: false, message: '❌ Building ID and address do not match our records.' };
-    await authAdapter.updateBuildingPasscode(buildingId.trim(), newPasscode);
+    await authAdapter.updateBuildingPasscode(building.trim(), newPasscode);
     return { ok: true, message: '✅ Passcode updated!', building: { ...building, passcode: newPasscode } };
   },
 

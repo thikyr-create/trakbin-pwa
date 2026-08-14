@@ -2,16 +2,16 @@
 "use client";
 
 import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
   LayoutGrid, Building2, Network, CreditCard, Wallet, BookOpen,
   Crown, Eye, Mail, CheckSquare, Users, BarChart3, Activity, Shield,
   Settings, LogOut, Radio,
 } from 'lucide-react';
-import { useCompanySession } from '@/lib/store/useCompanySession';
+import { useAdminSession } from '@/lib/store/useAdminSession';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -23,7 +23,7 @@ export const ADMIN_NAV = [
   { key: 'network',      label: 'Network',             href: '/admin/network',            Icon: Network },
   { key: 'payments',     label: 'Payments',            href: '/admin/payments',           Icon: CreditCard },
   { key: 'settlements',  label: 'Settlements',         href: '/admin/settlements',        Icon: Wallet },
-  { key: 'ledger',       label: 'Financial Ledger',    href: '/admin/finance',            Icon: BookOpen }, // preserved existing page
+  { key: 'ledger',       label: 'Financial Ledger',    href: '/admin/finance',            Icon: BookOpen },
   { key: 'subscriptions',label: 'Subscriptions',       href: '/admin/subscriptions',      Icon: Crown },
   { key: 'field',        label: 'Field Intelligence',  href: '/admin/field-intelligence', Icon: Eye },
   { key: 'comms',        label: 'Communications',      href: '/admin/communications',     Icon: Mail },
@@ -35,32 +35,18 @@ export const ADMIN_NAV = [
   { key: 'settings',     label: 'Settings',            href: '/admin/settings',           Icon: Settings },
 ] as const;
 
-function isAllowed(role: string | null): boolean {
-  if (role === 'admin') return true;
-  if (typeof window !== 'undefined' && window.localStorage.getItem('trakbin_admin') === '1') return true;
-  return false;
-}
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
-  const { tenant, loadTenantContext } = useCompanySession();
+  const { admin, loaded, loadAdminContext, signOutAdmin } = useAdminSession();
 
-  useEffect(() => { loadTenantContext(); }, []);
-
-    const allowed = isAllowed(tenant.role);
-
-  useEffect(() => {
-    if (tenant.loaded && !allowed && !pathname.startsWith('/admin/login')) {
-      router.replace('/admin/login');
-    }
-  }, [tenant.loaded, allowed, router, pathname]);
+  useEffect(() => { loadAdminContext(); }, []);
 
   // Login page renders standalone — no shell, no gate
   if (pathname.startsWith('/admin/login')) {
     return <>{children}</>;
   }
-  if (!tenant.loaded) {
+
+  if (!loaded) {
     return (
       <div className={`${body.className} flex min-h-screen items-center justify-center bg-[#0c1411]`}>
         <motion.div className="h-12 w-12 rounded-full border-b-2 border-emerald-400"
@@ -68,11 +54,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     );
   }
-  if (!allowed) return null;
 
   return (
     <div className={`${body.className} ${display.variable} ${mono.variable} relative min-h-screen bg-[#0c1411] text-gray-100`}>
-      {/* ambient field */}
       <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 opacity-[0.5]"
           style={{ backgroundImage: 'radial-gradient(circle, rgba(16,185,129,0.12) 1px, transparent 1px)', backgroundSize: '26px 26px' }} />
@@ -80,7 +64,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       <div className="relative z-10 flex min-h-screen">
-        {/* SIDEBAR */}
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-white/10 bg-[#0a110e]/60 px-4 py-5 backdrop-blur lg:flex">
           <div className="mb-6 flex items-center gap-3 px-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500">
@@ -115,12 +98,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Shield className="h-3.5 w-3.5" />
               </div>
               <div className="min-w-0 flex-1 leading-tight">
-                <p className="truncate text-xs font-bold text-white">Super Admin</p>
+                <p className="truncate text-xs font-bold text-white">{admin?.email || 'Super Admin'}</p>
                 <p className={`${mono.className} truncate text-[9px] font-bold uppercase tracking-wider text-emerald-300/60`}>
-                  {tenant.role}
+                  {admin?.role}
                 </p>
               </div>
-              <button onClick={() => { window.localStorage.removeItem('trakbin_admin'); router.replace('/auth'); }}
+              <button onClick={() => signOutAdmin()}
                 className="rounded-lg p-1.5 text-emerald-300/60 transition-colors hover:bg-white/10 hover:text-white">
                 <LogOut className="h-3.5 w-3.5" />
               </button>
@@ -128,7 +111,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </aside>
 
-        {/* MAIN */}
         <main className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 border-b border-white/10 bg-[#0c1411]/80 backdrop-blur">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
