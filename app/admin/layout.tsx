@@ -23,7 +23,7 @@ export const ADMIN_NAV = [
   { key: 'network',      label: 'Network',             href: '/admin/network',            Icon: Network },
   { key: 'payments',     label: 'Payments',            href: '/admin/payments',           Icon: CreditCard },
   { key: 'settlements',  label: 'Settlements',         href: '/admin/settlements',        Icon: Wallet },
-  { key: 'ledger',       label: 'Financial Ledger',    href: '/admin/finance',            Icon: BookOpen },
+    { key: 'ledger',       label: 'Financial Ledger',    href: '/admin/ledger',             Icon: BookOpen },
   { key: 'subscriptions',label: 'Subscriptions',       href: '/admin/subscriptions',      Icon: Crown },
   { key: 'field',        label: 'Field Intelligence',  href: '/admin/field-intelligence', Icon: Eye },
   { key: 'comms',        label: 'Communications',      href: '/admin/communications',     Icon: Mail },
