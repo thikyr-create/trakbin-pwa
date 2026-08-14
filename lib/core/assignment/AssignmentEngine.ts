@@ -56,10 +56,24 @@ export const AssignmentEngine = {
       }]).select().single();
       if (error) return { ok: false, errors: ['assignments: ' + error.message] };
 
-      const { error: abErr } = await supabase.from('assignment_buildings').insert(
+            const { error: abErr } = await supabase.from('assignment_buildings').insert(
         args.stops.map((s, i) => ({ assignment_id: assignment.id, building_id: s.building_id, stop_order: i + 1 }))
       );
       if (abErr) return { ok: false, errors: ['assignment_buildings: ' + abErr.message] };
+
+      // Also write to route_stops so the driver console sees the stops
+      const { error: rsErr } = await supabase.from('route_stops').insert(
+        args.stops.map((s, i) => ({
+          route_id: route.id,
+          company_id: args.companyId,
+          building_id: s.building_id,
+          sequence: i + 1,
+          status: 'pending',
+          latitude: s.lat,
+          longitude: s.lng,
+        }))
+      );
+      if (rsErr) return { ok: false, errors: ['route_stops: ' + rsErr.message] };
 
       const { error: tErr } = await supabase.from('trucks')
         .update({ status: 'assigned', current_driver: args.driver.full_name })

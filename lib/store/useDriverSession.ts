@@ -146,7 +146,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
         .from('routes')
         .select('*')
         .eq('company_id', cid)
-        .eq('driver_id', driver.employee_id || driver.id)
+        .eq('driver_id', String(driver.employee_id || driver.id))
         .in('status', ['assigned', 'active', 'paused'])
         .order('created_at', { ascending: false })
         .limit(1)
