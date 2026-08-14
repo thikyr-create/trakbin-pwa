@@ -103,12 +103,17 @@ export default function AdminApprovalsPage() {
       {tab === 'verification' && (
         <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}
           className="overflow-hidden rounded-[24px] border border-amber-400/30 bg-amber-400/[0.06]">
-          <Header icon={ShieldCheck} title="Operator verification" count={q.verification.length} amber />
+          <div className="flex items-center justify-between border-b border-amber-400/20 px-6 py-4">
+            <p className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-amber-200/80`}>
+              <ShieldCheck className="h-4 w-4" /> Operator verification
+            </p>
+            <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-amber-200/70`}>{q.verification.length}</span>
+          </div>
           {q.verification.length === 0 ? (
             <p className="px-6 py-14 text-center text-sm font-semibold text-amber-100/60">No open verification requests.</p>
           ) : (
             <ul className="divide-y divide-amber-400/10">
-                            {q.verification.map((r: any, i: number) => (
+              {q.verification.map((r: any, i: number) => (
                 <motion.li key={String(pick(r, ['id']) ?? i)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04, ease: EASE }}
                   className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
                   <div>
@@ -181,18 +186,7 @@ export default function AdminApprovalsPage() {
   );
 }
 
-function Header({ icon: Icon, title, count, amber }: { icon: any; title: string; count: number; amber?: boolean }) {
-  return (
-    <div className="flex items-center justify-between border-b border-amber-400/20 px-6 py-4">
-      <p className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] ${amber ? 'text-amber-200/80' : 'text-emerald-300/70'}`}>
-        <Icon className="h-4 w-4" /> {title}
-      </p>
-      <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider ${amber ? 'text-amber-200/70' : 'text-emerald-100/40'}`}>{count}</span>
-    </div>
-  );
-}
-
-function Queue({ icon, title, rows, empty, render }: {
+function Queue({ icon: Icon, title, rows, empty, render }: {
   icon: any; title: string; rows: any[]; empty: string;
   render: (row: any) => { head: string; meta: string; badge: string };
 }) {
@@ -201,7 +195,7 @@ function Queue({ icon, title, rows, empty, render }: {
       className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03]">
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
         <p className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300/70`}>
-          {icon({ className: 'h-4 w-4' })} {title}
+          <Icon className="h-4 w-4" /> {title}
         </p>
         <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>{rows.length}</span>
       </div>
@@ -209,7 +203,7 @@ function Queue({ icon, title, rows, empty, render }: {
         <p className="px-6 py-14 text-center text-sm font-semibold text-emerald-100/50">{empty}</p>
       ) : (
         <ul className="divide-y divide-white/5">
-          {rows.map((r, i) => {
+          {rows.map((r: any, i: number) => {
             const x = render(r);
             return (
               <motion.li key={String(pick(r, ['id']) ?? i)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, ease: EASE }}
