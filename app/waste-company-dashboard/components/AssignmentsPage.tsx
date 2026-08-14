@@ -88,22 +88,29 @@ export default function AssignmentsPage() {
   const driver = drivers.find((d) => d.id === driverId);
   const truck = trucks.find((t) => t.id === truckId);
 
-    const assign = async () => {
+      const assign = async () => {
     if (!cid) return;
     setSaving(true);
-    const selectedStops = preview.ordered.map((s) => ({
-      building_id: s.buildingId,
-      lat: s.latitude,
-      lng: s.longitude,
-    }));
-    // Coerce to string: Supabase bigint (number) vs DOM option value (string)
-    const driver = drivers.find((d) => String(d.id) === String(driverId));
-    const truck = trucks.find((t) => String(t.id) === String(truckId));
-    const res = await AssignmentEngine.assign({ companyId: cid, driver, truck, stops: selectedStops, assignedBy: 'dispatcher' });
-    setSaving(false);
-    if (!res.ok) { addNotification(res.errors?.join(' ') || 'Could not assign.', 'error'); return; }
-    addNotification(`Route assigned · ${selectedStops.length} stops → ${driver?.full_name}`, 'success');
-    setSelected([]); setDriverId(''); setTruckId(''); load();
+    try {
+      const selectedStops = preview.ordered.map((s) => ({
+        building_id: s.buildingId,
+        lat: s.latitude,
+        lng: s.longitude,
+      }));
+      const driver = drivers.find((d) => String(d.id) === String(driverId));
+      const truck = trucks.find((t) => String(t.id) === String(truckId));
+      if (!driver || !truck) { addNotification('Select a driver and a truck.', 'error'); return; }
+
+      const res = await AssignmentEngine.assign({ companyId: cid, driver, truck, stops: selectedStops, assignedBy: 'dispatcher' });
+      if (!res.ok) { addNotification(res.errors?.join(' ') || 'Could not assign.', 'error'); return; }
+
+      addNotification(`Route assigned · ${selectedStops.length} stops → ${driver?.full_name}`, 'success');
+      setSelected([]); setDriverId(''); setTruckId(''); load();
+    } catch (e: any) {
+      addNotification(e?.message || 'Could not assign.', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
