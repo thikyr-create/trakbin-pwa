@@ -1,13 +1,14 @@
 // app/admin/communications/page.tsx
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import {
   Mail, Send, Inbox, Smartphone, MessageSquare, FileText, Activity,
 } from 'lucide-react';
 import { useCommunications } from '@/lib/super-admin/hooks/useCommunications';
+import { getConfig } from '@/lib/super-admin/services/settings.service';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -36,6 +37,9 @@ export default function AdminCommunicationsPage() {
   const [orgId, setOrgId] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string>('');
+  const [announcementsOn, setAnnouncementsOn] = useState<boolean>(true);
+
+  useEffect(() => { getConfig().then((c) => setAnnouncementsOn(c.flags.announcements)).catch(() => {}); }, []);
 
   if (loading || !data) {
     return (
@@ -116,7 +120,12 @@ export default function AdminCommunicationsPage() {
                   {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
               )}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={doSend} disabled={busy || !title.trim() || !msg.trim()}
+              {!announcementsOn && (
+                <p className="rounded-xl bg-amber-400/10 px-4 py-2.5 text-xs font-bold text-amber-200 ring-1 ring-amber-300/30">
+                  Announcements are disabled by platform feature flag (Settings → Feature Flags).
+                </p>
+              )}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={doSend} disabled={busy || !title.trim() || !msg.trim() || !announcementsOn}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 py-3 text-sm font-extrabold text-emerald-950 hover:bg-emerald-300 disabled:bg-white/10 disabled:text-white/40">
                 <Send className="h-4 w-4" /> {busy ? 'Sending…' : 'Send announcement'}
               </motion.button>
@@ -139,7 +148,7 @@ export default function AdminCommunicationsPage() {
               <p className="px-6 py-14 text-center text-sm font-semibold text-emerald-100/50">Nothing sent yet. Compose the first announcement.</p>
             ) : (
               <ul className="divide-y divide-white/5">
-                {data.notices.map((n: any, i) => (
+                {data.notices.map((n: any, i: number) => (
                   <motion.li key={String(pick(n, ['id']) ?? i)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, ease: EASE }}
                     className="px-6 py-4">
                     <p className="text-sm font-extrabold text-white">{pick(n, ['title', 'subject']) || 'Untitled'}</p>

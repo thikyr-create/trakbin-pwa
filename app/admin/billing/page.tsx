@@ -10,9 +10,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useBilling } from '@/lib/super-admin/hooks/useBilling';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { getConfig, type PlatformConfig } from '@/lib/super-admin/services/settings.service';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -54,6 +52,7 @@ export default function AdminBillingPage() {
   const [tab, setTab] = useState<Tab>('revenue');
   const [unmatched, setUnmatched] = useState<any[]>([]);
   const [reconciling, setReconciling] = useState<Record<string, string>>({});
+  const [cfg, setCfg] = useState<PlatformConfig | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -62,6 +61,8 @@ export default function AdminBillingPage() {
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => { getConfig().then(setCfg).catch(() => {}); }, []);
 
   const reconcile = async (eventId: string) => {
     const payoutId = prompt('Enter the payout ID this transfer belongs to:');
@@ -154,8 +155,9 @@ export default function AdminBillingPage() {
             <p className={`${display.className} mt-4 text-4xl font-black text-white`}>{formatN(t.commission)}</p>
             <p className="mt-1 text-sm font-semibold text-emerald-100/50">Payment commissions retained</p>
             <div className="mt-5 border-t border-white/5 pt-4">
-              <p className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>Subscription revenue <span className="rounded bg-white/10 px-1.5 py-0.5 text-[8px]">A7R</span></p>
+              <p className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>Subscription revenue</p>
               <p className={`${display.className} mt-1 text-2xl font-black text-white`}>{formatN(0)}</p>
+              <p className="mt-1 text-xs font-semibold text-emerald-100/40">MRR lives in Subscriptions — separate ledger, never mixed</p>
             </div>
             <p className="mt-4 text-xs font-semibold text-emerald-100/40">Payment volume is not revenue.</p>
           </motion.section>
@@ -266,14 +268,16 @@ export default function AdminBillingPage() {
         </Section>
       )}
 
-      {/* SETTINGS */}
+      {/* SETTINGS — config-driven */}
       {tab === 'settings' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }}
             className="rounded-[20px] border border-white/10 bg-white/[0.03] p-5">
             <p className={`${mono.className} flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100/50`}><Settings className="h-3.5 w-3.5" /> Commission model</p>
-            <p className={`${display.className} mt-2 text-2xl font-black text-white`}>10% <span className="text-xs text-emerald-100/50">(1000 bps)</span></p>
-            <p className="mt-1 text-xs font-semibold text-emerald-100/40">Config-driven in A15R · never hardcoded in UI</p>
+            <p className={`${display.className} mt-2 text-2xl font-black text-white`}>
+              {((cfg?.commissionBps ?? 1000) / 100).toFixed(1).replace(/\.0$/, '')}% <span className="text-xs text-emerald-100/50">({cfg?.commissionBps ?? 1000} bps)</span>
+            </p>
+            <p className="mt-1 text-xs font-semibold text-emerald-100/40">Live from platform_config · edited in Settings → Billing</p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.05, ease: EASE }}
             className="rounded-[20px] border border-white/10 bg-white/[0.03] p-5">
@@ -285,7 +289,9 @@ export default function AdminBillingPage() {
             className="rounded-[20px] border border-white/10 bg-white/[0.03] p-5">
             <p className={`${mono.className} flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100/50`}><ArrowRightLeft className="h-3.5 w-3.5" /> Settlement rule</p>
             <p className={`${display.className} mt-2 text-2xl font-black text-white`}>Never on request</p>
-            <p className="mt-1 text-xs font-semibold text-emerald-100/40">Completed only after processor confirmation</p>
+            <p className="mt-1 text-xs font-semibold text-emerald-100/40">
+              Auto ≤ {formatN(cfg?.tiers.auto ?? 500000)} · review ≤ {formatN(cfg?.tiers.review ?? 5000000)} · above = enhanced
+            </p>
           </motion.div>
         </div>
       )}
