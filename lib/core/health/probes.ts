@@ -58,6 +58,17 @@ export async function runProbes(client: SupabaseClient): Promise<ProbeResult[]> 
     results.push({ name: 'API', status: 'down', latencyMs: 0, detail: e?.message || 'edge unreachable' });
   }
 
+  // RPC layer (first production RPCs live here)
+  try {
+    const ms = await time(async () => {
+      const { error } = await client.rpc('rpc_health');
+      if (error) throw new Error(error.message);
+    });
+    results.push({ name: 'RPC', status: ms < 800 ? 'healthy' : 'degraded', latencyMs: ms, detail: 'activation + health RPCs live' });
+  } catch (e: any) {
+    results.push({ name: 'RPC', status: 'down', latencyMs: 0, detail: e?.message || 'rpc failed' });
+  }
+
   // Mapbox
   const mbToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   if (!mbToken) {

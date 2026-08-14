@@ -17,7 +17,7 @@ const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 const PROBE_ICON: Record<string, any> = {
   Database, Authentication: KeyRound, Storage: HardDrive, API: Server,
-  Mapbox: Map, Paystack: Landmark, Email: Mail,
+  Mapbox: Map, Paystack: Landmark, Email: Mail, RPC: Braces,
 };
 
 function dot(status: ProbeResult['status']) {
@@ -59,9 +59,14 @@ export default function AdminHealthPage() {
         </div>
       </motion.section>
 
-      {/* STATUS BOARD */}
+      {/* STATUS BOARD — every probe real, RPC included */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {(loading ? Array.from({ length: 7 }, (_, i) => ({ name: ['Database', 'Authentication', 'Storage', 'API', 'Mapbox', 'Paystack', 'Email'][i], status: 'unconfigured' as const, latencyMs: 0, detail: 'probing…' })) : probes).map((p, i) => {
+        {(loading
+          ? ['Database', 'Authentication', 'Storage', 'API', 'RPC', 'Mapbox', 'Paystack', 'Email'].map((name) => ({
+              name, status: 'unconfigured' as const, latencyMs: 0, detail: 'probing…',
+            }))
+          : probes
+        ).map((p, i) => {
           const Icon = PROBE_ICON[p.name] || Activity;
           return (
             <motion.section key={p.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04, ease: EASE }}
@@ -79,17 +84,6 @@ export default function AdminHealthPage() {
             </motion.section>
           );
         })}
-
-        {/* RPC HEALTH — honest */}
-        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, ease: EASE }}
-          className="rounded-[20px] border border-white/10 bg-white/[0.03] p-5">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-sm font-extrabold text-white"><Braces className="h-4 w-4 text-emerald-300" /> RPC Health</span>
-            <span className="h-2.5 w-2.5 rounded-full bg-white/30" />
-          </div>
-          <p className={`${mono.className} mt-3 text-lg font-black text-white`}>0 live</p>
-          <p className={`${mono.className} mt-1 text-[9px] font-bold uppercase tracking-wider text-emerald-100/50`}>first production RPC lands in Q1 (activation)</p>
-        </motion.section>
       </div>
 
       {/* BACKGROUND JOBS + INCIDENTS */}

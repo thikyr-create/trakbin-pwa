@@ -9,6 +9,7 @@ import {
   CircleCheck, CircleX, Loader2, Eye,
 } from 'lucide-react';
 import { useApprovals } from '@/lib/super-admin/hooks/useApprovals';
+import { adminSupabase } from '@/lib/super-admin/supabase/client';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -33,6 +34,7 @@ export default function AdminApprovalsPage() {
   const { queues: q, loading, reload, act } = useApprovals();
   const [tab, setTab] = useState<Tab>('organizations');
   const [busy, setBusy] = useState<Record<string, string>>({});
+  const [activating, setActivating] = useState<Record<string, boolean>>({});
 
   if (loading || !q) {
     return (
@@ -52,6 +54,23 @@ export default function AdminApprovalsPage() {
     setBusy((b) => { const n = { ...b }; delete n[id]; return n; });
     if (json.ok) reload();
     else alert(json.error || 'Action failed');
+  };
+
+  // Q1: atomic claim activation through the production RPC
+  const activateRpc = async (r: any) => {
+    const companyId = r.company_id ?? Number(prompt('Operator ID to activate this claim for:') || NaN);
+    if (!companyId || isNaN(companyId)) return;
+    setActivating((a) => ({ ...a, [String(r.id)]: true }));
+    const { data, error } = await adminSupabase.rpc('activate_service_request', {
+      p_building_id: r.building_id,
+      p_company_id: companyId,
+    });
+    setActivating((a) => ({ ...a, [String(r.id)]: false }));
+    if (error) alert(error.message);
+    else {
+      alert(`Activated: ${(data as any)?.building_id} → org ${(data as any)?.company_id}`);
+      reload();
+    }
   };
 
   return (
@@ -141,15 +160,38 @@ export default function AdminApprovalsPage() {
         </motion.section>
       )}
 
-      {/* PROPERTY CLAIMS */}
+      {/* PROPERTY CLAIMS — actionable via production RPC */}
       {tab === 'claims' && (
-        <Queue icon={MapPin} title="Property claims" rows={q.propertyClaims}
-          empty="No property claims awaiting activation."
-          render={(r: any) => ({
-            head: String(pick(r, ['building_id']) || 'Claim'),
-            meta: `${pick(r, ['request_number']) || ''}${pick(r, ['submitted_at']) ? ` · ${new Date(pick(r, ['submitted_at'])).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}` : ''}`,
-            badge: 'company activates',
-          })} />
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}
+          className="overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03]">
+          <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+            <p className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-300/70`}>
+              <MapPin className="h-4 w-4" /> Property claims
+            </p>
+            <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>{q.propertyClaims.length}</span>
+          </div>
+          {q.propertyClaims.length === 0 ? (
+            <p className="px-6 py-14 text-center text-sm font-semibold text-emerald-100/50">No property claims awaiting activation.</p>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {q.propertyClaims.map((r: any, i: number) => (
+                <motion.li key={String(pick(r, ['id']) ?? i)} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, ease: EASE }}
+                  className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+                  <div>
+                    <p className="text-sm font-extrabold text-white">{String(pick(r, ['building_id']) || 'Claim')}</p>
+                    <p className={`${mono.className} mt-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100/40`}>
+                      {pick(r, ['request_number']) || ''}{pick(r, ['submitted_at']) ? ` · ${new Date(pick(r, ['submitted_at'])).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}` : ''}
+                    </p>
+                  </div>
+                  <motion.button whileTap={{ scale: 0.95 }} disabled={!!activating[String(r.id)]} onClick={() => activateRpc(r)}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-400 px-4 py-2 text-xs font-extrabold text-emerald-950 hover:bg-emerald-300 disabled:bg-white/10 disabled:text-white/40">
+                    {activating[String(r.id)] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CircleCheck className="h-3.5 w-3.5" />} Activate via RPC
+                  </motion.button>
+                </motion.li>
+              ))}
+            </ul>
+          )}
+        </motion.section>
       )}
 
       {/* SUBSCRIPTION EXCEPTIONS */}
@@ -176,7 +218,7 @@ export default function AdminApprovalsPage() {
       <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }}
         className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6">
         <span className="flex items-center gap-2 text-xs font-semibold text-emerald-100/50">
-          <CheckSquare className="h-3.5 w-3.5 text-emerald-300" /> Decisions server-gated · least privilege enforced
+          <CheckSquare className="h-3.5 w-3.5 text-emerald-300" /> Decisions server-gated · activation atomic via RPC
         </span>
         <span className={`${mono.className} flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-emerald-300/60`}>
           <CheckSquare className="h-3.5 w-3.5" /> Trakbin Approvals
