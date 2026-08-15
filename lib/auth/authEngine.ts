@@ -2,10 +2,7 @@
 import { authAdapter } from './authAdapter';
 import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
-import { BuildingPublisher } from '@/lib/core/event-bus';
-import { publish } from '@/lib/core/event-bus/platform-bus';
-import { TOPICS } from '@/lib/core/event-bus/topics';
-import { ensurePlatformSubscribers } from '@/lib/core/event-bus/subscribers';
+import { BuildingPublisher, BillingPublisher } from '@/lib/core/event-bus';
 import { emitAudit } from '@/lib/core/audit/audit-engine';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
 
@@ -190,9 +187,8 @@ export const authEngine = {
     });
     if (userError) return { ok: false, message: 'Registration failed: ' + userError.message };
 
-    // EVENT BUS: organization entered the platform → audit + future subscribers
-    ensurePlatformSubscribers(supabaseAuth.client);
-    publish(TOPICS.ORGANIZATION_CREATED, { companyId: haulerData.id, name: input.companyName });
+    // EVENT BUS: organization entered the platform (real bus) + audit trail
+    BillingPublisher.publish('ORGANIZATION_CREATED', { companyId: haulerData.id, name: input.companyName });
     emitAudit(supabaseAuth.client, {
       category: 'ADMIN_ACTION', action: 'organization.created',
       target: `org:${haulerData.id}`, metadata: { name: input.companyName },

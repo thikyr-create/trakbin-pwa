@@ -118,6 +118,17 @@ interface RawPlatformEventMap {
   PLATFORM_INVOICE_OVERDUE: { invoiceId?: string | null; companyId?: number | null; amount?: number | null; period?: string | null };
   ADJUSTMENT_CREDIT_ADDED: { companyId?: number | null; amount?: number | null; transactionId?: string | null };
 
+  // ── Settlement / subscription / org lifecycle ──
+  SETTLEMENT_REQUESTED: { payoutId?: string | null; companyId?: number | null; amount?: number | null };
+  SETTLEMENT_APPROVED: { payoutId?: string | null; companyId?: number | null; amount?: number | null };
+  SETTLEMENT_REJECTED: { payoutId?: string | null; companyId?: number | null; amount?: number | null };
+  SETTLEMENT_COMPLETED: { payoutId?: string | null; companyId?: number | null; amount?: number | null };
+  SUBSCRIPTION_CREATED: { companyId?: number | null; plan?: string | null };
+  SUBSCRIPTION_RENEWED: { companyId?: number | null; plan?: string | null };
+  SUBSCRIPTION_CANCELLED: { companyId?: number | null };
+  SUBSCRIPTION_EXPIRING: { companyId?: number | null };
+  ORGANIZATION_CREATED: { companyId?: number | null; name?: string | null };
+
   // ── Auth email events ──
   AUTH_2FA_ENROLLED: { userId?: string | null };
   AUTH_ACCOUNT_RECOVERY_REQUESTED: { userId?: string | null };
