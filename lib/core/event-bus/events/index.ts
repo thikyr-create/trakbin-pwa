@@ -9,18 +9,18 @@
  */
 interface RawPlatformEventMap {
   // ── Building lifecycle ──
-  BUILDING_REGISTERED: { buildingId?: string | null; companyId?: number | null };
+  BUILDING_REGISTERED: { buildingId?: string | null; companyId?: number| null };
   BUILDING_UPDATED: { buildingId?: string | null; companyId?: number | null };
   BUILDING_ONBOARDED: { buildingId?: string | null; companyId?: number | null };
   BUILDING_LOCATION_CORRECTED: { buildingId?: string | null; companyId?: number | null; latitude?: number | null; longitude?: number | null };
   BUILDING_STATUS_CHANGED: { buildingId?: string | null; companyId?: number | null; status?: string | null };
-  BUILDING_ARCHIVED: { buildingId?: string | null; companyId?: number | null };
+  BUILDING_ARCHIVED: { buildingId?: string | null; companyId?: number |null };
   BUILDING_CREATED: { buildingId?: string | null; companyId?: number | null };
   BUILDING_DELETED: { buildingId?: string | null; companyId?: number | null };
 
   // ── Service lifecycle ──
-  SERVICE_ACTIVATED: { buildingId?: string | null; companyId?: number | null };
-  SERVICE_DEACTIVATED: { buildingId?: string | null; companyId?: number | null };
+  SERVICE_ACTIVATED: { buildingId?: string | null; companyId?: number |null };
+  SERVICE_DEACTIVATED: { buildingId?: string | null; companyId?: number| null };
   SERVICE_CREATED: { buildingId?: string | null; companyId?: number | null };
   SERVICE_UPDATED: { buildingId?: string | null; companyId?: number | null };
   SERVICE_DELETED: { buildingId?: string | null; companyId?: number | null };
@@ -41,13 +41,13 @@ interface RawPlatformEventMap {
   TRUCK_DELETED: { truckId?: string | null; companyId?: number | null };
 
   // ── Driver lifecycle ──
-  DRIVER_CREATED: { driverId?: string | null; companyId?: number | null };
-  DRIVER_UPDATED: { driverId?: string | null; companyId?: number | null };
-  DRIVER_DELETED: { driverId?: string | null; companyId?: number | null };
-  DRIVER_ASSIGNED: { driverId?: string | null; routeId?: string | null; companyId?: number | null };
+  DRIVER_CREATED: { driverId?: string | null; companyId?: number | null};
+  DRIVER_UPDATED: { driverId?: string | null; companyId?: number | null};
+  DRIVER_DELETED: { driverId?: string | null; companyId?: number | null};
+  DRIVER_ASSIGNED: { driverId?: string | null; routeId?: string | null;companyId?: number | null };
 
   // ── Caretaker auth ──
-  CARETAKER_LOGGED_IN: { buildingId?: string | null; companyId?: number | null };
+  CARETAKER_LOGGED_IN: { buildingId?: string | null; companyId?: number| null };
   CARETAKER_LOGGED_OUT: { buildingId?: string | null; companyId?: number | null };
   CARETAKER_PASSCODE_RESET: { buildingId?: string | null };
 
@@ -69,8 +69,8 @@ interface RawPlatformEventMap {
   ROUTE_CREATED: { companyId?: number | null; routeId?: string | null };
   ROUTE_UPDATED: { companyId?: number | null; routeId?: string | null };
   ROUTE_DELETED: { companyId?: number | null; routeId?: string | null };
-  ROUTE_ASSIGNED: { companyId?: number | null; routeId?: string | null; driverId?: string | null };
-  ROUTE_GENERATED: { companyId?: number | null; routeId?: string | null };
+  ROUTE_ASSIGNED: { companyId?: number | null; routeId?: string | null;driverId?: string | null };
+  ROUTE_GENERATED: { companyId?: number | null; routeId?: string | null};
   DISPATCH_FAILED: { companyId?: number | null; reason?: string | null };
 
   // ── Driver console (Phase B events) ──
@@ -88,7 +88,7 @@ interface RawPlatformEventMap {
     activityType?: 'pickup' | 'skip' | 'report' | 'deviation' | null;
   };
   DRIVER_DEVIATED: { driverId?: string | null; companyId?: number | null; distanceM?: number | null };
-  DRIVER_REJOINED_ROUTE: { driverId?: string | null; companyId?: number | null };
+  DRIVER_REJOINED_ROUTE: { driverId?: string | null; companyId?: number| null };
   DRIVER_FEEDBACK_SUBMITTED: { driverId?: string | null; buildingId?: string | null; companyId?: number | null; category?: string | null };
   DRIVER_LOCATION_CORRECTED: { driverId?: string | null; buildingId?: string | null; companyId?: number | null };
   DRIVER_ROUTE_COMPLETED: { driverId?: string | null; routeId?: string | null; companyId?: number | null };
@@ -96,7 +96,7 @@ interface RawPlatformEventMap {
   DRIVER_ROUTE_RESUMED: { driverId?: string | null; routeId?: string | null; companyId?: number | null };
 
   // ── Operations events ──
-  INCIDENT_REPORTED: { incidentId?: string | null; companyId?: number | null; type?: string | null };
+  INCIDENT_REPORTED: { incidentId?: string | null; companyId?: number |null; type?: string | null };
   REPORT_CREATED: { reportId?: string | null; companyId?: number | null; type?: string | null };
   PICKUP_COMPLETED: { pickupId?: string | null; companyId?: number | null; buildingId?: string | null };
   OPS_INCIDENT_REPORTED: { incidentId?: string | null; companyId?: number | null };
@@ -106,16 +106,22 @@ interface RawPlatformEventMap {
   // ── Billing events ──
   BILLING_INVOICE_CREATED: { invoiceId?: string | null; companyId?: number | null; amount?: number | null };
   BILLING_PAYMENT_RECEIVED: { paymentId?: string | null; companyId?: number | null; amount?: number | null };
-  BILLING_REMINDER_DUE: { invoiceId?: string | null; companyId?: number | null };
+  BILLING_REMINDER_DUE: { invoiceId?: string | null; companyId?: number| null };
   INVOICE_CREATED: { invoiceId?: string | null; companyId?: number | null };
   PAYMENT_RECEIVED: { paymentId?: string | null; companyId?: number | null };
   PAYMENT_FAILED: { paymentId?: string | null; companyId?: number | null; reason?: string | null };
   PAYOUT_RELEASED: { payoutId?: string | null; companyId?: number | null; amount?: number | null };
 
+  // ── Platform billing (Trakbin → operators) ──
+  PLATFORM_INVOICE_CREATED: { invoiceId?: string | null; companyId?: number | null; amount?: number | null; period?: string | null };
+  PLATFORM_INVOICE_PAID: { invoiceId?: string | null; companyId?: number | null; amount?: number | null };
+  PLATFORM_INVOICE_OVERDUE: { invoiceId?: string | null; companyId?: number | null; amount?: number | null; period?: string | null };
+  ADJUSTMENT_CREDIT_ADDED: { companyId?: number | null; amount?: number | null; transactionId?: string | null };
+
   // ── Auth email events ──
   AUTH_2FA_ENROLLED: { userId?: string | null };
   AUTH_ACCOUNT_RECOVERY_REQUESTED: { userId?: string | null };
-  AUTH_DRIVER_CREDENTIALS_SENT: { driverId?: string | null; companyId?: number | null };
+  AUTH_DRIVER_CREDENTIALS_SENT: { driverId?: string | null; companyId?:number | null };
   AUTH_EMAIL_VERIFICATION_REQUESTED: { userId?: string | null };
   AUTH_NEW_LOGIN: { userId?: string | null };
   AUTH_OTP_REQUESTED: { userId?: string | null };
