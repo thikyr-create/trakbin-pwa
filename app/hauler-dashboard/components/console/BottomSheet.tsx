@@ -9,20 +9,20 @@ import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStor
 import { calculateDistanceInMeters } from '../../utils/geo';
 import NextStopCard from './NextStopCard';
 
-const VISIBLE_ACTIVE = 272; // handle + next-stop card + pause button
-const VISIBLE_IDLE = 44;    // handle + peek — drag up to reveal
+const VISIBLE_ACTIVE = 272;
+const VISIBLE_IDLE = 44;
 
 export default function BottomSheet() {
   const {
     currentStop, isArrived, isRoutePaused, gpsLocation,
     completePickup, setShowSkipModal, setShowReportModal, toggleRoutePause,
+    flyToLocation, // ← Added this
   } = useDriverSession();
   const { sheetState, setSheetState, openEvidence, setPauseModalOpen } = useConsoleStore();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [collapsedY, setCollapsedY] = useState(300);
 
   const mode: 'idle' | 'paused' | 'active' = !currentStop ? 'idle' : isRoutePaused ? 'paused' : 'active';
-  // paused stays fully visible (critical state); idle collapses to a grab bar; active shows the task card
   const visiblePx = mode === 'active' ? VISIBLE_ACTIVE : mode === 'idle' ? VISIBLE_IDLE : 9999;
 
   useLayoutEffect(() => {
@@ -46,12 +46,15 @@ export default function BottomSheet() {
     else if (fastDown || (movedDown && !fastUp)) setSheetState('collapsed');
   };
 
+  // FIX 1: In-app navigation + auto-collapse
   const handleNavigate = () => {
     if (!stop || stop.latitude == null || stop.longitude == null) return;
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${stop.latitude},${stop.longitude}&travelmode=driving`,
-      '_blank'
-    );
+    
+    // Fly the in-app map to the stop
+    flyToLocation(stop.latitude, stop.longitude, 17);
+    
+    // Auto-collapse the sheet so the map is visible
+    setSheetState('collapsed');
   };
 
   const handleConfirm = async () => {
@@ -77,13 +80,11 @@ export default function BottomSheet() {
         <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
       </div>
 
-      {/* When expanded, inner scroll owns the pointer; when collapsed, whole sheet drags */}
       <div
         className="px-5 pb-5 overflow-y-auto max-h-[58vh]"
         onPointerDown={sheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
       >
         {mode === 'idle' && (
-          /* ── Off shift: always-visible idle surface ── */
           <div className="rounded-xl bg-gray-50 border border-gray-200 p-4 flex items-center gap-3">
             <span className="w-2.5 h-2.5 rounded-full bg-gray-400 shrink-0" />
             <div>
@@ -94,13 +95,12 @@ export default function BottomSheet() {
         )}
 
         {mode === 'paused' && (
-          /* ── Paused: Resume lives here ── */
           <div className="space-y-3">
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-center gap-3">
               <Pause size={18} className="text-amber-600 shrink-0" />
               <div>
                 <p className="text-sm font-black text-amber-800">Route paused</p>
-                <p className="text-xs text-amber-600">Progress preserved — stops won't be marked late.</p>
+                <p className="text-xs text-amber-600">Progress preserved— stops won't be marked late.</p>
               </div>
             </div>
             <button
@@ -113,7 +113,6 @@ export default function BottomSheet() {
         )}
 
         {mode === 'active' && currentStop && (
-          /* ── Active: Navigate / Confirm Pickup / Pause ── */
           <>
             <NextStopCard
               stop={currentStop}
