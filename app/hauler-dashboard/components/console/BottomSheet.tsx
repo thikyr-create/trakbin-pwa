@@ -24,10 +24,10 @@ export default function BottomSheet() {
 
   const mode: 'idle' | 'paused' | 'active' = !currentStop ? 'idle' : isRoutePaused ? 'paused' : 'active';
   
-  // FIX: Allow active mode to collapse to the grab handle (VISIBLE_IDLE)
-  const visiblePx = mode === 'active' 
-    ? (sheetState === 'collapsed' ? VISIBLE_IDLE : VISIBLE_ACTIVE)
-    : mode === 'idle' ? VISIBLE_IDLE : 9999;
+  // REMOVED EXCEPTION: Always collapse to grab handle when collapsed, regardless of mode
+  const visiblePx = sheetState === 'collapsed' 
+    ? VISIBLE_IDLE 
+    : (mode === 'active' || mode === 'paused' ? VISIBLE_ACTIVE : VISIBLE_IDLE);
 
   useLayoutEffect(() => {
     const h = sheetRef.current?.offsetHeight ?? 0;
@@ -54,7 +54,6 @@ export default function BottomSheet() {
     setSheetState(sheetState === 'expanded' ? 'collapsed' : 'expanded');
   };
 
-  // FIX: Set navigation destination to draw the blue routing line, then collapse the sheet
   const handleNavigate = () => {
     if (!stop || stop.latitude == null || stop.longitude == null) return;
     setNavigationDestination({ lat: stop.latitude, lng: stop.longitude });
