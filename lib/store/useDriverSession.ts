@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { recordActivity, type DriverEventType } from '@/lib/features/driver/activity';
 import { deviationDetector } from '@/lib/features/driver/deviation/deviationDetector';
+import { breadcrumbRecorder } from '@/lib/features/driver/breadcrumbs/breadcrumbRecorder';
 import { DriverRoute, RouteBuilding } from '../../app/hauler-dashboard/components/types';
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from '../../app/hauler-dashboard/utils/geo';
 
@@ -142,7 +143,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
     set({ isLoading: true });
     try {
-            console.log('[driver-console] auth uid:', user.id);
+      console.log('[driver-console] auth uid:', user.id);
       console.log('[driver-console] driver row:', driver);
       console.log('[driver-console] querying routes:', { cid, driver_id: String(driver.id) });
 
@@ -227,11 +228,27 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
   updateGps: (lat, lng, accuracy?) => {
     set({ gpsLocation: { lat, lng }, gpsAccuracy: accuracy ?? null });
-    const { currentStop, isArrived, isRoutePaused, route, driverCompanyId } = get();
+    const { currentStop, isArrived, isRoutePaused, route, driverCompanyId, driver } = get();
     const { tenant } = useCompanySession.getState();
+    const cid = driverCompanyId ?? tenant.companyId;
+
+    // ─── BREADCRUMB RECORDING ───
+    // Record continuous GPS track while actively on a route
+    if (cid && route && driver) {
+      breadcrumbRecorder.record({
+        driverId: driver.employee_id || driver.id || 'unknown',
+        companyId: cid,
+        routeId: route.id,
+        lat,
+        lng,
+        accuracy,
+        speed: null, // Mobile GPS speed is often null/unreliable; FI calculates it from points
+        heading: null,
+      });
+    }
 
     // Route start: first GPS lock on an assigned route
-    if (route && route.status === 'assigned' && (driverCompanyId ?? tenant.companyId) && !routeStartRecorded) {
+    if (route && route.status === 'assigned' && cid && !routeStartRecorded) {
       routeStartRecorded = true;
       (async () => {
         try {
@@ -426,7 +443,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     deviationDetector.reset();
 
     try {
-            await supabase.from('routes').update({
+      await supabase.from('routes').update({
         status: 'completed',
         ended_at: new Date().toISOString()
       }).eq('id', route.id).eq('company_id', cid);
@@ -436,6 +453,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
       await supabase.from('drivers').update({ status: 'available', current_assignment_id: null }).eq('id', Number(route.driver_id));
       await supabase.from('trucks').update({ status: 'available', current_driver: null }).eq('id', Number(route.truck_id));
 
+      // ─── BREADCRUMB FLUSH ───
+      // Ensure the final batch of GPS points is sent before stopping tracking
+      await breadcrumbRecorder.flush();
       stopGpsTracking();
 
       set({
@@ -457,4 +477,5 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   highlightNode: (id) => set({ highlightedNodeId: id }),
   flyToLocation: (lat, lng, zoom) => set({ targetLocation: { lat, lng, zoom }, cameraMode: 'navigating' }),
   centerOnDriver: () => set({ cameraMode: 'following' }),
-});});
+});
+});

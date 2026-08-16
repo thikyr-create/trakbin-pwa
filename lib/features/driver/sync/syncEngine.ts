@@ -26,6 +26,32 @@ async function flushOne(item: QueuedItem): Promise<boolean> {
     }
     return true;
   }
+
+  if (item.type === 'driver_breadcrumb') {
+    // Map camelCase breadcrumb record → snake_case DB columns
+    const p = item.payload as any;
+    const row = {
+      driver_id: p.driverId,
+      company_id: p.companyId,
+      route_id: p.routeId ?? null,
+      lat: p.lat,
+      lng: p.lng,
+      accuracy_m: p.accuracy ?? null,
+      speed_mps: p.speed ?? null,
+      heading: p.heading ?? null,
+      recorded_at: p.recorded_at,
+    };
+    const { error } = await supabase.from('driver_breadcrumbs').insert([row]);
+    if (error) {
+      // No unique constraint on breadcrumbs, but treat duplicate-key-style
+      // errors as success just in case; real errors surface to failed count.
+      if (/duplicate key|unique/i.test(error.message)) return true;
+      return false;
+    }
+    return true;
+  }
+
+  // Unknown type — drop it rather than block the queue
   return true;
 }
 

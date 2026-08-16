@@ -30,3 +30,10 @@ export const GPS_CONFIG = {
   timeout: 10000,
   maximumAge: 0,
 };
+
+export const BREADCRUMB_CONFIG = {
+  minTimeMs: 15000,       // record at least every 15s
+  minDistanceM: 30,       // OR if moved 30m
+  batchSize: 20,          // flush to DB every 20 points
+  flushIntervalMs: 60000, // or flush every 60s
+};
