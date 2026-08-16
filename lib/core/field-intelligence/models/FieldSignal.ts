@@ -2,7 +2,8 @@
 export type SignalKind =
   | 'pickup_confidence' | 'location_accuracy' | 'route_deviation'
   | 'stop_duration' | 'route_efficiency' | 'arrival_accuracy'
-  | 'road_behavior' | 'travel_time' | 'service_time';
+  | 'road_behavior' | 'travel_time' | 'service_time'
+  | 'route_distance' | 'route_duration'; // Added for breadcrumb learning
 
 export type SignalEntityType = 'building' | 'zone' | 'route' | 'driver' | 'segment';
 
