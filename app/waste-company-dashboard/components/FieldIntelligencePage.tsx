@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X, MapPin, TrendingUp } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { useCompanySession } from '@/lib/store/useCompanySession';
-import { useEntitlement } from '@/lib/features/subscription/hooks/useEntitlement';
-import CapabilityLocked from './entitlement/CapabilityLocked';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -25,14 +23,23 @@ interface Intelligence {
 
 export default function FieldIntelligencePage() {
   const { tenant } = useCompanySession();
-  const { allowed, checking } = useEntitlement(tenant?.companyId, 'field_intelligence');
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [intelligence, setIntelligence] = useState<Intelligence[]>([]);
   const [tab, setTab] = useState<'corrections' | 'intelligence'>('corrections');
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    if (!tenant?.companyId) return;
+    fetchData();
+    const channel = supabase
+      .channel('field_corrections_realtime')
+      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'field_corrections', filter: `company_id=eq.${tenant.companyId}` }, () => { fetchData(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [tenant?.companyId]);
+
   const fetchData = async () => {
-    if (!tenant?.companyId || allowed !== true) return;
+    if (!tenant?.companyId) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/field-intelligence/corrections/list?companyId=${tenant.companyId}`);
@@ -45,32 +52,12 @@ export default function FieldIntelligencePage() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (!tenant?.companyId || allowed !== true) return;
-    fetchData();
-    const channel = supabase
-      .channel('field_corrections_realtime')
-      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'field_corrections', filter: `company_id=eq.${tenant.companyId}` }, () => { fetchData(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [tenant?.companyId, allowed]);
-
   const handleApprove = async (id: number) => {
     await fetch('/api/field-intelligence/corrections/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctionId: id, reviewedBy: 'admin' }) });
   };
   const handleReject = async (id: number) => {
     await fetch('/api/field-intelligence/corrections/reject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ correctionId: id, reviewedBy: 'admin' }) });
   };
-
-  if (checking) {
-    return (
-      <div className="py-16 text-center">
-        <motion.div className="mx-auto h-8 w-8 rounded-full border-2 border-emerald-600 border-t-transparent" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
-        <p className="mt-3 text-sm text-gray-500">Checking entitlement…</p>
-      </div>
-    );
-  }
-  if (!allowed) return <CapabilityLocked title="Field Intelligence" capability="field intelligence" />;
 
   const pending = corrections.filter((c) => c.status !== 'applied' && c.status !== 'rejected');
   const applied = corrections.filter((c) => c.status === 'applied');
@@ -79,9 +66,7 @@ export default function FieldIntelligencePage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100">
-            <TrendingUp size={20} className="text-emerald-700" />
-          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100"><TrendingUp size={20} className="text-emerald-700" /></div>
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Self-learning operations</p>
             <h2 className="text-lg font-black text-gray-900">Field Intelligence</h2>

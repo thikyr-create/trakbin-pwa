@@ -6,9 +6,6 @@ import { motion } from "framer-motion";
 import { Download } from "lucide-react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { useAnalytics } from "@/lib/features/analytics/hooks/useAnalytics";
-import { useCompanySession } from "@/lib/store/useCompanySession";
-import { useEntitlement } from "@/lib/features/subscription/hooks/useEntitlement";
-import CapabilityLocked from "../entitlement/CapabilityLocked";
 import AnalyticsFilters from "./AnalyticsFilters";
 import KPIGrid from "./KPIGrid";
 import RevenueTrendChart from "./RevenueTrendChart";
@@ -24,20 +21,8 @@ const body = Plus_Jakarta_Sans({ subsets: ["latin"], display: "swap", variable: 
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
 export default function AnalyticsPage() {
-  const { tenant } = useCompanySession();
-  const { allowed, checking } = useEntitlement(tenant?.companyId, 'analytics');
   const { data, loading, error, preset, setPreset, kpis, revenueSeries, growthSeries, paymentDist, fleet, insights } = useAnalytics();
   const [showExport, setShowExport] = useState(false);
-
-  if (checking) {
-    return (
-      <div className="py-16 text-center">
-        <motion.div className="mx-auto h-8 w-8 rounded-full border-2 border-emerald-600 border-t-transparent" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
-        <p className="mt-3 text-sm text-gray-500">Checking entitlement…</p>
-      </div>
-    );
-  }
-  if (!allowed) return <CapabilityLocked title="Analytics" capability="analytics" />;
 
   const executionGap = (data?.plannedRuns ?? 0) === 0;
 
