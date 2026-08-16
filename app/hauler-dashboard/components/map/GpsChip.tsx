@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 
-export default function GpsChip({ className = 'bottom-24' }: { className?: string }) {
+export default function GpsChip({ className = 'bottom-[52px]' }: { className?: string }) {
   const { gpsLocation, gpsAccuracy } = useDriverSession();
   const { sheetState } = useConsoleStore();
 
