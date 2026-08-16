@@ -67,6 +67,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // charge.failed: PSP rejected the payment
+  if (event.event === 'charge.failed') {
+    const ref = event.data?.reference;
+    if (!ref) return NextResponse.json({ ok: true });
+    
+    await markFailed(ref);
+    return NextResponse.json({ ok: true, status: 'failed' });
+  }
+
   // money-OUT: transfer events
   if (event.event === 'transfer.success' || event.event === 'transfer.failed' || event.event === 'transfer.reversed') {
     const code = event.data?.transfer_code;

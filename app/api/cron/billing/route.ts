@@ -62,7 +62,10 @@ export async function GET(req: NextRequest) {
     try {
       const res = await fetch(`${origin}/api/company/billing`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': process.env.CRON_SECRET || '',
+        },
         body: JSON.stringify({ action: 'generate_bulk', company_id: company.company_id }),
       });
       const data = await res.json().catch(() => null);
