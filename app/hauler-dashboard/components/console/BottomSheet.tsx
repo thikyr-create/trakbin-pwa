@@ -112,7 +112,7 @@ export default function BottomSheet() {
           </div>
         )}
 
-        {mode === 'active' && currentStop && (
+                {mode === 'active' && currentStop && (
           <>
             <NextStopCard
               stop={currentStop}
@@ -121,6 +121,7 @@ export default function BottomSheet() {
               etaMin={etaMin}
               onNavigate={handleNavigate}
               onConfirm={handleConfirm}
+              onSkip={() => setShowSkipModal(true)}
             />
             <button
               onClick={() => setPauseModalOpen(true)}

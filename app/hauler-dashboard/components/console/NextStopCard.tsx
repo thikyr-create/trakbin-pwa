@@ -1,7 +1,7 @@
 // app/hauler-dashboard/components/console/NextStopCard.tsx
 "use client";
 
-import { Navigation, CircleCheck, Building2 } from 'lucide-react';
+import { Navigation, CircleCheck, Building2, SkipForward } from 'lucide-react';
 import type { RouteBuilding } from '../types';
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
   etaMin: number | null;
   onNavigate: () => void;
   onConfirm: () => void;
+  onSkip: () => void; // ← New prop
 }
 
-export default function NextStopCard({ stop, isArrived, distanceM, etaMin, onNavigate, onConfirm }: Props) {
+export default function NextStopCard({ stop, isArrived, distanceM, etaMin, onNavigate, onConfirm, onSkip }: Props) {
   const s: any = stop;
 
   return (
@@ -49,7 +50,7 @@ export default function NextStopCard({ stop, isArrived, distanceM, etaMin, onNav
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           onClick={onNavigate}
           className="flex items-center justify-center gap-2 py-3.5 bg-blue-600 text-white font-bold rounded-xl text-sm uppercase active:scale-95 transition-all"
@@ -57,11 +58,17 @@ export default function NextStopCard({ stop, isArrived, distanceM, etaMin, onNav
           <Navigation size={16} /> Navigate
         </button>
         <button
+          onClick={onSkip}
+          className="flex items-center justify-center gap-2 py-3.5 bg-amber-500 text-white font-bold rounded-xl text-sm uppercase active:scale-95 transition-all"
+        >
+          <SkipForward size={16} /> Skip
+        </button>
+        <button
           onClick={onConfirm}
           disabled={!isArrived}
           className="flex items-center justify-center gap-2 py-3.5 bg-emerald-600 text-white font-bold rounded-xl text-sm uppercase active:scale-95 transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
         >
-          <CircleCheck size={16} /> Confirm Pickup
+          <CircleCheck size={16} /> Confirm
         </button>
       </div>
       {!isArrived && (
