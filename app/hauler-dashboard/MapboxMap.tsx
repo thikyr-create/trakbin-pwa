@@ -14,9 +14,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// Placeholder only — replaced by the first true source (GPS / stops / company area)
 const PLACEHOLDER_CENTER: [number, number] = [9.0, 8.0];
-const MAX_USABLE_ACCURACY_M = 1000; // beyond this, the fix is a lie (IP geolocation)
+const MAX_USABLE_ACCURACY_M = 1000;
 
 function stopMarkerEl(stop: any, isNext: boolean): HTMLDivElement {
   const el = document.createElement('div');
@@ -40,7 +39,7 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
   const destMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const centeredRef = useRef(false);
 
-  const { routeStops, cameraMode, targetLocation, gpsLocation, gpsAccuracy, highlightedNodeId } = useDriverSession();
+  const { routeStops, cameraMode, targetLocation, gpsLocation, gpsAccuracy, highlightedNodeId, navigationDestination } = useDriverSession();
   const { searchDestination } = useConsoleStore();
 
   const gpsUsable = !!gpsLocation && gpsAccuracy != null && gpsAccuracy <= MAX_USABLE_ACCURACY_M;
@@ -64,8 +63,6 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     map.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
     mapRef.current = map;
 
-    // NO driver marker here anymore — it's created only from a real GPS fix below.
-
     map.on('style.load', () => drawRouteRef.current());
 
     if (onMapReady) onMapReady(map);
@@ -73,7 +70,6 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     return () => { map.remove(); mapRef.current = null; };
   }, []);
 
-  // Driver marker: created/moved ONLY from usable GPS fixes
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !gpsLocation || !gpsUsable) return;
@@ -95,7 +91,6 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     }
   }, [gpsLocation, gpsUsable, cameraMode]);
 
-  // Fallback centering: company operational area when no GPS and no route stops
   useEffect(() => {
     const map = mapRef.current;
     if (!map || centeredRef.current || gpsUsable || routeStops.length > 0) return;
@@ -121,7 +116,6 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     return () => { cancelled = true; };
   }, [gpsUsable, routeStops.length]);
 
-  // Recalculate canvas when the visible viewport changes (Safari chrome, orientation)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -137,7 +131,7 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
     };
   }, []);
 
-  // Driving route line to a searched destination (Bolt-style)
+  // Search destination routing (existing)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -197,6 +191,64 @@ export default function MapboxMap({ onMapReady }: { onMapReady?: (map: mapboxgl.
 
     return () => { cancelled = true; };
   }, [searchDestination]);
+
+  // NEW: Navigation destination routing (blue line from driver to next stop)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const clear = () => {
+      if (map.getLayer('nav-route-layer')) map.removeLayer('nav-route-layer');
+      if (map.getSource('nav-route')) map.removeSource('nav-route');
+    };
+
+    if (!navigationDestination) { clear(); return; }
+
+    const state = useDriverSession.getState();
+    if (!state.gpsLocation || state.gpsAccuracy == null || state.gpsAccuracy > MAX_USABLE_ACCURACY_M) {
+      clear();
+      return;
+    }
+
+    const origin: [number, number] = [state.gpsLocation.lng, state.gpsLocation.lat];
+    const dest: [number, number] = [navigationDestination.lng, navigationDestination.lat];
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const url =
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${origin[0]},${origin[1]};${dest[0]},${dest[1]}` +
+          `?geometries=geojson&access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (cancelled || !mapRef.current) return;
+        const coords = data?.routes?.[0]?.geometry?.coordinates;
+        clear();
+        if (!coords || coords.length < 2) return;
+
+        map.addSource('nav-route', {
+          type: 'geojson',
+          data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
+        });
+        map.addLayer({
+          id: 'nav-route-layer',
+          type: 'line',
+          source: 'nav-route',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#2563EB', 'line-width': 5, 'line-opacity': 0.9 },
+        });
+
+        const bounds = new mapboxgl.LngLatBounds();
+        bounds.extend(origin);
+        coords.forEach((c: [number, number]) => bounds.extend(c));
+        map.fitBounds(bounds, { padding: 70, duration: 1200 });
+      } catch (e) {
+        console.warn('[nav-route] directions failed', e);
+      }
+    })();
+
+    return () => { cancelled = true; clear(); };
+  }, [navigationDestination]);
 
   const drawRoute = () => {
     const map = mapRef.current;

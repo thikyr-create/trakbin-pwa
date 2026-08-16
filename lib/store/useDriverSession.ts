@@ -46,6 +46,7 @@ export interface DriverSessionState {
   cameraMode: 'following' | 'exploring' | 'navigating' | 'idle';
   highlightedNodeId: string | null;
   targetLocation: { lat: number; lng: number; zoom: number } | null;
+  navigationDestination: { lat: number; lng: number } | null;
 
   initializeSession: () => void;
   startGpsTracking: () => void;
@@ -60,6 +61,7 @@ export interface DriverSessionState {
   setShowSkipModal: (show: boolean) => void;
   setShowReportModal: (show: boolean) => void;
   setShowEndShiftModal: (show: boolean) => void;
+  setNavigationDestination: (dest: { lat: number; lng: number } | null) => void;
   searchGeocode: (query: string) => Promise<void>;
   selectGeocodeResult: (result: GeocodeResult) => void;
   toggleRoutePause: (reason?: string) => Promise<void>;
@@ -119,6 +121,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   cameraMode: 'idle',
   highlightedNodeId: null,
   targetLocation: null,
+  navigationDestination: null,
 
   initializeSession: async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -296,7 +299,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     const nextStop = newStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending') || null;
     const newRoute = { ...route, completed_stops: route.completed_stops + 1 };
 
-    set({ routeStops: newStops, currentStop: nextStop, route: newRoute, isArrived: false });
+    // Clear navigation destination so the blue routing line disappears
+    set({ routeStops: newStops, currentStop: nextStop, route: newRoute, isArrived: false, navigationDestination: null });
     approachedFor = null;
 
     await supabase.from('route_stops').update({ status: 'completed', completion_time: new Date().toISOString() }).eq('id', currentStop.id).eq('company_id', cid);
@@ -320,7 +324,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     const newStops = routeStops.map(s => s.id === currentStop.id ? { ...s, status: 'skipped' as RouteBuilding['status'], skip_reason: reason } : s);
     const nextStop = newStops.find(s => s.sequence === currentStop.sequence + 1 && s.status === 'pending') || null;
 
-    set({ routeStops: newStops, currentStop: nextStop, isArrived: false, showSkipModal: false });
+    // Clear navigation destination so the blue routing line disappears
+    set({ routeStops: newStops, currentStop: nextStop, isArrived: false, showSkipModal: false, navigationDestination: null });
     approachedFor = null;
 
     await supabase.from('route_stops').update({ status: 'skipped', skip_reason: reason }).eq('id', currentStop.id).eq('company_id', cid);
@@ -370,6 +375,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   setShowSkipModal: (show) => set({ showSkipModal: show }),
   setShowReportModal: (show) => set({ showReportModal: show }),
   setShowEndShiftModal: (show) => set({ showEndShiftModal: show }),
+  
+  setNavigationDestination: (dest) => set({ navigationDestination: dest }),
 
   searchGeocode: async (query) => {
     if (!query.trim()) { set({ geocodeResults: [] }); return; }
@@ -465,7 +472,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
         isArrived: false,
         isRoutePaused: false,
         showEndShiftModal: false,
-        progressStats: { distance: 0, eta: 0 }
+        progressStats: { distance: 0, eta: 0 },
+        navigationDestination: null
       });
     } catch (error) {
       console.error('Error ending shift:', error);
