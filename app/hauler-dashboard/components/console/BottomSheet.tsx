@@ -16,7 +16,7 @@ export default function BottomSheet() {
   const {
     currentStop, isArrived, isRoutePaused, gpsLocation,
     completePickup, setShowSkipModal, setShowReportModal, toggleRoutePause,
-    flyToLocation, // ← Added this
+    flyToLocation,
   } = useDriverSession();
   const { sheetState, setSheetState, openEvidence, setPauseModalOpen } = useConsoleStore();
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -46,14 +46,15 @@ export default function BottomSheet() {
     else if (fastDown || (movedDown && !fastUp)) setSheetState('collapsed');
   };
 
+  // FIX 3: Manual collapse/expand anytime via tap on the handle
+  const toggleSheet = () => {
+    setSheetState(sheetState === 'expanded' ? 'collapsed' : 'expanded');
+  };
+
   // FIX 1: In-app navigation + auto-collapse
   const handleNavigate = () => {
     if (!stop || stop.latitude == null || stop.longitude == null) return;
-    
-    // Fly the in-app map to the stop
     flyToLocation(stop.latitude, stop.longitude, 17);
-    
-    // Auto-collapse the sheet so the map is visible
     setSheetState('collapsed');
   };
 
@@ -75,10 +76,14 @@ export default function BottomSheet() {
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
       className="absolute bottom-0 left-0 right-0 z-20 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-200 will-change-transform"
     >
-      {/* Drag handle — always a drag source */}
-      <div className="w-full flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
+      {/* FIX 3: Drag handle — tap to collapse/expand anytime */}
+      <motion.div
+        onTap={toggleSheet}
+        className="w-full flex justify-center pt-3 pb-2 cursor-pointer"
+        title={sheetState === 'expanded' ? 'Tap to collapse' : 'Tap to expand'}
+      >
         <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
-      </div>
+      </motion.div>
 
       <div
         className="px-5 pb-5 overflow-y-auto max-h-[58vh]"
@@ -112,7 +117,7 @@ export default function BottomSheet() {
           </div>
         )}
 
-                {mode === 'active' && currentStop && (
+        {mode === 'active' && currentStop && (
           <>
             <NextStopCard
               stop={currentStop}

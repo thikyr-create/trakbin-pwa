@@ -1,3 +1,4 @@
+// app/hauler-dashboard/components/SkipReasonModal.tsx
 "use client";
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -5,7 +6,17 @@ import { X, SkipForward } from 'lucide-react';
 import { useState } from 'react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 
-const REASONS = ["Resident absent", "Locked gate", "Road blocked", "Construction", "Flooding", "Security issue", "Other"];
+const REASONS = [
+  "Not available",
+  "No bin on site",
+  "Resident absent",
+  "Locked gate",
+  "Road blocked",
+  "Construction",
+  "Flooding",
+  "Security issue",
+  "Other",
+];
 
 export default function SkipReasonModal() {
   const { showSkipModal, setShowSkipModal, skipStop } = useDriverSession();
@@ -45,7 +56,7 @@ export default function SkipReasonModal() {
             </div>
             <div className="p-5">
               <p className="text-sm text-gray-400 mb-4">Select a reason for skipping this collection:</p>
-              <div className="space-y-2 mb-6">
+              <div className="space-y-2 mb-6 max-h-[40vh] overflow-y-auto">
                 {REASONS.map((reason, i) => (
                   <motion.button
                     key={reason}
