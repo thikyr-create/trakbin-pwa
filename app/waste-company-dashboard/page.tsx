@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
@@ -37,9 +37,7 @@ const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-di
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 type PageView =
   | 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments'
@@ -138,7 +136,7 @@ export default function WasteCompanyDashboard() {
 
   const truckOptions = useMemo(() => trucks.map((t) => ({
     id: t.truck_id,
-    label: `${t.truck_id} · ${t.license_plate || 'No plate'}`,
+    label: `${t.truck_id} Â· ${t.license_plate || 'No plate'}`,
     helper: t.truck_type,
   })), [trucks]);
 
@@ -261,7 +259,7 @@ export default function WasteCompanyDashboard() {
             </div>
           </motion.header>
 
-          {/* ── COMMAND STRIP — overview only ── */}
+          {/* â”€â”€ COMMAND STRIP â€” overview only â”€â”€ */}
           {activePage === 'overview' && (
           <motion.section
             initial={{ opacity: 0, y: 12 }}
@@ -317,7 +315,7 @@ export default function WasteCompanyDashboard() {
                   <div>
                     <p className="flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-200/70"><Wallet className="h-3 w-3" /> Treasury</p>
                     <p className={`${display.className} mt-0.5 text-2xl font-extrabold leading-none tabular-nums text-white`}>
-                      {treasury === null ? <span className="inline-block w-20 animate-pulse text-emerald-200/40">—</span> : <Counter value={treasury} prefix="₦" />}
+                      {treasury === null ? <span className="inline-block w-20 animate-pulse text-emerald-200/40">â€”</span> : <Counter value={treasury} prefix="â‚¦" />}
                     </p>
                   </div>
                   <button onClick={() => { setActivePage('earnings'); setSidebarOpen(false); }} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-100 ring-1 ring-white/15 transition-colors hover:bg-white/20" title="Open treasury"><ArrowLeft className="h-4 w-4 rotate-180" /></button>
@@ -347,7 +345,7 @@ export default function WasteCompanyDashboard() {
             <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }} className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200/70 pt-6">
               <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-500">
                 <motion.span className="h-2 w-2 rounded-full bg-emerald-500" animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-                Operations synced <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">· realtime on</span>
+                Operations synced <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-gray-400">Â· realtime on</span>
               </span>
               <span className="flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.2em] text-gray-400"><Activity className="h-3.5 w-3.5 text-emerald-500" /> Trakbin Dispatch</span>
             </motion.footer>

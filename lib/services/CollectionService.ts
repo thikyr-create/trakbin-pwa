@@ -1,11 +1,8 @@
-// lib/services/CollectionService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/services/CollectionService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { SyncService } from './SyncService';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 export const CollectionService = {
   async completeCollection(buildingId: string): Promise<{ success: boolean }> {
@@ -20,7 +17,7 @@ export const CollectionService = {
       if (error) throw error;
       return { success: true };
     } catch (error) {
-      console.warn('⚠️ Network error. Queuing collection offline.');
+      console.warn('âš ï¸ Network error. Queuing collection offline.');
       // Fallback to offline queue
       SyncService.queueEvent({
         building_id: buildingId,
@@ -45,7 +42,7 @@ export const CollectionService = {
       if (error) throw error;
       return { success: true };
     } catch (error) {
-      console.warn('️ Network error. Queuing issue report offline.');
+      console.warn('ï¸ Network error. Queuing issue report offline.');
       SyncService.queueEvent({
         building_id: buildingId,
         action: 'issue',

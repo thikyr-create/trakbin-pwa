@@ -1,15 +1,15 @@
-// app/hauler-dashboard/components/EvidenceCapture.tsx (complete)
+﻿// app/hauler-dashboard/components/EvidenceCapture.tsx (complete)
 "use client";
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Video, Upload, X, Check, Loader2 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { recordActivity } from '@/lib/features/driver/activity';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 
 interface EvidenceCaptureProps {
   open: boolean;
@@ -61,7 +61,7 @@ export default function EvidenceCapture({ open, onClose, activityType, buildingI
       }
     }
 
-    // Publish the attached event — chain of truth preserved (append-only)
+    // Publish the attached event â€” chain of truth preserved (append-only)
     if (urls.length > 0) {
       const { driver, driverCompanyId, gpsLocation } = useDriverSession.getState();
       const { tenant } = useCompanySession.getState();
@@ -157,7 +157,7 @@ export default function EvidenceCapture({ open, onClose, activityType, buildingI
                     disabled={files.length === 0 || uploading}
                     className="w-full py-3 bg-blue-600 text-white font-black rounded-xl uppercase disabled:bg-slate-800 disabled:text-gray-500 hover:bg-blue-500 transition-all flex items-center justify-center gap-2"
                   >
-                    {uploading ? <><Loader2 size={15} className="animate-spin" /> Uploading…</> : <><Upload size={15} /> Upload {files.length} file{files.length !== 1 ? 's' : ''}</>}
+                    {uploading ? <><Loader2 size={15} className="animate-spin" /> Uploadingâ€¦</> : <><Upload size={15} /> Upload {files.length} file{files.length !== 1 ? 's' : ''}</>}
                   </motion.button>
                 </>
               ) : (

@@ -1,13 +1,10 @@
-// lib/features/driver/breadcrumbs/breadcrumbRecorder.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/driver/breadcrumbs/breadcrumbRecorder.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { offlineQueue } from '../sync/offlineQueue';
 import { calculateDistanceInMeters } from '@/app/hauler-dashboard/utils/geo';
 import { BREADCRUMB_CONFIG } from '@/app/hauler-dashboard/utils/constants';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 interface BreadcrumbInput {
   driverId: string;

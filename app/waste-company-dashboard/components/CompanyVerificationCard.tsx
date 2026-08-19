@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Mail, UserCheck, FileCheck2, CircleCheck, Loader2, Upload, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { getCompanyVerification } from '@/lib/auth/companyVerification';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
@@ -42,9 +42,9 @@ export default function CompanyVerificationCard({ companyId }: Props) {
         urls.push(data.publicUrl);
       }
       await supabase.from('haulers').update({ documents_urls: urls, documents_status: 'pending' }).eq('id', Number(companyId));
-      setNote('✅ Documents submitted — pending review. This does not block your operations.');
+      setNote('âœ… Documents submitted â€” pending review. This does not block your operations.');
       load();
-    } catch (e: any) { setNote('❌ Upload failed: ' + (e?.message || 'unknown')); }
+    } catch (e: any) { setNote('âŒ Upload failed: ' + (e?.message || 'unknown')); }
     finally { setUploading(false); }
   };
 
@@ -60,7 +60,7 @@ export default function CompanyVerificationCard({ companyId }: Props) {
         {children}
       </div>
       <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ring-1 ${done ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : pending ? 'bg-amber-50 text-amber-700 ring-amber-200' : 'bg-gray-100 text-gray-500 ring-gray-200'}`}>
-        {done ? 'done' : pending ? 'review' : optional ? '—' : 'required'}
+        {done ? 'done' : pending ? 'review' : optional ? 'â€”' : 'required'}
       </span>
     </div>
   );
@@ -111,21 +111,21 @@ export default function CompanyVerificationCard({ companyId }: Props) {
         <Row Icon={FileCheck2} label="Document verification" optional done={v.documents === 'approved'} pending={v.documents === 'pending'}>
           <p className="text-xs font-medium text-gray-500">
             {v.documents === 'approved' ? 'Business registration / licence approved.' :
-             v.documents === 'pending' ? 'Documents submitted — pending review.' :
+             v.documents === 'pending' ? 'Documents submitted â€” pending review.' :
              'Upload your business registration or licence (optional).'}
           </p>
           <p className="mt-0.5 text-[11px] font-medium text-gray-400">Does not block accepting buildings or assigning drivers.</p>
           {v.documents !== 'approved' && (
             <label className={`mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 ${uploading ? 'opacity-60' : ''}`}>
               {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              {uploading ? 'Uploading…' : 'Upload documents'}
+              {uploading ? 'Uploadingâ€¦' : 'Upload documents'}
               <input type="file" multiple accept=".pdf,image/*" className="hidden" disabled={uploading} onChange={(e) => uploadDocs(e.target.files)} />
             </label>
           )}
         </Row>
       </div>
 
-      {note && <p className={`mt-3 text-xs font-semibold ${note.includes('❌') ? 'text-red-600' : 'text-emerald-700'}`}>{note}</p>}
+      {note && <p className={`mt-3 text-xs font-semibold ${note.includes('âŒ') ? 'text-red-600' : 'text-emerald-700'}`}>{note}</p>}
     </motion.section>
   );
 }

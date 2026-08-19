@@ -2,13 +2,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser as supabase } from '@/lib/supabaseBrowser';
 import { useDriverSession } from '@/lib/store/useDriverSession';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export interface DriverNotification {
   id: string;

@@ -1,17 +1,14 @@
-// lib/features/subscription/hooks/useEntitlement.ts
+﻿// lib/features/subscription/hooks/useEntitlement.ts
 "use client";
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { canOrganizationAccess } from '@/lib/core/finance/subscription-engine/entitlement-resolver';
 import type { Capability } from '@/lib/core/finance/subscription-engine/plans';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
-// allowed: null = checking · true = entitled · false = locked
+// allowed: null = checking Â· true = entitled Â· false = locked
 export function useEntitlement(companyId: number | null | undefined, cap: Capability) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
 

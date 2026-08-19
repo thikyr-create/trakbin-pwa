@@ -1,12 +1,11 @@
+﻿// app/shift/page.tsx
 "use client";
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import Link from 'next/link';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 // Calculate distance between two GPS points (in meters)
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {

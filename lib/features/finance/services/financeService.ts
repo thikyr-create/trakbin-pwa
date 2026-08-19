@@ -1,9 +1,7 @@
-// lib/features/finance/services/financeService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/finance/services/financeService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface MonthlyRevenue {
   month: string; // YYYY-MM
@@ -45,7 +43,7 @@ export interface FinanceOverview {
 }
 
 export async function fetchFinanceOverview(company_id: number): Promise<FinanceOverview> {
-  // 1) Buildings first — they scope payments (payments has no company_id)
+  // 1) Buildings first â€” they scope payments (payments has no company_id)
   const { data: buildings } = await supabase
     .from('Buildings')
     .select('custom_id, address, estate, payment_status, wallet_balance, next_billing_date')
@@ -152,8 +150,8 @@ export async function fetchFinanceOverview(company_id: number): Promise<FinanceO
   });
 
   // 4) Unified transaction feed
-  //    receipts = confirmed money · payments = attempts only (pending/failed) ·
-  //    settlements = ledger payouts — no double counting
+  //    receipts = confirmed money Â· payments = attempts only (pending/failed) Â·
+  //    settlements = ledger payouts â€” no double counting
   const transactions: Transaction[] = [];
 
   receipts.forEach((r: any) => {

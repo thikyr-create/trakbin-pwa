@@ -1,14 +1,12 @@
-// lib/features/zones/services/zoneService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/zones/services/zoneService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import {
   resolveBuildingZone,
   type ZoneResolution,
 } from '../utils/zoneAssignment';
 import { ZonePublisher, AssignmentPublisher } from '@/lib/core/event-bus';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface ZoneRecord {
   id: string;
@@ -221,8 +219,8 @@ export async function fetchUnassignedBuildings(
 
 /**
  * Bulk auto-assignment.
- * High + medium confidence → written to service_assignments.
- * Low confidence + unmatched → returned for manual review (never auto-applied).
+ * High + medium confidence â†’ written to service_assignments.
+ * Low confidence + unmatched â†’ returned for manual review (never auto-applied).
  */
 export async function autoAssignZones(company_id: number): Promise<AutoAssignResult> {
   const zones = await fetchZones(company_id);
@@ -270,7 +268,7 @@ export async function autoAssignZones(company_id: number): Promise<AutoAssignRes
   return { assigned: toWrite.length, needsReview };
 }
 
-/** Manual assignment — used by the needs-review flow. */
+/** Manual assignment â€” used by the needs-review flow. */
 export async function assignBuildingToZone(
   company_id: number,
   building_id: string,
@@ -356,7 +354,7 @@ export async function createZone(
 /**
  * Updates only the SAFE fields of a zone.
  * zone_name is deliberately NOT editable: it is the join key to
- * service_assignments.zone_id — renaming would orphan buildings.
+ * service_assignments.zone_id â€” renaming would orphan buildings.
  */
 export async function updateZone(
   zone_id: string,
@@ -412,7 +410,7 @@ export async function toggleZoneActive(
   return { ok: true };
 }
 
-/** Auto-assignment flag — defaults ON when no settings row exists. */
+/** Auto-assignment flag â€” defaults ON when no settings row exists. */
 export async function fetchAutoAssignFlag(company_id: number): Promise<boolean> {
   const { data } = await supabase
     .from('company_settings')
@@ -443,7 +441,7 @@ export async function setAutoAssignFlag(
 
 /**
  * Merge new coverage details into an existing zone (union, never overwrite).
- * Optional: caller can also rename the zone — cascades to service_assignments.zone_id.
+ * Optional: caller can also rename the zone â€” cascades to service_assignments.zone_id.
  */
 export async function mergeIntoZone(
   zone_id: string,

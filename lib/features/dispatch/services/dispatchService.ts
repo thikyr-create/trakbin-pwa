@@ -1,12 +1,10 @@
-// lib/features/dispatch/services/dispatchService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/dispatch/services/dispatchService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { optimizeRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 import { optimizeDispatch, enrichDriverContext, type ScoredResource } from '../utils/dispatchOptimizer';
 import { RoutePublisher } from '@/lib/core/event-bus';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface DispatchPreview {
   targetDate: string;
@@ -41,7 +39,7 @@ function getTargetDateInfo(date: Date) {
 // Legacy stop shape (still used by zoneGroups Map construction)
 interface Stop { building_id: string; lat: number; lng: number; }
 
-// Map legacy shape → new OptimizationStop shape
+// Map legacy shape â†’ new OptimizationStop shape
 function toOptimizationStops(stops: Stop[]): OptimizationStop[] {
   return stops.map((s) => ({
     buildingId: s.building_id,
@@ -212,7 +210,7 @@ export async function executeDispatch(
   for (const [zoneName, stops] of zoneGroups.entries()) {
     const enrichedDrivers = await enrichDriverContext(company_id, driverPool, zoneName, iso);
 
-    // ── NEW: delegate stop ordering to the core route-optimization engine ──
+    // â”€â”€ NEW: delegate stop ordering to the core route-optimization engine â”€â”€
     // The core handles sub-chunking via maxStopsPerRoute and returns road-network
     // distances/times when MAPBOX_TOKEN is present.
     const optimizationResult = await optimizeRoute({

@@ -1,11 +1,9 @@
-// lib/features/finance/services/billingService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/finance/services/billingService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { isInvoiceOverdue } from '../utils/billingHelpers';
 import type { PricingPlan } from '@/lib/features/settings/services/settingsService';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface BillingPlan {
   id: string;
@@ -233,7 +231,7 @@ export async function autoLinkBuildingsToPlans(
     return { linked: 0, skipped: buildings.length };
   }
 
-  // Build a map: building_type → most recent active plan
+  // Build a map: building_type â†’ most recent active plan
   const planByType = new Map<string, any>();
   plans.forEach((p: any) => {
     if (!planByType.has(p.building_type)) {

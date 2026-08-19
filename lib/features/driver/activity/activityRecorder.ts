@@ -1,12 +1,10 @@
-// lib/features/driver/activity/activityRecorder.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/driver/activity/activityRecorder.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { DriverPublisher } from '@/lib/core/event-bus';
 import { offlineQueue } from '../sync/offlineQueue';
 import type { DriverEventType } from './activityEvents';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 interface RecordInput {
   eventType: DriverEventType;

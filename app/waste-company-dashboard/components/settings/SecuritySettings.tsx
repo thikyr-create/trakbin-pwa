@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
@@ -6,10 +6,7 @@ import { Shield, Loader2, CircleCheck, TriangleAlert, KeyRound, Fingerprint, Mon
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -70,7 +67,7 @@ export default function SecuritySettings(_props: SettingsSectionProps) {
               Security
             </h2>
             <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400`}>
-              session · password · hardening
+              session Â· password Â· hardening
             </p>
           </div>
         </div>
@@ -79,7 +76,7 @@ export default function SecuritySettings(_props: SettingsSectionProps) {
           <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.16em] text-gray-400`}>
             Signed in as
           </p>
-          <p className="mt-1 text-sm font-bold text-gray-800">{email ?? "Loading session…"}</p>
+          <p className="mt-1 text-sm font-bold text-gray-800">{email ?? "Loading sessionâ€¦"}</p>
         </div>
       </div>
 
@@ -112,12 +109,12 @@ export default function SecuritySettings(_props: SettingsSectionProps) {
           <button type="submit" disabled={saving || !newPassword}
             className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-md shadow-emerald-200 transition hover:bg-emerald-700 disabled:opacity-50">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
-            {saving ? "Updating…" : "Update password"}
+            {saving ? "Updatingâ€¦" : "Update password"}
           </button>
         </form>
       </div>
 
-      {/* Planned capabilities — honest */}
+      {/* Planned capabilities â€” honest */}
       <div className="rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm">
         <p className={`${mono.className} mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400`}>
           Planned with the security-hardening phase
@@ -125,7 +122,7 @@ export default function SecuritySettings(_props: SettingsSectionProps) {
         <div className="space-y-2">
           {[
             { Icon: Fingerprint, label: "Two-factor authentication", desc: "Requires the auth-linkage foundation (Phase SEC)" },
-            { Icon: MonitorSmartphone, label: "Active sessions & login history", desc: "Requires a session-audit table — not built yet" },
+            { Icon: MonitorSmartphone, label: "Active sessions & login history", desc: "Requires a session-audit table â€” not built yet" },
           ].map((row) => {
             const Icon = row.Icon;
             return (

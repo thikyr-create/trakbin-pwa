@@ -1,11 +1,11 @@
-// lib/core/assignment/AssignmentEngine.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/core/assignment/AssignmentEngine.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { previewRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 import { validateAssignment } from './AssignmentValidator';
 import { createRoute } from './RouteEngine';
 import { emit } from './AssignmentEvents';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 
 // Legacy stop shape (passed by the UI from preview.ordered)
 interface LegacyStop { building_id: string; lat: number; lng: number; }
@@ -13,7 +13,7 @@ interface LegacyStop { building_id: string; lat: number; lng: number; }
 /**
  * All driver/truck id references are coerced to String() at every write:
  * drivers.id / trucks.id are integers, routes.* is text, assignments is now text.
- * Every method returns { ok, errors } — the engine NEVER throws, so the UI
+ * Every method returns { ok, errors } â€” the engine NEVER throws, so the UI
  * can never strand on a spinner.
  */
 export const AssignmentEngine = {
@@ -23,7 +23,7 @@ export const AssignmentEngine = {
       if (!v.ok) return { ok: false, errors: v.errors };
 
       // The UI already ordered these stops via previewRoute (haversine, instant).
-      // We trust that order — re-ordering would silently change what the dispatcher approved.
+      // We trust that order â€” re-ordering would silently change what the dispatcher approved.
       // Recompute distance/duration for consistency.
       const orderedStops: OptimizationStop[] = args.stops.map((s) => ({
         buildingId: s.building_id,
@@ -62,7 +62,7 @@ export const AssignmentEngine = {
       if (abErr) return { ok: false, errors: ['assignment_buildings: ' + abErr.message] };
 
       // Also write to route_stops so the driver console sees the stops
-            // route_stops carries no coordinates — the driver console merges
+            // route_stops carries no coordinates â€” the driver console merges
       // lat/lng from Buildings by building_id (single source of truth)
       const { error: rsErr } = await supabase.from('route_stops').insert(
         args.stops.map((s, i) => ({
@@ -85,7 +85,7 @@ export const AssignmentEngine = {
         return { ok: false, errors: ([tErr?.message, dErr?.message].filter(Boolean)) as string[] };
       }
 
-      await emit(args.companyId, assignment.id, 'route_assigned', `Route assigned to ${args.driver.full_name} (${args.truck.truck_id}) · ${args.stops.length} stops`);
+      await emit(args.companyId, assignment.id, 'route_assigned', `Route assigned to ${args.driver.full_name} (${args.truck.truck_id}) Â· ${args.stops.length} stops`);
       return { ok: true, assignment };
     } catch (e: any) {
       return { ok: false, errors: [e?.message || 'Assignment failed'] };

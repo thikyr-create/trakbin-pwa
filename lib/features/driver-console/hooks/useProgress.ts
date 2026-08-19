@@ -1,15 +1,12 @@
-// lib/features/driver-console/hooks/useProgress.ts
+﻿// lib/features/driver-console/hooks/useProgress.ts
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { calculateDistanceInMeters } from '../../../../app/hauler-dashboard/utils/geo';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 export interface ProgressData {
   total: number;
@@ -73,7 +70,7 @@ export function useProgress(): ProgressData {
     };
   }, [sorted]);
 
-  // Waste collected — only when the data exists
+  // Waste collected â€” only when the data exists
   useEffect(() => {
     if (!driverCompanyId) return;
     const today = new Date();

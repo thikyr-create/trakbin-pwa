@@ -1,10 +1,8 @@
-// lib/features/buildings/services/buildingService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/buildings/services/buildingService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { resolveNextCollection } from '../utils/buildingHelpers';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface BuildingRecord {
   building_id: number;
@@ -126,8 +124,8 @@ async function resolveAssignedDrivers(
 
 /**
  * Builds a collection-history row set from the verified execution chain:
- *   collections.building_id → assignments.id (status, assigned_at, route_id)
- *   → routes.driver_id → drivers.full_name
+ *   collections.building_id â†’ assignments.id (status, assigned_at, route_id)
+ *   â†’ routes.driver_id â†’ drivers.full_name
  *
  * Output shape matches what CollectionHistory.tsx renders:
  *   { id, collection_date, status, hauler_name, notes }
@@ -153,7 +151,7 @@ async function resolveCollectionHistory(custom_id: string): Promise<any[]> {
 
   if (!assignments || assignments.length === 0) return [];
 
-  // Route → driver chain for hauler name
+  // Route â†’ driver chain for hauler name
   const routeIds = [
     ...new Set(assignments.map((a: any) => a.route_id).filter(Boolean)),
   ];

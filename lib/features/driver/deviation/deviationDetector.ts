@@ -1,13 +1,11 @@
-// lib/features/driver/deviation/deviationDetector.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/driver/deviation/deviationDetector.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { recordActivity } from '../activity';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { calculateDistanceInMeters } from '@/app/hauler-dashboard/utils/geo';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 const DEVIATION_THRESHOLD_M = 150; // alert if >150m off route
 const REJOIN_THRESHOLD_M = 50; // consider rejoined if within 50m
@@ -81,7 +79,7 @@ export const deviationDetector = {
   },
 };
 
-/** Distance from point (lat, lng) to line segment (lat1,lng1)→(lat2,lng2) in meters */
+/** Distance from point (lat, lng) to line segment (lat1,lng1)â†’(lat2,lng2) in meters */
 function distanceToSegment(lat: number, lng: number, lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000; // Earth radius in meters
   const dLat1 = ((lat1 - lat) * Math.PI) / 180;

@@ -1,17 +1,15 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { 
   LayoutDashboard, Building2, ClipboardList, Truck, Home, TriangleAlert, 
   Trash2, SearchCheck, ChartColumn, Leaf, Megaphone, ScrollText, Settings, LogOut, 
   Menu, X, TrendingUp, TrendingDown, Activity, ShieldCheck, Eye, Filter, Plus, ChevronRight, Zap, Phone, Users, DollarSign, MapPin, ArrowLeft, Mail, Hash, Calendar, Briefcase
 } from 'lucide-react';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 type PageView = 'overview' | 'companies' | 'compliance' | 'fleet' | 'drivers' | 'buildings' | 'incidents' | 'dumping' | 'inspections' | 'analytics' | 'sustainability' | 'notices' | 'audit' | 'settings';
 
@@ -267,11 +265,11 @@ function CompanyProfile({ company, onBack }: any) {
               </div>
               <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
                 <p className="text-xs font-black text-purple-600 uppercase">Active Trucks</p>
-                <p className="text-3xl font-black text-purple-700 mt-1">—</p>
+                <p className="text-3xl font-black text-purple-700 mt-1">â€”</p>
               </div>
               <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
                 <p className="text-xs font-black text-orange-600 uppercase">Total Drivers</p>
-                <p className="text-3xl font-black text-orange-700 mt-1">—</p>
+                <p className="text-3xl font-black text-orange-700 mt-1">â€”</p>
               </div>
             </div>
           </div>
@@ -353,7 +351,7 @@ function DriverProfile({ driver, onBack }: any) {
               </div>
               <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                 <p className="text-xs font-black text-blue-600 uppercase">Collections</p>
-                <p className="text-3xl font-black text-blue-700 mt-1">—</p>
+                <p className="text-3xl font-black text-blue-700 mt-1">â€”</p>
               </div>
             </div>
           </div>
@@ -458,7 +456,7 @@ function DumpingPage({ reports }: any) {
   return (
     <div className="space-y-4">
       <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-xl p-6 text-white flex items-center gap-4"><div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-sm"><Trash2 className="w-8 h-8 text-white" /></div><div><h2 className="text-xl font-black uppercase mb-1">Illegal Dumping Command</h2><p className="text-sm font-bold text-red-100">{reports.length} Recent Reports Loaded from Database</p></div></div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"><h2 className="text-xs font-black text-slate-900 uppercase">Recent Reports</h2></div><div className="divide-y divide-slate-100">{reports.length === 0 ? ( <div className="p-8 text-center text-sm font-bold text-slate-500">No illegal dumping reports recorded yet.</div> ) : ( reports.map((r: any, idx: number) => ( <div key={idx} className="px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer"><div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.severity === 'Critical' ? 'bg-red-100' : r.severity === 'High' ? 'bg-orange-100' : 'bg-yellow-100'}`}><TriangleAlert className={`w-5 h-5 ${r.severity === 'Critical' ? 'text-red-600' : r.severity === 'High' ? 'text-orange-600' : 'text-yellow-600'}`} /></div><div><p className="text-sm font-black text-slate-900 uppercase">{r.location}</p><p className="text-xs font-bold text-slate-500">ID: {r.id} • Reported by {r.reported_by} • {new Date(r.created_at).toLocaleDateString()}</p></div></div><div className="flex items-center gap-3"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getStatusColor(r.status)}`}>{r.status}</span><button className="p-2 hover:bg-slate-100 rounded-lg"><Eye size={16} className="text-slate-500" /></button></div></div> )) )}</div></div>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden"><div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"><h2 className="text-xs font-black text-slate-900 uppercase">Recent Reports</h2></div><div className="divide-y divide-slate-100">{reports.length === 0 ? ( <div className="p-8 text-center text-sm font-bold text-slate-500">No illegal dumping reports recorded yet.</div> ) : ( reports.map((r: any, idx: number) => ( <div key={idx} className="px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-all cursor-pointer"><div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-lg flex items-center justify-center ${r.severity === 'Critical' ? 'bg-red-100' : r.severity === 'High' ? 'bg-orange-100' : 'bg-yellow-100'}`}><TriangleAlert className={`w-5 h-5 ${r.severity === 'Critical' ? 'text-red-600' : r.severity === 'High' ? 'text-orange-600' : 'text-yellow-600'}`} /></div><div><p className="text-sm font-black text-slate-900 uppercase">{r.location}</p><p className="text-xs font-bold text-slate-500">ID: {r.id} â€¢ Reported by {r.reported_by} â€¢ {new Date(r.created_at).toLocaleDateString()}</p></div></div><div className="flex items-center gap-3"><span className={`text-xs font-black px-2 py-1 rounded-full uppercase ${getStatusColor(r.status)}`}>{r.status}</span><button className="p-2 hover:bg-slate-100 rounded-lg"><Eye size={16} className="text-slate-500" /></button></div></div> )) )}</div></div>
     </div>
   );
 }

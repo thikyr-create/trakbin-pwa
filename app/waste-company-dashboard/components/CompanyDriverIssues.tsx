@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import { Wrench, ShieldAlert, TrafficCone, Cog, CircleHelp, CircleCheck } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 
@@ -36,7 +36,7 @@ export default function CompanyDriverIssues() {
     const patch: any = { status: next };
     if (next === 'resolved') patch.resolved_at = new Date().toISOString();
     await supabase.from('driver_issues').update(patch).eq('id', it.id);
-    addNotification(`Issue ${it.issue_number} → ${next}.`, 'success');
+    addNotification(`Issue ${it.issue_number} â†’ ${next}.`, 'success');
     load();
   };
 
@@ -62,7 +62,7 @@ export default function CompanyDriverIssues() {
                         <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ring-1 ${STATUS_CHIP[it.status] || STATUS_CHIP.open}`}>{it.status}</span>
                       </p>
                       <p className="mt-0.5 text-xs font-medium text-gray-600">{it.description}</p>
-                      <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` · ${it.truck_id}` : ''}{it.location ? ` · ${it.location}` : ''}</p>
+                      <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` Â· ${it.truck_id}` : ''}{it.location ? ` Â· ${it.location}` : ''}</p>
                     </div>
                   </div>
                   {it.status !== 'resolved'

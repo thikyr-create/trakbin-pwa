@@ -1,9 +1,7 @@
-// lib/features/finance/services/paymentStatsService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/features/finance/services/paymentStatsService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = supabaseBrowser;
 
 export interface PaymentMethodStat {
   method: string;

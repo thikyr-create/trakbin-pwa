@@ -1,18 +1,15 @@
-// app/hauler-dashboard/MapboxMap.tsx
+﻿// app/hauler-dashboard/MapboxMap.tsx
 "use client";
 
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 // @ts-ignore
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 const PLACEHOLDER_CENTER: [number, number] = [9.0, 8.0];
 const MAX_USABLE_ACCURACY_M = 1000;

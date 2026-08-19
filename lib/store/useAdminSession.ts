@@ -1,11 +1,11 @@
-// lib/store/useAdminSession.ts
+﻿// lib/store/useAdminSession.ts
 "use client";
 
 import { create } from 'zustand';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { emitAudit } from '@/lib/core/audit/audit-engine';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 
 export interface AdminSessionState {
   admin: { id: string; role: string; email: string | null } | null;
@@ -17,7 +17,7 @@ export interface AdminSessionState {
 /**
  * Admin-only session store. Deliberately separate from useCompanySession:
  * the company store models tenants; this models the platform control plane.
- * Non-admins are bounced to /admin/login — no company resolution, no /auth.
+ * Non-admins are bounced to /admin/login â€” no company resolution, no /auth.
  * NEVER redirects when already on /admin/login (self-redirect reload loop).
  */
 export const useAdminSession = create<AdminSessionState>((set) => ({
@@ -51,7 +51,7 @@ export const useAdminSession = create<AdminSessionState>((set) => ({
 
     set({ admin: { id: user.id, role: 'admin', email: user.email ?? null }, loaded: true });
 
-    // Access log — every admin console entry leaves a trace
+    // Access log â€” every admin console entry leaves a trace
     emitAudit(supabase, {
       category: 'SECURITY_EVENT',
       actorId: user.id,

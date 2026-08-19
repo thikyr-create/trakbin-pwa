@@ -1,13 +1,13 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
 import { Inbox, MapPin, Building2, CircleCheck, X, Loader2, Globe, CalendarClock } from 'lucide-react';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
@@ -21,7 +21,7 @@ export default function ServiceRequestsPage() {
   const [zoneId, setZoneId] = useState('');
   const [frequency, setFrequency] = useState('weekly');
   const [days, setDays] = useState<string[]>(['Mon']);
-  const [timeWindow, setTimeWindow] = useState('08:00 AM – 11:00 AM');
+  const [timeWindow, setTimeWindow] = useState('08:00 AM â€“ 11:00 AM');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function ServiceRequestsPage() {
               </div>
 
               {zones.length === 0 ? (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">You have no active zones yet — add one under Zones before activating buildings.</p>
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">You have no active zones yet â€” add one under Zones before activating buildings.</p>
               ) : (
                 <div className="space-y-4">
                   <div>

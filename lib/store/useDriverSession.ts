@@ -2,17 +2,13 @@
 "use client";
 
 import { create } from 'zustand';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseBrowser as supabase } from '@/lib/supabaseBrowser';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { recordActivity, type DriverEventType } from '@/lib/features/driver/activity';
 import { deviationDetector } from '@/lib/features/driver/deviation/deviationDetector';
 import { breadcrumbRecorder } from '@/lib/features/driver/breadcrumbs/breadcrumbRecorder';
 import { DriverRoute, RouteBuilding } from '../../app/hauler-dashboard/components/types';
 import { calculateDistanceInMeters, calculateTotalDistanceKm } from '../../app/hauler-dashboard/utils/geo';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export interface GeocodeResult {
   id: string;
@@ -137,6 +133,17 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
     if (!profile && !driverRow) {
       console.error('Driver profile not found');
       window.location.href = '/auth';
+      return;
+    }
+
+    // IDENTITY GUARD: a stale/wrong session (company/caretaker) must be
+    // redirected — never rendered as a UUID-as-driver.
+    if (!driverRow && profile?.role && profile.role !== 'driver') {
+      console.warn('[driver-console] non-driver session detected →', profile.role);
+      window.location.href =
+        profile.role === 'company' ? '/waste-company-dashboard'
+        : profile.role === 'caretaker' ? '/caretaker-dashboard'
+        : '/auth';
       return;
     }
 
@@ -375,7 +382,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   setShowSkipModal: (show) => set({ showSkipModal: show }),
   setShowReportModal: (show) => set({ showReportModal: show }),
   setShowEndShiftModal: (show) => set({ showEndShiftModal: show }),
-  
+
   setNavigationDestination: (dest) => set({ navigationDestination: dest }),
 
   searchGeocode: async (query) => {

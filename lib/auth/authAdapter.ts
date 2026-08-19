@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { resolveBuildingZone } from '@/lib/features/zones/utils/zoneAssignment';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 
 async function geocodeAddress(address: string): Promise<{ lat: number; lon: number } | null> {
   try {
@@ -99,7 +99,7 @@ export const authAdapter = {
 
     if (!zones || zones.length === 0) return null;
 
-    // Polygon → radius → text hierarchy (nearest = low confidence, rejected)
+    // Polygon â†’ radius â†’ text hierarchy (nearest = low confidence, rejected)
     const res = resolveBuildingZone(
       { custom_id: 'registration', latitude: lat, longitude: lng, estate: estate || null, address: officialAddress },
       zones as any

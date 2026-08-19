@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,10 +12,7 @@ import type { InvoiceRow } from "@/lib/features/finance/services/billingService"
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 interface ReceiptModalProps {
   open: boolean;
@@ -24,9 +21,9 @@ interface ReceiptModalProps {
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return "—";
+  if (!value) return "â€”";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "â€”";
   return d.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -148,7 +145,7 @@ export default function ReceiptModal({ open, invoice, onClose }: ReceiptModalPro
               {loading ? (
                 <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 p-6 text-gray-400">
                   <Loader2 size={16} className="animate-spin" />
-                  <span className="text-xs font-semibold">Locating receipt…</span>
+                  <span className="text-xs font-semibold">Locating receiptâ€¦</span>
                 </div>
               ) : receipt ? (
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
@@ -157,13 +154,13 @@ export default function ReceiptModal({ open, invoice, onClose }: ReceiptModalPro
                   </p>
                   <dl className="space-y-2">
                     {[
-                      ["Receipt №", receipt.receipt_number || "—"],
+                      ["Receipt â„–", receipt.receipt_number || "â€”"],
                       ["Issued", formatDate(receipt.issued_at || receipt.created_at)],
                       ["Gross", formatNaira(receipt.gross)],
                       ["Platform fee", formatNaira(receipt.commission)],
                       ["Net", formatNaira(receipt.net)],
-                      ["Provider", receipt.provider_name || "—"],
-                      ["Payer", receipt.payer_email || "—"],
+                      ["Provider", receipt.provider_name || "â€”"],
+                      ["Payer", receipt.payer_email || "â€”"],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4">
                         <dt className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-gray-400`}>

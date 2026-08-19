@@ -1,11 +1,8 @@
-// lib/services/SyncService.ts
-import { createClient } from '@supabase/supabase-js';
+﻿// lib/services/SyncService.ts
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { CollectionEvent } from './types';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = supabaseBrowser;
 
 const QUEUE_KEY = 'trakbin_offline_queue';
 
@@ -15,7 +12,7 @@ export const SyncService = {
     const queue = this.getQueue();
     queue.push({ ...event, id: crypto.randomUUID(), synced: false });
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-    console.log('⏳ Event queued for offline sync:', event.action);
+    console.log('â³ Event queued for offline sync:', event.action);
   },
 
   // 2. Get all pending events
@@ -30,7 +27,7 @@ export const SyncService = {
     const queue = this.getQueue();
     if (queue.length === 0) return;
 
-    console.log(`🔄 Syncing ${queue.length} offline events...`);
+    console.log(`ðŸ”„ Syncing ${queue.length} offline events...`);
 
     const remainingQueue: CollectionEvent[] = [];
 
@@ -51,7 +48,7 @@ export const SyncService = {
         }
         // If successful, we don't add it back to the remaining queue
       } catch (error) {
-        console.error('❌ Sync failed for event:', event.id);
+        console.error('âŒ Sync failed for event:', event.id);
         remainingQueue.push(event); // Keep it in the queue to try again later
       }
     }
@@ -63,7 +60,7 @@ export const SyncService = {
   initAutoSync(): void {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
-        console.log('🌐 Connection restored. Syncing...');
+        console.log('ðŸŒ Connection restored. Syncing...');
         this.syncPendingEvents();
       });
     }

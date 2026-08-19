@@ -1,7 +1,7 @@
 // lib/auth/authEngine.ts
 import { authAdapter } from './authAdapter';
-import { supabaseAuth } from './supabaseAuth';
 import { useAuthStore } from '@/lib/store/authStore';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { BuildingPublisher, BillingPublisher } from '@/lib/core/event-bus';
 import { emitAudit } from '@/lib/core/audit/audit-engine';
 import type { AuthResult, CaretakerRegisterInput, CompanyRegisterInput, LoginInput, RegisterCaretakerResult, Role } from './types';
@@ -33,7 +33,10 @@ export const authEngine = {
         return { ok: false, message: '❌ Invalid Building ID or Passcode' };
       }
 
-      const { error } = await supabaseAuth.signInWithPassword(data.email, data.password);
+      const { error } = await supabaseBrowser.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
       if (error) {
         return { ok: false, message: '❌ Session error: ' + error.message };
       }
@@ -54,7 +57,11 @@ export const authEngine = {
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) return { ok: false, message: '❌ Invalid Driver ID or password' };
 
-      const { error } = await supabaseAuth.client.auth.setSession({
+      // FIX: Kill any stale session first so a leftover company/caretaker session
+      // can never shadow the driver identity and corrupt the state store.
+      await supabaseBrowser.auth.signOut().catch(() => {});
+
+      const { error } = await supabaseBrowser.auth.setSession({
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
       });
@@ -71,11 +78,11 @@ export const authEngine = {
     const password = (input.password || '').trim();
 
     try {
-      const { data, error } = await supabaseAuth.signInWithPassword(email, password);
+      const { data, error } = await supabaseBrowser.auth.signInWithPassword({ email, password });
       if (error) {
         if (/confirm/i.test(error.message)) return { ok: false, message: '⚠️ Please confirm your email before signing in — check your inbox.' };
       } else if (data.user) {
-        const { data: profile } = await supabaseAuth.client
+        const { data: profile } = await supabaseBrowser
           .from('profiles')
           .select('company_id, role')
           .eq('id', data.user.id)
@@ -170,9 +177,10 @@ export const authEngine = {
 
     let authId: string | null = null; let needsConfirm = false;
     try {
-      const { data, error } = await supabaseAuth.signUp(input.email, input.password, {
-        companyId: haulerData.id,
-        role: 'company',
+      const { data, error } = await supabaseBrowser.auth.signUp({
+        email: input.email,
+        password: input.password,
+        options: { data: { company_id: haulerData.id, role: 'company' } },
       });
       if (!error && data.user) {
         authId = data.user.id;
@@ -189,7 +197,7 @@ export const authEngine = {
 
     // EVENT BUS: organization entered the platform (real bus) + audit trail
     BillingPublisher.publish('ORGANIZATION_CREATED', { companyId: haulerData.id, name: input.companyName });
-    emitAudit(supabaseAuth.client, {
+    emitAudit(supabaseBrowser, {
       category: 'ADMIN_ACTION', action: 'organization.created',
       target: `org:${haulerData.id}`, metadata: { name: input.companyName },
     }).catch(() => {});
@@ -220,10 +228,14 @@ export const authEngine = {
   },
 
   signOut(): void {
-    localStorage.removeItem(KEYS.caretaker); localStorage.removeItem(KEYS.company); localStorage.removeItem(KEYS.driver);
+    localStorage.removeItem(KEYS.caretaker); 
+    localStorage.removeItem(KEYS.company); 
+    localStorage.removeItem(KEYS.driver);
     useAuthStore.getState().clearSession();
-    supabaseAuth.signOut().catch(() => {});
+    supabaseBrowser.auth.signOut().catch(() => {});
   },
 
-  getRole(): Role | null { return useAuthStore.getState().role; },
+  getRole(): Role | null { 
+    return useAuthStore.getState().role; 
+  },
 };

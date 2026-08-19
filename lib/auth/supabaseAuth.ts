@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = supabaseBrowser;
 
 // Real Supabase Auth adapter. Stage C Part 2 will route new signups + logins
 // through this; Part 1 uses it only for OTP / password recovery.
@@ -21,7 +21,7 @@ export const supabaseAuth = {
     });
   },
 
-  // email OTP (no password) — used for recovery
+  // email OTP (no password) â€” used for recovery
   async requestOtp(email: string) { return supabase.auth.signInWithOtp({ email }); },
   async verifyOtp(email: string, token: string) {
     return supabase.auth.verifyOtp({ email, token, type: 'email' });
