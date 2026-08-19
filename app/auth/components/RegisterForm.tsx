@@ -1,7 +1,7 @@
+// app/auth/components/RegisterForm.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import { Building2, UserPlus, Truck, MapPin, Phone, Loader2, Search, CircleCheck, CircleAlert, Smartphone, Monitor, ChevronDown } from 'lucide-react';
@@ -9,7 +9,6 @@ import CompanyIdCard from './CompanyIdCard';
 import { authEngine } from '@/lib/auth/authEngine';
 import type { AccountType } from '@/lib/auth/types';
 
-const DraggableMap = dynamic(() => import('../../dashboard/DraggableMap'), { ssr: false });
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const inputCls = 'w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200';
@@ -42,7 +41,6 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
   const [operatingAddress, setOperatingAddress] = useState('');
   const [contactNumber, setContactNumber] = useState('');
 
-  // INSIDE the component — this was the bug (it was at module scope)
   const [companyCard, setCompanyCard] = useState<null | { id: number; name: string; email: string; license: string }>(null);
 
   useEffect(() => { if (typeof window !== 'undefined') setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)); }, []);
@@ -75,7 +73,7 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
     setSearching(true); setMessage('');
     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=1`)
       .then((r) => r.json()).then((d) => {
-        if (d && d.length > 0) { setCoords({ lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }); setGpsStatus('captured'); setGpsAddress(d[0].display_name); setMessage('✅ Location found! Drag the red pin to your exact house.'); }
+        if (d && d.length > 0) { setCoords({ lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }); setGpsStatus('captured'); setGpsAddress(d[0].display_name); setMessage('✅ Location found!'); }
         else setMessage('❌ Location not found.');
         setSearching(false);
       }).catch(() => { setMessage('Search failed.'); setSearching(false); });
@@ -190,23 +188,11 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
             <button type="button" onClick={handleSearch} disabled={searching} className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:bg-gray-400">{searching ? 'Searching...' : 'Search'}</button>
           </div>
 
-          {gpsStatus !== 'idle' && (
-            <div className="overflow-hidden rounded-xl border-2 border-gray-200 shadow-inner">
-              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
-                <p className="flex items-center gap-2 text-xs font-bold text-gray-700"><MapPin size={14} className="text-green-600" /> Pinpoint Exact Location</p>
-                <p className="text-[10px] text-gray-500">Drag the red pin</p>
-              </div>
-              <div style={{ height: '300px' }}>
-                <DraggableMap coords={coords} onDragEnd={(lat, lon) => { setCoords({ lat, lon }); fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`).then((r) => r.json()).then((d) => { if (d.display_name) setGpsAddress(d.display_name); }).catch(() => {}); }} />
-              </div>
-            </div>
-          )}
-
           {gpsAddress && (
             <div className="relative">
               <MapPin className="absolute left-3 top-3 h-5 w-5 text-green-600" />
               <div className="w-full rounded-xl border border-green-200 bg-green-50 py-3 pl-10 pr-4 text-sm text-gray-700">
-                <p className="mb-1 text-[10px] font-bold uppercase text-green-700">Detected Map Location (Auto)</p>
+                <p className="mb-1 text-[10px] font-bold uppercase text-green-700">Detected Location (Auto)</p>
                 <p>{gpsAddress}</p>
               </div>
             </div>
@@ -243,7 +229,6 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
         </motion.div>
       )}
 
-      {/* INSIDE the returned JSX — this was floating outside before */}
       {companyCard && (
         <CompanyIdCard company={companyCard} onClose={() => { setCompanyCard(null); onSwitchToLogin(); }} />
       )}

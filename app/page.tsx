@@ -76,7 +76,7 @@ export default function Home() {
         >
           <span className="h-px w-10 bg-emerald-300/50" />
           <p className="text-sm sm:text-base font-semibold tracking-[0.3em] text-emerald-100/80">
-            BUILDING CITIES NOT TRUCKS
+                        BUILDING CITIES NOT WASTE
           </p>
           <span className="h-px w-10 bg-emerald-300/50" />
         </motion.div>
