@@ -81,7 +81,7 @@ export default function DriverIssuesCard() {
       }
       const issue_number = `DI-${Date.now().toString().slice(-6)}`;
       const { error } = await supabase.from('driver_issues').insert([{
-        issue_number, driver_id: driver.id, employee_id: driver.employee_id, driver_name: driver.full_name,
+                issue_number, driver_id: String(driver.id), employee_id: driver.employee_id, driver_name: driver.full_name,
         company_id: driver.company_id, truck_id: truckId || null, issue_type: issueType,
         description, location: location || null, latitude: coords?.lat ?? null, longitude: coords?.lon ?? null,
         media: urls, status: 'open',
