@@ -1,9 +1,10 @@
+// app/waste-company-dashboard/components/settings/SettingsPage.tsx
 "use client";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Building2, Receipt, Tags, Truck, Bell, CreditCard, Plug, SlidersHorizontal,
+  Building2, Receipt, Tags, Truck, Bell, CreditCard, SlidersHorizontal,
   Shield, Users, TriangleAlert, Construction,
 } from "lucide-react";
 import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
@@ -25,7 +26,6 @@ const SECTION_ICONS: Record<SettingsSectionId, React.ComponentType<{ size?: numb
   collection: Truck,
   notifications: Bell,
   payments: CreditCard,
-  integrations: Plug,
   preferences: SlidersHorizontal,
   security: Shield,
   users: Users,

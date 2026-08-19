@@ -8,7 +8,6 @@ import CollectionSettings from "./CollectionSettings";
 import NotificationSettings from "./NotificationSettings";
 import PaymentSettings from "./PaymentSettings";
 import Preferences from "./Preferences";
-import IntegrationsSettings from "./IntegrationsSettings";
 import SecuritySettings from "./SecuritySettings";
 import UserManagement from "./UserManagement";
 import DangerZone from "./DangerZone";
@@ -22,7 +21,6 @@ export const SECTIONS: Partial<Record<SettingsSectionId, ComponentType<SettingsS
   notifications: NotificationSettings,
   payments: PaymentSettings,
   preferences: Preferences,
-  integrations: IntegrationsSettings,
   security: SecuritySettings,
   users: UserManagement,
   danger: DangerZone,

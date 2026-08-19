@@ -8,7 +8,6 @@ export type SettingsSectionId =
   | "collection"
   | "notifications"
   | "payments"
-  | "integrations"
   | "preferences"
   | "security"
   | "users"
@@ -43,7 +42,6 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     items: [
       { id: "notifications", label: "Notifications", description: "Email, SMS, push, and alerts" },
       { id: "payments", label: "Payments", description: "Gateway, settlement, and wallet" },
-      { id: "integrations", label: "Integrations", description: "Connected services" },
       { id: "preferences", label: "Preferences", description: "Theme, language, timezone, units" },
     ],
   },
