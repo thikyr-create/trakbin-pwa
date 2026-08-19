@@ -76,13 +76,40 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     }
   },
 
-  fetchFleet: async () => {
+    fetchFleet: async () => {
     const cid = get().tenant.companyId;
     if (!cid) return;
     try {
-      const { data: routes, error } = await supabase.from('routes').select('*, drivers(full_name), trucks(truck_id)').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false });
-      if (error) throw error;
-      set({ trucks: (routes || []).map((r: any) => ({ id: r.id, truck_id: r.trucks?.truck_id || 'Unknown', driver_name: r.drivers?.full_name || 'Unknown', status: r.status === 'paused' ? 'paused' : 'on_route', current_route_id: r.id, capacity_percent: 0, completed_stops: r.completed_stops || 0, total_stops: r.total_stops || 0,license_plate: '', truck_type: '' })) });
+      // Fetch routes, drivers, and trucks separately (no FK between routes.driver_id text and drivers.id integer)
+      const [{ data: routes, error: routesError }, { data: drivers }, { data: trucks }] = await Promise.all([
+        supabase.from('routes').select('*').eq('company_id', cid).in('status', ['active', 'paused']).order('created_at', { ascending: false }),
+        supabase.from('drivers').select('employee_id, full_name').eq('company_id', cid),
+        supabase.from('trucks').select('id, truck_id, license_plate, truck_type').eq('company_id', cid),
+      ]);
+      if (routesError) throw routesError;
+
+      // Build lookup maps for client-side join
+      const driverMap = new Map((drivers || []).map(d => [d.employee_id, d]));
+      const truckMap = new Map((trucks || []).map(t => [String(t.id), t]));
+
+      const fleet = (routes || []).map((r: any) => {
+        const driver = driverMap.get(r.driver_id);
+        const truck = truckMap.get(String(r.truck_id));
+        return {
+          id: r.id,
+          truck_id: truck?.truck_id || 'Unknown',
+          driver_name: driver?.full_name || 'Unknown',
+          status: r.status === 'paused' ? 'paused' : 'on_route',
+          current_route_id: r.id,
+          capacity_percent: 0,
+          completed_stops: r.completed_stops || 0,
+          total_stops: r.total_stops || 0,
+          license_plate: truck?.license_plate || '',
+          truck_type: truck?.truck_type || '',
+        };
+      });
+
+      set({ trucks: fleet });
     } catch (e) { console.error('Error fetching fleet:', e); }
   },
 
