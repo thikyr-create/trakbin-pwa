@@ -26,6 +26,7 @@ export async function fetchAnalyticsData(company_id: number): Promise<AnalyticsD
     { data: invoices },
     { data: issues },
     { data: assignments },
+    { data: collections },
   ] = await Promise.all([
     supabase
       .from('Buildings')
@@ -57,16 +58,21 @@ export async function fetchAnalyticsData(company_id: number): Promise<AnalyticsD
       .from('assignments')
       .select('id, route_id')
       .eq('company_id', company_id),
+    // FIX: Count collections by building_id + company_id (no assignment_id column exists)
+    supabase
+      .from('collections')
+      .select('id, building_id')
+      .eq('company_id', company_id),
   ]);
 
   const assignmentsArr = assignments || [];
+  const collectionsArr = collections || [];
 
   // How many planned runs actually connect to a route? (execution truth)
   let connectedRuns = 0;
   let plannedStops = 0;
 
   if (assignmentsArr.length > 0) {
-    const assignmentIds = assignmentsArr.map((a: any) => a.id);
     const routeIds = assignmentsArr.map((a: any) => a.route_id).filter(Boolean);
 
     if (routeIds.length > 0) {
@@ -78,11 +84,17 @@ export async function fetchAnalyticsData(company_id: number): Promise<AnalyticsD
       connectedRuns = assignmentsArr.filter((a: any) => routeSet.has(a.route_id)).length;
     }
 
-    const { data: stops } = await supabase
-      .from('collections')
-      .select('id')
-      .in('assignment_id', assignmentIds);
-    plannedStops = (stops || []).length;
+    // Get all building_ids that have active service_assignments for this company
+    const { data: serviceAssignments } = await supabase
+      .from('service_assignments')
+      .select('building_id')
+      .eq('company_id', company_id)
+      .eq('service_status', 'active');
+
+    const activeBuildingIds = new Set((serviceAssignments || []).map((sa: any) => sa.building_id));
+
+    // Count collections for buildings that have active assignments
+    plannedStops = collectionsArr.filter((c: any) => activeBuildingIds.has(c.building_id)).length;
   }
 
   return {
