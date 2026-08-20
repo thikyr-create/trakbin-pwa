@@ -1,7 +1,7 @@
 ﻿"use client";
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { Shield, Loader2, CircleCheck, TriangleAlert, KeyRound, Fingerprint, MonitorSmartphone } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";

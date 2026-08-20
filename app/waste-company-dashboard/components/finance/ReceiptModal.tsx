@@ -1,9 +1,9 @@
 ﻿"use client";
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Receipt, Loader2 } from "lucide-react";
-import { createClient } from "@supabase/supabase-js";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import { formatNaira } from "@/lib/utils/money";
 import { deriveInvoiceNumber } from "@/lib/features/finance/utils/billingHelpers";

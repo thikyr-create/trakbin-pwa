@@ -1,7 +1,7 @@
 ﻿"use client";
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
 import { Plus, Search, X, Users, LayoutGrid, List } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
