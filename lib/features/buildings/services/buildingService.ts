@@ -1,4 +1,4 @@
-﻿// lib/features/buildings/services/buildingService.ts
+// lib/features/buildings/services/buildingService.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { resolveNextCollection } from '../utils/buildingHelpers';
 
@@ -124,8 +124,8 @@ async function resolveAssignedDrivers(
 
 /**
  * Builds a collection-history row set from the verified execution chain:
- *   collections.building_id â†’ assignments.id (status, assigned_at, route_id)
- *   â†’ routes.driver_id â†’ drivers.full_name
+ *   collections.building_id → assignments.id (status, assigned_at, route_id)
+ *   → routes.driver_id → drivers.full_name
  *
  * Output shape matches what CollectionHistory.tsx renders:
  *   { id, collection_date, status, hauler_name, notes }
@@ -151,7 +151,7 @@ async function resolveCollectionHistory(custom_id: string): Promise<any[]> {
 
   if (!assignments || assignments.length === 0) return [];
 
-  // Route â†’ driver chain for hauler name
+  // Route → driver chain for hauler name
   const routeIds = [
     ...new Set(assignments.map((a: any) => a.route_id).filter(Boolean)),
   ];

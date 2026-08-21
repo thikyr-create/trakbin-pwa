@@ -1,4 +1,4 @@
-﻿// app/waste-company-dashboard/components/AssignmentsPage.tsx
+// app/waste-company-dashboard/components/AssignmentsPage.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
@@ -104,7 +104,7 @@ export default function AssignmentsPage() {
       const res = await AssignmentEngine.assign({ companyId: cid, driver, truck, stops: selectedStops, assignedBy: 'dispatcher' });
       if (!res.ok) { addNotification(res.errors?.join(' ') || 'Could not assign.', 'error'); return; }
 
-      addNotification(`Route assigned Â· ${selectedStops.length} stops â†’ ${driver?.full_name}`, 'success');
+      addNotification(`Route assigned · ${selectedStops.length} stops → ${driver?.full_name}`, 'success');
       setSelected([]); setDriverId(''); setTruckId(''); load();
     } catch (e: any) {
       addNotification(e?.message || 'Could not assign.', 'error');
@@ -131,7 +131,7 @@ export default function AssignmentsPage() {
             <span className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-gray-400`}>{selected.length} selected</span>
           </div>
           <div className="max-h-72 space-y-2 overflow-y-auto p-4">
-            {eligible.length === 0 ? <p className="py-8 text-center text-sm font-semibold text-gray-400">No eligible buildings â€” activate service requests first.</p> :
+            {eligible.length === 0 ? <p className="py-8 text-center text-sm font-semibold text-gray-400">No eligible buildings — activate service requests first.</p> :
               eligible.map((b) => (
                 <label key={b.custom_id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-all ${selected.includes(b.custom_id) ? 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-200' : 'border-gray-200 bg-gray-50 hover:border-gray-300'}`}>
                   <input type="checkbox" checked={selected.includes(b.custom_id)} onChange={() => toggle(b.custom_id)} className="h-4 w-4 accent-emerald-600" />
@@ -184,11 +184,11 @@ export default function AssignmentsPage() {
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                   <div>
                     <p className="flex items-center gap-2 text-sm font-extrabold text-gray-900">{d?.full_name || 'Driver'} <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">{a.status}</span></p>
-                    <p className={`${mono.className} mt-0.5 text-[10px] font-semibold text-gray-400`}>{t?.truck_id || 'Truck'} Â· {new Date(a.assigned_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
+                    <p className={`${mono.className} mt-0.5 text-[10px] font-semibold text-gray-400`}>{t?.truck_id || 'Truck'} · {new Date(a.assigned_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <select value={reTruck[a.id] || ''} onChange={(e) => setReTruck((p) => ({ ...p, [a.id]: e.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-semibold outline-none">
-                      <option value="">Reassign truckâ€¦</option>
+                      <option value="">Reassign truck…</option>
                       {trkAvail.map((x) => (<option key={x.id} value={x.id}>{x.truck_id}</option>))}
                     </select>
                     <button onClick={async () => {
@@ -199,7 +199,7 @@ export default function AssignmentsPage() {
                       addNotification(`Truck reassigned to ${nt.truck_id}`, 'success'); load();
                     }} className="flex items-center gap-1 rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-gray-800"><RefreshCw className="h-3 w-3" /> Truck</button>
                     <select value={reDriver[a.id] || ''} onChange={(e) => setReDriver((p) => ({ ...p, [a.id]: e.target.value }))} className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-xs font-semibold outline-none">
-                      <option value="">Reassign driverâ€¦</option>
+                      <option value="">Reassign driver…</option>
                       {drvAvail.map((x) => (<option key={x.id} value={x.id}>{x.full_name}</option>))}
                     </select>
                     <button onClick={async () => {

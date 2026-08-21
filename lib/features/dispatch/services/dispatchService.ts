@@ -1,4 +1,4 @@
-﻿// lib/features/dispatch/services/dispatchService.ts
+// lib/features/dispatch/services/dispatchService.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { optimizeRoute, type OptimizationStop } from '@/lib/core/route-optimization';
 import { optimizeDispatch, enrichDriverContext, type ScoredResource } from '../utils/dispatchOptimizer';
@@ -39,7 +39,7 @@ function getTargetDateInfo(date: Date) {
 // Legacy stop shape (still used by zoneGroups Map construction)
 interface Stop { building_id: string; lat: number; lng: number; }
 
-// Map legacy shape â†’ new OptimizationStop shape
+// Map legacy shape → new OptimizationStop shape
 function toOptimizationStops(stops: Stop[]): OptimizationStop[] {
   return stops.map((s) => ({
     buildingId: s.building_id,
@@ -210,7 +210,7 @@ export async function executeDispatch(
   for (const [zoneName, stops] of zoneGroups.entries()) {
     const enrichedDrivers = await enrichDriverContext(company_id, driverPool, zoneName, iso);
 
-    // â”€â”€ NEW: delegate stop ordering to the core route-optimization engine â”€â”€
+    // ── NEW: delegate stop ordering to the core route-optimization engine ──
     // The core handles sub-chunking via maxStopsPerRoute and returns road-network
     // distances/times when MAPBOX_TOKEN is present.
     const optimizationResult = await optimizeRoute({

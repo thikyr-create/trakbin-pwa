@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useState } from "react";
@@ -21,9 +21,9 @@ interface ReceiptModalProps {
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return "â€”";
+  if (!value) return "—";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "â€”";
+  if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -145,7 +145,7 @@ export default function ReceiptModal({ open, invoice, onClose }: ReceiptModalPro
               {loading ? (
                 <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-gray-200 p-6 text-gray-400">
                   <Loader2 size={16} className="animate-spin" />
-                  <span className="text-xs font-semibold">Locating receiptâ€¦</span>
+                  <span className="text-xs font-semibold">Locating receipt…</span>
                 </div>
               ) : receipt ? (
                 <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
@@ -154,13 +154,13 @@ export default function ReceiptModal({ open, invoice, onClose }: ReceiptModalPro
                   </p>
                   <dl className="space-y-2">
                     {[
-                      ["Receipt â„–", receipt.receipt_number || "â€”"],
+                      ["Receipt №", receipt.receipt_number || "—"],
                       ["Issued", formatDate(receipt.issued_at || receipt.created_at)],
                       ["Gross", formatNaira(receipt.gross)],
                       ["Platform fee", formatNaira(receipt.commission)],
                       ["Net", formatNaira(receipt.net)],
-                      ["Provider", receipt.provider_name || "â€”"],
-                      ["Payer", receipt.payer_email || "â€”"],
+                      ["Provider", receipt.provider_name || "—"],
+                      ["Payer", receipt.payer_email || "—"],
                     ].map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-4">
                         <dt className={`${mono.className} text-[10px] font-bold uppercase tracking-wider text-gray-400`}>

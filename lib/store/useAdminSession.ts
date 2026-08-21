@@ -1,4 +1,4 @@
-﻿// lib/store/useAdminSession.ts
+// lib/store/useAdminSession.ts
 "use client";
 
 import { create } from 'zustand';
@@ -17,7 +17,7 @@ export interface AdminSessionState {
 /**
  * Admin-only session store. Deliberately separate from useCompanySession:
  * the company store models tenants; this models the platform control plane.
- * Non-admins are bounced to /admin/login â€” no company resolution, no /auth.
+ * Non-admins are bounced to /admin/login — no company resolution, no /auth.
  * NEVER redirects when already on /admin/login (self-redirect reload loop).
  */
 export const useAdminSession = create<AdminSessionState>((set) => ({
@@ -51,7 +51,7 @@ export const useAdminSession = create<AdminSessionState>((set) => ({
 
     set({ admin: { id: user.id, role: 'admin', email: user.email ?? null }, loaded: true });
 
-    // Access log â€” every admin console entry leaves a trace
+    // Access log — every admin console entry leaves a trace
     emitAudit(supabase, {
       category: 'SECURITY_EVENT',
       actorId: user.id,

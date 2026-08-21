@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useMemo, useState } from "react";
@@ -128,7 +128,7 @@ export default function DriversPage({ drivers, trucks = [], onRefetch }: Drivers
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search drivers by name or IDâ€¦"
+            placeholder="Search drivers by name or ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-9 text-sm font-semibold text-gray-900 outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"

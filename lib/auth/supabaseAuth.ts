@@ -1,4 +1,4 @@
-﻿import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 const supabase = supabaseBrowser;
 
@@ -21,7 +21,7 @@ export const supabaseAuth = {
     });
   },
 
-  // email OTP (no password) â€” used for recovery
+  // email OTP (no password) — used for recovery
   async requestOtp(email: string) { return supabase.auth.signInWithOtp({ email }); },
   async verifyOtp(email: string, token: string) {
     return supabase.auth.verifyOtp({ email, token, type: 'email' });

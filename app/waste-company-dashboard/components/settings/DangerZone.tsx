@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useState } from "react";
@@ -83,7 +83,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
       a.click();
       URL.revokeObjectURL(url);
 
-      setFeedback({ type: "success", text: "Export downloaded. Your data stays in Trakbin â€” this is a copy, not a deletion." });
+      setFeedback({ type: "success", text: "Export downloaded. Your data stays in Trakbin — this is a copy, not a deletion." });
     } catch {
       setFeedback({ type: "error", text: "Export failed. Please try again." });
     } finally {
@@ -138,7 +138,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
             className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-700 disabled:opacity-50"
           >
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {exporting ? "Preparingâ€¦" : "Export"}
+            {exporting ? "Preparing…" : "Export"}
           </button>
         </div>
 
@@ -158,7 +158,7 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
                 className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-600"
               >
                 <RotateCcw size={14} />
-                Resetâ€¦
+                Reset…
               </button>
             ) : (
               <div className="flex items-center gap-2">
@@ -181,13 +181,13 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
           </div>
         </div>
 
-        {/* Planned destructive actions â€” honest */}
+        {/* Planned destructive actions — honest */}
         <div className="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 px-4 py-4">
           <CircleX size={16} className="shrink-0 text-gray-300" />
           <div>
             <p className="text-xs font-bold text-gray-500">Deactivate / delete company</p>
             <p className="text-[11px] font-medium text-gray-400">
-              Requires an account-lifecycle foundation (active flag + approval flow) â€” planned with Phase SEC.
+              Requires an account-lifecycle foundation (active flag + approval flow) — planned with Phase SEC.
               Nothing destructive is offered before it can be done safely.
             </p>
           </div>

@@ -1,4 +1,4 @@
-﻿// lib/features/driver/deviation/deviationDetector.ts
+// lib/features/driver/deviation/deviationDetector.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { recordActivity } from '../activity';
 import { useDriverSession } from '@/lib/store/useDriverSession';
@@ -79,7 +79,7 @@ export const deviationDetector = {
   },
 };
 
-/** Distance from point (lat, lng) to line segment (lat1,lng1)â†’(lat2,lng2) in meters */
+/** Distance from point (lat, lng) to line segment (lat1,lng1)→(lat2,lng2) in meters */
 function distanceToSegment(lat: number, lng: number, lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000; // Earth radius in meters
   const dLat1 = ((lat1 - lat) * Math.PI) / 180;

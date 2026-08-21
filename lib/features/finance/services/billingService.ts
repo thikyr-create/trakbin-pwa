@@ -1,4 +1,4 @@
-﻿// lib/features/finance/services/billingService.ts
+// lib/features/finance/services/billingService.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { isInvoiceOverdue } from '../utils/billingHelpers';
 import type { PricingPlan } from '@/lib/features/settings/services/settingsService';
@@ -231,7 +231,7 @@ export async function autoLinkBuildingsToPlans(
     return { linked: 0, skipped: buildings.length };
   }
 
-  // Build a map: building_type â†’ most recent active plan
+  // Build a map: building_type → most recent active plan
   const planByType = new Map<string, any>();
   plans.forEach((p: any) => {
     if (!planByType.has(p.building_type)) {

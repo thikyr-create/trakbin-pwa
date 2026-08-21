@@ -1,4 +1,4 @@
-﻿// lib/features/driver/sync/syncEngine.ts
+// lib/features/driver/sync/syncEngine.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { offlineQueue } from './offlineQueue';
 import type { QueuedItem } from './syncTypes';
@@ -18,7 +18,7 @@ async function flushOne(item: QueuedItem): Promise<boolean> {
   if (item.type === 'driver_activity') {
     const { error } = await supabase.from('driver_activity').insert([item.payload as any]);
     if (error) {
-      // UNIQUE violation on idempotency_key = already persisted â†’ treat as success
+      // UNIQUE violation on idempotency_key = already persisted → treat as success
       if (/duplicate key|unique/i.test(error.message)) return true;
       return false;
     }
@@ -26,7 +26,7 @@ async function flushOne(item: QueuedItem): Promise<boolean> {
   }
 
   if (item.type === 'driver_breadcrumb') {
-    // Map camelCase breadcrumb record â†’ snake_case DB columns
+    // Map camelCase breadcrumb record → snake_case DB columns
     const p = item.payload as any;
     const row = {
       driver_id: p.driverId,
@@ -49,7 +49,7 @@ async function flushOne(item: QueuedItem): Promise<boolean> {
     return true;
   }
 
-  // Unknown type â€” drop it rather than block the queue
+  // Unknown type — drop it rather than block the queue
   return true;
 }
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -35,20 +35,20 @@ export default function BillingCard() {
   const oldest = (pending || [])[0];
   const isOverdue = oldest ? new Date(oldest.due_date) < new Date(new Date().toDateString()) : false;
 
-  // Honest state machine â€” never a fake figure.
+  // Honest state machine — never a fake figure.
   let chip: { text: string; cls: string };
   let headline: string;
   let sub: string;
   if (!loaded) {
     chip = { text: 'Syncing', cls: 'bg-gray-100 text-gray-500' };
-    headline = 'â€”';
-    sub = 'Reading your accountâ€¦';
+    headline = '—';
+    sub = 'Reading your account…';
   } else if ((pending || []).length > 0) {
     chip = isOverdue
       ? { text: 'Overdue', cls: 'bg-red-50 text-red-700' }
       : { text: 'Outstanding', cls: 'bg-amber-50 text-amber-700' };
-    headline = `â‚¦${dueTotal.toLocaleString()}`;
-    sub = `${isOverdue ? 'Overdue Â· due ' : 'Due '}${new Date(oldest.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    headline = `₦${dueTotal.toLocaleString()}`;
+    sub = `${isOverdue ? 'Overdue · due ' : 'Due '}${new Date(oldest.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   } else if (invoiceCount.paid > 0) {
     chip = { text: 'Up to date', cls: 'bg-emerald-50 text-emerald-700' };
     headline = 'Paid';
@@ -57,7 +57,7 @@ export default function BillingCard() {
       : 'No balance owing';
   } else {
     chip = { text: 'Yet to be billed', cls: 'bg-gray-100 text-gray-500' };
-    headline = 'â‚¦0';
+    headline = '₦0';
     sub = 'Your first invoice appears on your billing date';
   }
 
@@ -87,7 +87,7 @@ export default function BillingCard() {
 
       <div className="mt-auto pt-5">
         <div className="flex items-center justify-between border-t border-gray-100 pt-4 text-xs font-semibold text-gray-500">
-          <span>{invoiceCount.paid} paid Â· {loaded ? (pending || []).length : invoiceCount.due} due</span>
+          <span>{invoiceCount.paid} paid · {loaded ? (pending || []).length : invoiceCount.due} due</span>
           {loaded && (pending || []).length === 0 && <CircleCheck className="h-4 w-4 text-emerald-500" />}
         </div>
         <div className="mt-3 flex items-center gap-1 text-sm font-bold text-emerald-600">
@@ -99,7 +99,7 @@ export default function BillingCard() {
             onClick={(e) => { e.stopPropagation(); setShowAutopay(true); }}
             className="mt-3 w-full rounded-lg border border-gray-200 bg-gray-50 py-2 text-xs font-bold text-gray-700 transition-all hover:bg-gray-100"
           >
-            âš¡ Set Autopay
+            ⚡ Set Autopay
           </button>
         )}
       </div>

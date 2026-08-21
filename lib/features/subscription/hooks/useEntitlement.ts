@@ -1,4 +1,4 @@
-﻿// lib/features/subscription/hooks/useEntitlement.ts
+// lib/features/subscription/hooks/useEntitlement.ts
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -8,7 +8,7 @@ import type { Capability } from '@/lib/core/finance/subscription-engine/plans';
 
 const supabase = supabaseBrowser;
 
-// allowed: null = checking Â· true = entitled Â· false = locked
+// allowed: null = checking · true = entitled · false = locked
 export function useEntitlement(companyId: number | null | undefined, cap: Capability) {
   const [allowed, setAllowed] = useState<boolean | null>(null);
 

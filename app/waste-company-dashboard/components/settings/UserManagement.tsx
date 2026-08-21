@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useEffect, useState } from "react";
@@ -74,7 +74,7 @@ export default function UserManagement({ bundle, loading }: SettingsSectionProps
               <div className="min-w-0">
                 <p className="text-sm font-bold text-gray-900">{u.full_name || u.email || "Unnamed user"}</p>
                 <p className="text-[11px] font-medium text-gray-400">
-                  {u.email || "No email"}{u.phone ? ` Â· ${u.phone}` : ""}
+                  {u.email || "No email"}{u.phone ? ` · ${u.phone}` : ""}
                 </p>
               </div>
               <span className={`${mono.className} rounded-full bg-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-gray-500 ring-1 ring-gray-200`}>
@@ -85,14 +85,14 @@ export default function UserManagement({ bundle, loading }: SettingsSectionProps
         </div>
       )}
 
-      {/* Honest roadmap note â€” no dead invite button */}
+      {/* Honest roadmap note — no dead invite button */}
       <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-gray-50/40 px-4 py-3">
         <UserPlus size={16} className="shrink-0 text-gray-300" />
         <div>
           <p className="text-xs font-bold text-gray-500">Roles & invitations</p>
           <p className="text-[11px] font-medium text-gray-400">
             Dispatcher, Finance Officer, Supervisor roles and secure invitations arrive with the
-            RBAC foundation â€” until then, account creation stays outside the dashboard for safety.
+            RBAC foundation — until then, account creation stays outside the dashboard for safety.
           </p>
         </div>
       </div>

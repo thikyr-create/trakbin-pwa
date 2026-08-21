@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useRef,useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Trash2, Camera, MapPin, CircleCheck, Upload, X } from 'lucide-react';
@@ -29,11 +29,11 @@ export default function ReportIssuePage() {
   const [uploading, setUploading] = useState(false);
 
   const issueOptions = [
-    { id: 'dumping', title: 'Illegal Dumping', icon: 'ðŸ—‘', desc: 'Waste dumped in unauthorized locations.' },
-    { id: 'missed', title: 'Missed Collection', icon: 'ðŸš›', desc: 'Scheduled pickup was missed.' },
-    { id: 'damaged', title: 'Damaged Bin', icon: 'ðŸ—‘ï¸', desc: 'Bin is broken or missing.' },
+    { id: 'dumping', title: 'Illegal Dumping', icon: '🗑', desc: 'Waste dumped in unauthorized locations.' },
+    { id: 'missed', title: 'Missed Collection', icon: '🚛', desc: 'Scheduled pickup was missed.' },
+    { id: 'damaged', title: 'Damaged Bin', icon: '🗑️', desc: 'Bin is broken or missing.' },
     { id: 'blocked', title: 'Blocked Access', icon: '', desc: 'Truck cannot access the bin.' },
-    { id: 'burning', title: 'Burning Waste', icon: 'ðŸ”¥', desc: 'Open burning of trash observed.' },
+    { id: 'burning', title: 'Burning Waste', icon: '🔥', desc: 'Open burning of trash observed.' },
   ];
 
   const handleWasteTypeToggle = (type: string) => {

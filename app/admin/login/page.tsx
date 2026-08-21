@@ -1,4 +1,4 @@
-﻿// app/admin/login/page.tsx
+// app/admin/login/page.tsx
 "use client";
 
 import { useState } from 'react';
@@ -88,7 +88,7 @@ export default function AdminLoginPage() {
             <label className={`${mono.className} mb-1.5 block text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-100/60`}>Password</label>
             <input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-400/20"
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+              placeholder="••••••••" />
           </div>
 
           {error && (
@@ -107,7 +107,7 @@ export default function AdminLoginPage() {
           <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 py-3 text-sm font-extrabold text-emerald-950 shadow-lg shadow-emerald-400/25 transition-colors hover:bg-emerald-300 disabled:bg-white/10 disabled:text-white/40">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : mode === 'signin' ? <KeyRound className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-            {busy ? 'Workingâ€¦' : mode === 'signin' ? 'Sign in' : 'Create admin'}
+            {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create admin'}
           </motion.button>
         </form>
 

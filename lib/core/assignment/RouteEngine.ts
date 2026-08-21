@@ -1,4 +1,4 @@
-﻿import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 const supabase = supabaseBrowser;
 
 export async function createRoute(args: {
@@ -27,8 +27,8 @@ export async function createRoute(args: {
     total_stops: args.totalStops,
     completed_stops: 0,
     status: 'active',
-    route_name: routeName,                 // NOT NULL â€” was missing, insert threw
-    zone_id: args.zoneName || 'unassigned', // NOT NULL â€” was missing, insert threw
+    route_name: routeName,                 // NOT NULL — was missing, insert threw
+    zone_id: args.zoneName || 'unassigned', // NOT NULL — was missing, insert threw
     algorithm: 'haversine_nearest_neighbour',
     matrix_source: 'client_haversine',
   }]).select().single();

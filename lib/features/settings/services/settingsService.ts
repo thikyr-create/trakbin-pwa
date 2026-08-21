@@ -1,4 +1,4 @@
-﻿// lib/features/settings/services/settingsService.ts
+// lib/features/settings/services/settingsService.ts
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 const supabase = supabaseBrowser;
@@ -84,7 +84,7 @@ export async function fetchSettingsBundle(company_id: number): Promise<SettingsB
     .eq('id', company_id)
     .maybeSingle();
 
-  // Settings row â€” create with defaults on first read
+  // Settings row — create with defaults on first read
   let settings: any = null;
   const { data: existing } = await supabase
     .from('company_settings')
@@ -184,7 +184,7 @@ export async function createPricingPlan(
 
   if (error || !plan) return { ok: false, error: error?.message || 'Failed to create plan.' };
 
-  // Audit trail â€” plan creation is the first history entry
+  // Audit trail — plan creation is the first history entry
   await supabase.from('pricing_history').insert([
     {
       company_id,

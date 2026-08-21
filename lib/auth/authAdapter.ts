@@ -1,4 +1,4 @@
-﻿import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { resolveBuildingZone } from '@/lib/features/zones/utils/zoneAssignment';
 
 const supabase = supabaseBrowser;
@@ -99,7 +99,7 @@ export const authAdapter = {
 
     if (!zones || zones.length === 0) return null;
 
-    // Polygon â†’ radius â†’ text hierarchy (nearest = low confidence, rejected)
+    // Polygon → radius → text hierarchy (nearest = low confidence, rejected)
     const res = resolveBuildingZone(
       { custom_id: 'registration', latitude: lat, longitude: lng, estate: estate || null, address: officialAddress },
       zones as any

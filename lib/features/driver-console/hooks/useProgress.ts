@@ -1,4 +1,4 @@
-﻿// lib/features/driver-console/hooks/useProgress.ts
+// lib/features/driver-console/hooks/useProgress.ts
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
@@ -70,7 +70,7 @@ export function useProgress(): ProgressData {
     };
   }, [sorted]);
 
-  // Waste collected â€” only when the data exists
+  // Waste collected — only when the data exists
   useEffect(() => {
     if (!driverCompanyId) return;
     const today = new Date();

@@ -1,4 +1,4 @@
-﻿// app/waste-company-dashboard/components/FieldIntelligencePage.tsx
+// app/waste-company-dashboard/components/FieldIntelligencePage.tsx
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -104,7 +104,7 @@ export default function FieldIntelligencePage() {
                       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100"><MapPin size={20} className="text-amber-700" /></div>
                       <div>
                         <h3 className="font-black text-gray-900">{cor.entity_type} <span className="font-mono text-sm">{cor.entity_id}</span></h3>
-                        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400">Field: {cor.field} Â· {cor.status.replace(/_/g, ' ')}</p>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400">Field: {cor.field} · {cor.status.replace(/_/g, ' ')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -147,7 +147,7 @@ export default function FieldIntelligencePage() {
                   <div className="text-right"><p className="font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400">Confidence</p><p className="text-lg font-black text-emerald-700">{Math.round(intel.confidence * 100)}%</p></div>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-2 ring-1 ring-gray-200"><pre className="overflow-x-auto text-[11px] text-gray-700 font-mono">{JSON.stringify(intel.value, null, 2)}</pre></div>
-                <p className="mt-2 font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400">{intel.sample_count} samples Â· {new Date(intel.updated_at).toLocaleDateString()}</p>
+                <p className="mt-2 font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400">{intel.sample_count} samples · {new Date(intel.updated_at).toLocaleDateString()}</p>
               </motion.div>
             ))
           )}

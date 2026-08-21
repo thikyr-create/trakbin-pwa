@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -36,7 +36,7 @@ export default function CompanyDriverIssues() {
     const patch: any = { status: next };
     if (next === 'resolved') patch.resolved_at = new Date().toISOString();
     await supabase.from('driver_issues').update(patch).eq('id', it.id);
-    addNotification(`Issue ${it.issue_number} â†’ ${next}.`, 'success');
+    addNotification(`Issue ${it.issue_number} → ${next}.`, 'success');
     load();
   };
 
@@ -62,7 +62,7 @@ export default function CompanyDriverIssues() {
                         <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ring-1 ${STATUS_CHIP[it.status] || STATUS_CHIP.open}`}>{it.status}</span>
                       </p>
                       <p className="mt-0.5 text-xs font-medium text-gray-600">{it.description}</p>
-                      <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` Â· ${it.truck_id}` : ''}{it.location ? ` Â· ${it.location}` : ''}</p>
+                      <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` · ${it.truck_id}` : ''}{it.location ? ` · ${it.location}` : ''}</p>
                     </div>
                   </div>
                   {it.status !== 'resolved'

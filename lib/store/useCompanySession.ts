@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { create } from 'zustand';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -136,7 +136,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       .neq('is_active', false);
 
     if (!zones || zones.length === 0) {
-      // Company has no zones â†’ only show requests already assigned to them
+      // Company has no zones → only show requests already assigned to them
       const assigned = (allRequests || []).filter((r) => r.company_id === cid);
       set({ serviceRequests: assigned });
       return;
@@ -144,10 +144,10 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
 
     // 3. Filter: keep requests already assigned to this company + unassigned requests that match a zone
     const filtered = (allRequests || []).filter((req) => {
-      // Already assigned to this company â†’ always show
+      // Already assigned to this company → always show
       if (req.company_id === cid) return true;
 
-      // Unassigned â†’ check if building matches any zone
+      // Unassigned → check if building matches any zone
       const building = req.buildings as any;
       if (!building) return false;
 
@@ -222,9 +222,9 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
       const json = await res.json();
       if (json.ok) {
         await get().fetchEarnings();
-        get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested â€” releasingâ€¦', json.already ? 'info' : 'success');
+        get().addNotification(json.already ? 'Payout request already recorded.' : 'Payout requested — releasing…', json.already ? 'info' : 'success');
         if (!json.already && json.payout_id) { try { await get().executePayout(json.payout_id); } catch {} }
-      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is â‚¦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
+      } else get().addNotification(json.reason === 'insufficient_available' ? 'Not enough available balance.' : json.reason === 'below_minimum' ? `Minimum payout is ₦${(json.minimum || 1000).toLocaleString()}.` : 'Could not request payout.', 'error');
       return json;
     } catch (e: any) { get().addNotification('Could not request payout.', 'error'); return { ok: false, reason: e?.message }; }
   },
@@ -262,12 +262,12 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
         ]);
         const coverage = buildingRow ? resolveBuildingZone(buildingRow as any, (myZones || []) as any) : null;
         if (!coverage || coverage.confidence === 'low') {
-          get().addNotification('âŒ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
+          get().addNotification('❌ This building is outside your defined zones. Add coverage in Zones before accepting.', 'warning');
           return;
         }
       }
 
-      // zone_id is a NAME-keyed join column everywhere else â€” normalize UUID â†’ name here
+      // zone_id is a NAME-keyed join column everywhere else — normalize UUID → name here
       const { data: zoneRow } = await supabase
         .from('company_zones')
         .select('zone_name')
@@ -318,7 +318,7 @@ export const useCompanySession = create<CompanySessionState>((set, get) => ({
     const routeSub = supabase.channel('routes-channel').on('postgres_changes', {event: '*', schema: 'public', table: 'routes', filter: `company_id=eq.${cid}` },(p) => { const n = p.new as any; get().updateTruckStatus(n.route_id, n.status === 'paused' ? 'paused' : n.status === 'completed' ? 'completed' : 'on_route'); }).subscribe();
     const ledgerSub = supabase.channel(`company-ledger-${cid}`).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_transactions', filter:`company_id=eq.${cid}` }, () => { get().fetchEarnings(); }).subscribe();
     const payoutSub = supabase.channel(`company-payouts-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'payouts', filter: `company_id=eq.${cid}` }, () => { get().fetchPayouts(); get().fetchEarnings(); }).subscribe();
-    // EVENT BUS bridges: DB changes (any tab/user) â†’ semantic events
+    // EVENT BUS bridges: DB changes (any tab/user) → semantic events
     const buildingsSub = supabase.channel(`company-buildings-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `company_id=eq.${cid}` }, () => { BuildingPublisher.publish('BUILDING_UPDATED', {}); }).subscribe();
     const zonesSub = supabase.channel(`company-zones-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'company_zones', filter: `company_id=eq.${cid}` }, () => { ZonePublisher.publish('ZONE_UPDATED', {}); }).subscribe();
     const assignSub = supabase.channel(`company-assignments-${cid}`).on('postgres_changes', { event: '*', schema: 'public', table: 'service_assignments', filter: `company_id=eq.${cid}` }, () => { AssignmentPublisher.publish('ASSIGNMENT_UPDATED', {}); }).subscribe();

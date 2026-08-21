@@ -50,11 +50,12 @@ export function useDriverNotifications() {
       })
     );
 
+        const routeKey = driver?.id != null ? String(driver.id) : driverId;
     const { data: routes } = await supabase
       .from('routes')
       .select('id, total_stops, created_at')
       .eq('company_id', driverCompanyId)
-      .eq('driver_id', driverId)
+      .eq('driver_id', routeKey)
       .gte('created_at', weekAgo)
       .order('created_at', { ascending: false })
       .limit(3);

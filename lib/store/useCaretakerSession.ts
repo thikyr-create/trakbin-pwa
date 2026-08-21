@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { create } from 'zustand';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -197,7 +197,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       .on('postgres_changes', { event: '*', schema: 'public', table: 'collections', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchFullHistory(true); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ledger_transactions', filter: `building_id=eq.${bId}` }, () => { get().refreshAll(); get().fetchLedger(); })
       // FIX: Watch the building row itself. When a company accepts (company_id updates),
-      // the caretaker's local state refreshes instantly â†’ Report tab unlocks live.
+      // the caretaker's local state refreshes instantly → Report tab unlocks live.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'Buildings', filter: `custom_id=eq.${bId}` }, async () => {
         const { data: updated } = await supabase.from('Buildings').select('*').eq('custom_id', bId).maybeSingle();
         if (updated) {
@@ -260,9 +260,9 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       if (autopayEnabled && newInv?.id) {
         const res = await get().payInvoice(newInv.id);
         paidByAutopay = !!res.ok;
-        if (res.ok && !res.already) alert(`âœ… Autopay settled â€” ${monthLabel}. Provider credited, platform fee applied.`);
-        else if (!res.ok && res.reason === 'insufficient_wallet') alert(`âš ï¸ Autopay skipped: insufficient wallet balance.`);
-        else if (!res.ok && res.reason === 'no_provider_assigned') alert(`âš ï¸ Autopay held: no waste provider assigned yet â€” invoice stays pending.`);
+        if (res.ok && !res.already) alert(`✅ Autopay settled — ${monthLabel}. Provider credited, platform fee applied.`);
+        else if (!res.ok && res.reason === 'insufficient_wallet') alert(`⚠️ Autopay skipped: insufficient wallet balance.`);
+        else if (!res.ok && res.reason === 'no_provider_assigned') alert(`⚠️ Autopay held: no waste provider assigned yet — invoice stays pending.`);
       }
 
       set((state) => ({
@@ -290,7 +290,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     await supabase.from('Buildings').update({ autopay_enabled: true, autopay_source: autopaySource }).eq('custom_id', building.custom_id);
     await get().refreshAll();
     set({ autopayLoading: false, showAutopay: false });
-    alert(`âœ… Autopay enabled! We will automatically settle from your ${autopaySource} on the 1st of every month.`);
+    alert(`✅ Autopay enabled! We will automatically settle from your ${autopaySource} on the 1st of every month.`);
   },
 
   disableAutopay: async () => {

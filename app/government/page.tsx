@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -29,7 +29,7 @@ export default function GovernmentLoginPage() {
         .single();
 
       if (error || !data) {
-        setError('âŒ Invalid credentials. Access denied.');
+        setError('❌ Invalid credentials. Access denied.');
         setLoading(false);
         return;
       }
@@ -37,7 +37,7 @@ export default function GovernmentLoginPage() {
       localStorage.setItem('trakbin_government_official', JSON.stringify(data));
       router.push('/government-portal');
     } catch (err) {
-      setError('âŒ System error. Please try again.');
+      setError('❌ System error. Please try again.');
       setLoading(false);
     }
   };
@@ -70,7 +70,7 @@ export default function GovernmentLoginPage() {
             <div>
               <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Password</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none pr-12" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 outline-none pr-12" placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -83,7 +83,7 @@ export default function GovernmentLoginPage() {
             </button>
           </form>
           <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-            <a href="/" className="text-xs font-bold text-gray-500 hover:text-emerald-600 transition-all">â† Return to Public Site</a>
+            <a href="/" className="text-xs font-bold text-gray-500 hover:text-emerald-600 transition-all">← Return to Public Site</a>
           </div>
         </div>
       </div>

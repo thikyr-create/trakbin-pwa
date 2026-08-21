@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -21,7 +21,7 @@ export default function ServiceRequestsPage() {
   const [zoneId, setZoneId] = useState('');
   const [frequency, setFrequency] = useState('weekly');
   const [days, setDays] = useState<string[]>(['Mon']);
-  const [timeWindow, setTimeWindow] = useState('08:00 AM â€“ 11:00 AM');
+  const [timeWindow, setTimeWindow] = useState('08:00 AM – 11:00 AM');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function ServiceRequestsPage() {
               </div>
 
               {zones.length === 0 ? (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">You have no active zones yet â€” add one under Zones before activating buildings.</p>
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">You have no active zones yet — add one under Zones before activating buildings.</p>
               ) : (
                 <div className="space-y-4">
                   <div>

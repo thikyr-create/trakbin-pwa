@@ -1,4 +1,4 @@
-﻿// lib/features/driver-console/hooks/useActivityTimeline.ts
+// lib/features/driver-console/hooks/useActivityTimeline.ts
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
@@ -15,7 +15,7 @@ export interface ActivityEvent {
   occurred_at: string;
 }
 
-/** Operational timeline â€” reads the existing activity trail, never fabricates. */
+/** Operational timeline — reads the existing activity trail, never fabricates. */
 export function useActivityTimeline() {
   const { driver, driverCompanyId } = useDriverSession();
   const [events, setEvents] = useState<ActivityEvent[]>([]);
@@ -38,7 +38,7 @@ export function useActivityTimeline() {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  // Live updates â€” unique topic per instance
+  // Live updates — unique topic per instance
   useEffect(() => {
     if (!driverCompanyId) return;
     const topic = `driver_activity_${Math.random().toString(36).slice(2)}`;

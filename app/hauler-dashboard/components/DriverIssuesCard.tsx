@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
@@ -62,7 +62,7 @@ export default function DriverIssuesCard() {
         } catch {}
         setLocBusy(false);
       },
-      () => { setLocBusy(false); setMessage('Could not read location â€” type it instead.'); },
+      () => { setLocBusy(false); setMessage('Could not read location — type it instead.'); },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
@@ -87,10 +87,10 @@ export default function DriverIssuesCard() {
         media: urls, status: 'open',
       }]);
       if (error) throw error;
-      setMessage('âœ… Issue reported to your company.');
+      setMessage('✅ Issue reported to your company.');
       setDescription(''); setLocation(''); setCoords(null);
       load(driver.id);
-    } catch (e: any) { setMessage('âŒ ' + (e?.message || 'Failed to report.')); }
+    } catch (e: any) { setMessage('❌ ' + (e?.message || 'Failed to report.')); }
     finally { setSaving(false); }
   };
 
@@ -120,7 +120,7 @@ export default function DriverIssuesCard() {
             <Truck className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input value={truckId} onChange={(e) => setTruckId(e.target.value)} placeholder="Truck ID (e.g. TRK-1234)" className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-4 text-sm font-semibold outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
           </div>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the issueâ€¦" className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Describe the issue…" className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
           <div className="flex gap-2">
             <div className="relative flex-1">
               <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -135,9 +135,9 @@ export default function DriverIssuesCard() {
             <input id="drv-issue-photo" type="file" multiple accept="image/*" className="hidden" />
           </label>
           <motion.button whileTap={{ scale: 0.98 }} disabled={saving} onClick={() => { const el = document.getElementById('drv-issue-photo') as HTMLInputElement; submit(el?.files || null); }} className="w-full rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
-            {saving ? 'Reportingâ€¦' : 'Report issue'}
+            {saving ? 'Reporting…' : 'Report issue'}
           </motion.button>
-          {message && <p className={`text-xs font-semibold ${message.includes('âŒ') ? 'text-red-600' : 'text-emerald-700'}`}>{message}</p>}
+          {message && <p className={`text-xs font-semibold ${message.includes('❌') ? 'text-red-600' : 'text-emerald-700'}`}>{message}</p>}
         </div>
       </motion.section>
 
@@ -159,7 +159,7 @@ export default function DriverIssuesCard() {
                       <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ring-1 ${STATUS_CHIP[it.status] || STATUS_CHIP.open}`}>{it.status}</span>
                     </p>
                     <p className="mt-0.5 text-xs font-medium text-gray-500">{it.description}</p>
-                    <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` Â· ${it.truck_id}` : ''} Â· {new Date(it.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
+                    <p className="font-mono mt-0.5 text-[10px] font-semibold text-gray-400">{it.issue_number}{it.truck_id ? ` · ${it.truck_id}` : ''} · {new Date(it.created_at).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })}</p>
                   </div>
                   {it.status === 'resolved' && <CircleCheck className="h-5 w-5 shrink-0 text-emerald-500" />}
                 </div>
