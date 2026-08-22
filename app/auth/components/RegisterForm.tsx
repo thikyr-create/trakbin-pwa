@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import { Building2, UserPlus, Truck, MapPin, Phone, Loader2, Search, CircleCheck, CircleAlert, Smartphone, Monitor, ChevronDown } from 'lucide-react';
 import CompanyIdCard from './CompanyIdCard';
+import PasswordField from './PasswordField';
 import { authEngine } from '@/lib/auth/authEngine';
 import type { AccountType } from '@/lib/auth/types';
 
@@ -22,6 +23,7 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
   const [message, setMessage] = useState('');
 
   const [passcode, setPasscode] = useState('');
+  const [confirmPasscode, setConfirmPasscode] = useState('');
   const [buildingType, setBuildingType] = useState('Residential Single Unit');
   const [numberOfFlats, setNumberOfFlats] = useState('');
   const [numberOfShops, setNumberOfShops] = useState('');
@@ -36,12 +38,16 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [licenseNumber, setLicenseNumber] = useState('');
   const [operatingAddress, setOperatingAddress] = useState('');
   const [contactNumber, setContactNumber] = useState('');
 
   const [companyCard, setCompanyCard] = useState<null | { id: number; name: string; email: string; license: string }>(null);
+
+  const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const passcodeMismatch = confirmPasscode.length > 0 && passcode !== confirmPasscode;
 
   useEffect(() => { if (typeof window !== 'undefined') setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)); }, []);
 
@@ -81,6 +87,14 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setMessage('');
+    
+    if (accountType === 'Caretaker' && passcodeMismatch) { 
+      setMessage('❌ Passcodes do not match.'); setLoading(false); return; 
+    }
+    if (accountType !== 'Caretaker' && passwordMismatch) { 
+      setMessage('❌ Passwords do not match.'); setLoading(false); return; 
+    }
+
     if (accountType === 'Caretaker') {
       if (gpsStatus !== 'captured') { setMessage('Please search for your location or allow GPS.'); setLoading(false); return; }
       if (!officialAddress) { setMessage('❌ Please enter the official building address.'); setLoading(false); return; }
@@ -88,7 +102,10 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
       if (buildingType === 'Commercial' && !numberOfShops) { setMessage('❌ Please select number of shops.'); setLoading(false); return; }
       const res = await authEngine.registerCaretaker({ passcode, buildingType, officialAddress, estate, gpsAddress, latitude: coords.lat, longitude: coords.lon, numberOfFlats, numberOfShops });
       setMessage(res.message);
-      if (res.ok && res.buildingId) onRegistered(res.buildingId, passcode, officialAddress);
+      if (res.ok && res.buildingId) {
+        onRegistered(res.buildingId, passcode, officialAddress);
+        setPasscode(''); setConfirmPasscode('');
+      }
       setLoading(false);
       return;
     }
@@ -96,6 +113,7 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
     setMessage(res.message);
     if (res.ok && res.companyId) {
       setCompanyCard({ id: res.companyId, name: companyName, email, license: licenseNumber });
+      setConfirmPassword('');
     }
     setLoading(false);
   };
@@ -111,7 +129,27 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
             <p className="mt-0.5 text-xs text-blue-700">You'll receive a digital ID card to save after registration.</p>
           </div>
 
-          <input type="password" placeholder="Set Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} required className={inputCls} />
+          <PasswordField
+            value={passcode}
+            onChange={setPasscode}
+            placeholder="Set Passcode"
+            required
+            autoComplete="new-password"
+            name="passcode"
+            className={inputCls}
+          />
+          <PasswordField
+            value={confirmPasscode}
+            onChange={setConfirmPasscode}
+            placeholder="Confirm Passcode"
+            required
+            autoComplete="new-password"
+            name="confirmPasscode"
+            className={`${inputCls} ${passcodeMismatch ? 'border-red-300 bg-red-50' : ''}`}
+          />
+          {passcodeMismatch && (
+            <p className="text-[11px] font-semibold text-red-600">Passcodes do not match.</p>
+          )}
 
           <div className="relative">
             <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
@@ -201,7 +239,27 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
       ) : (
         <>
           <input type="email" placeholder="Business Email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
-          <input type="password" placeholder="Create Password" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
+          <PasswordField
+            value={password}
+            onChange={setPassword}
+            placeholder="Create Password"
+            required
+            autoComplete="new-password"
+            name="password"
+            className={inputCls}
+          />
+          <PasswordField
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            placeholder="Confirm Password"
+            required
+            autoComplete="new-password"
+            name="confirmPassword"
+            className={`${inputCls} ${passwordMismatch ? 'border-red-300 bg-red-50' : ''}`}
+          />
+          {passwordMismatch && (
+            <p className="text-[11px] font-semibold text-red-600">Passwords do not match.</p>
+          )}
           <div className="relative">
             <Truck className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input type="text" placeholder="Company Name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required className={`${inputCls} pl-10`} />
@@ -218,7 +276,7 @@ export default function RegisterForm({ accountType, onRegistered, onSwitchToLogi
         </>
       )}
 
-      <motion.button whileTap={{ scale: 0.98 }} whileHover={{ y: -1 }} type="submit" disabled={loading || (accountType === 'Caretaker' && gpsStatus !== 'captured')} className={`w-full rounded-xl py-3 font-extrabold text-white shadow-lg transition-all ${loading || (accountType === 'Caretaker' && gpsStatus !== 'captured') ? 'cursor-not-allowed bg-gray-400 shadow-none' : 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700'}`}>
+      <motion.button whileTap={{ scale: 0.98 }} whileHover={{ y: -1 }} type="submit" disabled={loading || (accountType === 'Caretaker' && gpsStatus !== 'captured') || passwordMismatch || passcodeMismatch} className={`w-full rounded-xl py-3 font-extrabold text-white shadow-lg transition-all ${loading || (accountType === 'Caretaker' && gpsStatus !== 'captured') || passwordMismatch || passcodeMismatch ? 'cursor-not-allowed bg-gray-400 shadow-none' : 'bg-emerald-600 shadow-emerald-200 hover:bg-emerald-700'}`}>
         {loading ? 'Creating Account...' : `Register as ${accountType === 'Operations' ? 'Waste Company' : accountType}`}
       </motion.button>
 

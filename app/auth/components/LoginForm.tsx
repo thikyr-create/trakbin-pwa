@@ -1,3 +1,4 @@
+// app/auth/components/LoginForm.tsx
 "use client";
 
 import { useState } from 'react';
@@ -8,6 +9,7 @@ import { Building2, LogIn, CircleCheck, CircleAlert, KeyRound, ArrowLeft, ArrowR
 import { authEngine } from '@/lib/auth/authEngine';
 import { supabaseAuth } from '@/lib/auth/supabaseAuth';
 import { ROLE_HOME } from '@/lib/auth/permissions';
+import PasswordField from './PasswordField';
 import type { AccountType } from '@/lib/auth/types';
 import OTPInput from './OTPInput';
 import BuildingIdCard from './BuildingIdCard';
@@ -33,6 +35,7 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
   const [message, setMessage] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [recAddress, setRecAddress] = useState('');
   const [recovered, setRecovered] = useState<any>(null);
 
@@ -41,6 +44,8 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
   
   // Validate Building ID format: TRK-XXXXXX (6 alphanumeric chars)
   const buildingIdValid = buildingId.length === 0 || /^TRK-[A-Z0-9]{6}$/.test(buildingId.toUpperCase());
+  
+  const newPasswordMismatch = confirmNewPassword.length > 0 && newPassword !== confirmNewPassword;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +75,7 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
 
   const doReset = async () => {
     if (otp.length < 6 || !newPassword) { setMessage('❌ Enter the 6-digit code and a new password.'); return; }
+    if (newPassword !== confirmNewPassword) { setMessage('❌ New passwords do not match.'); return; }
     setLoading(true); setMessage('');
     const v = await supabaseAuth.verifyOtp(email.trim(), otp);
     if (v.error) { setLoading(false); setMessage('❌ ' + v.error.message); return; }
@@ -77,7 +83,7 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
     setLoading(false);
     if (u.error) { setMessage('❌ ' + u.error.message); return; }
     setMessage('✅ Password updated. Sign in with your new password.');
-    setOtp(''); setNewPassword(''); setView('login');
+    setOtp(''); setNewPassword(''); setConfirmNewPassword(''); setView('login');
   };
 
   const doCaretakerRecover = async () => {
@@ -86,7 +92,10 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
     const res = await authEngine.resetCaretakerPasscode(buildingId, recAddress, newPassword);
     setLoading(false);
     setMessage(res.message);
-    if (res.ok && res.building) setRecovered(res.building);
+    if (res.ok && res.building) {
+      setRecovered(res.building);
+      setNewPassword('');
+    }
   };
 
   return (
@@ -137,13 +146,13 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
                 </motion.div>
               )}
               
-              <input type="password" placeholder="Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} required className={inputCls} />
+              <PasswordField value={passcode} onChange={setPasscode} placeholder="Passcode" required className={inputCls} />
               <button type="button" onClick={() => { setView('caretaker-recover'); setMessage(''); }} className="text-xs font-bold text-emerald-600 underline hover:text-emerald-800">Forgot passcode?</button>
             </>
           ) : (
             <>
               <input type="text" placeholder="Email or Employee ID" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
+              <PasswordField value={password} onChange={setPassword} placeholder="Password" required className={inputCls} />
               <button type="button" onClick={() => { setView('forgot'); setMessage(''); }} className="text-xs font-bold text-emerald-600 underline hover:text-emerald-800">Forgot password?</button>
             </>
           )}
@@ -162,7 +171,7 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
             <input type="text" placeholder="Building ID" value={buildingId} onChange={(e) => setBuildingId(e.target.value.toUpperCase())} required className={`${inputCls} pl-10`} />
           </div>
           <input type="text" placeholder="Official building address (as registered)" value={recAddress} onChange={(e) => setRecAddress(e.target.value)} required className={inputCls} />
-          <input type="password" placeholder="New passcode" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputCls} />
+          <PasswordField value={newPassword} onChange={setNewPassword} placeholder="New passcode" required autoComplete="new-password" className={inputCls} />
           <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={loading} className="w-full rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
             {loading ? 'Updating…' : 'Set new passcode'}
           </motion.button>
@@ -185,8 +194,19 @@ export default function LoginForm({ accountType, onSwitchAccountType }: Props) {
           <button type="button" onClick={() => setView('forgot')} className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-emerald-600"><ArrowLeft size={14} /> Back</button>
           <h2 className="flex items-center gap-2 text-xl font-extrabold tracking-tight text-gray-900"><KeyRound className="h-5 w-5 text-emerald-600" /> Enter code + new password</h2>
           <OTPInput value={otp} onChange={setOtp} />
-          <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className={inputCls} />
-          <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={loading} className="w-full rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
+          <PasswordField value={newPassword} onChange={setNewPassword} placeholder="New password" required autoComplete="new-password" className={inputCls} />
+          <PasswordField
+            value={confirmNewPassword}
+            onChange={setConfirmNewPassword}
+            placeholder="Confirm new password"
+            required
+            autoComplete="new-password"
+            className={`${inputCls} ${newPasswordMismatch ? 'border-red-300 bg-red-50' : ''}`}
+          />
+          {newPasswordMismatch && (
+            <p className="text-[11px] font-semibold text-red-600">Passwords do not match.</p>
+          )}
+          <motion.button whileTap={{ scale: 0.98 }} type="submit" disabled={loading || newPasswordMismatch} className="w-full rounded-xl bg-emerald-600 py-3 font-extrabold text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 disabled:bg-gray-400">
             {loading ? 'Updating…' : 'Set new password'}
           </motion.button>
         </>
