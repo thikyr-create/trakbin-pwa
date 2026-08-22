@@ -78,7 +78,7 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
   const resendEmail = async () => {
     setResending(true);
     setFeedback(null);
-    const { data } = await supabase.auth.getUser();
+    
         const email = sessionUser?.email;
     if (!email) {
       setResending(false);
