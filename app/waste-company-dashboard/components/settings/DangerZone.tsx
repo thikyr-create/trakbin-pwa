@@ -1,12 +1,10 @@
+// app/waste-company-dashboard/components/settings/DangerZone.tsx
 "use client";
-import { supabaseBrowser } from '@/lib/supabaseBrowser';
 
 import { useState } from "react";
-import { TriangleAlert, Download, RotateCcw, Loader2, CircleCheck, CircleX } from "lucide-react";
+import { TriangleAlert, RotateCcw, Loader2, CircleCheck, CircleX } from "lucide-react";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import type { SettingsSectionProps } from "./settingsConfig";
-
-const supabase = supabaseBrowser;
 
 const display = Sora({ subsets: ["latin"], display: "swap", variable: "--font-display" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
@@ -44,52 +42,9 @@ const DEFAULT_SETTINGS = {
 };
 
 export default function DangerZone({ bundle, saveSettings }: SettingsSectionProps) {
-  const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  const companyId = bundle?.profile?.id ?? null;
-
-  const handleExport = async () => {
-    if (!companyId) return;
-    setExporting(true);
-    setFeedback(null);
-
-    try {
-      const [buildings, invoices, zones, plans, settings] = await Promise.all([
-        supabase.from("Buildings").select("*").eq("company_id", companyId),
-        supabase.from("invoices").select("*").eq("company_id", companyId),
-        supabase.from("company_zones").select("*").eq("company_id", companyId),
-        supabase.from("pricing_plans").select("*").eq("company_id", companyId),
-        supabase.from("company_settings").select("*").eq("company_id", companyId),
-      ]);
-
-      const payload = {
-        exported_at: new Date().toISOString(),
-        company_id: companyId,
-        buildings: buildings.data || [],
-        invoices: invoices.data || [],
-        zones: zones.data || [],
-        pricing_plans: plans.data || [],
-        settings: settings.data || [],
-      };
-
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `trakbin-export-company-${companyId}-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      setFeedback({ type: "success", text: "Export downloaded. Your data stays in Trakbin — this is a copy, not a deletion." });
-    } catch {
-      setFeedback({ type: "error", text: "Export failed. Please try again." });
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const handleReset = async () => {
     if (!confirmReset) return;
@@ -114,66 +69,32 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
           <TriangleAlert size={18} />
         </span>
         <div>
-          <h2 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>
-            Danger zone
-          </h2>
-          <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400`}>
-            every action here requires confirmation
-          </p>
+          <h2 className={`${display.className} text-lg font-extrabold tracking-tight text-gray-900`}>Danger zone</h2>
+          <p className={`${mono.className} text-[10px] font-bold uppercase tracking-[0.18em] text-gray-400`}>every action here requires confirmation</p>
         </div>
       </div>
 
       <div className="space-y-3">
-        {/* Export */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/40 px-4 py-4">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-800">Export company data</p>
-            <p className="text-[11px] font-medium text-gray-400">
-              Buildings, invoices, zones, pricing, and settings as JSON. Non-destructive.
-            </p>
-          </div>
-          <button
-            onClick={handleExport}
-            disabled={exporting || !companyId}
-            className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-700 disabled:opacity-50"
-          >
-            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {exporting ? "Preparing…" : "Export"}
-          </button>
-        </div>
-
         {/* Reset settings */}
         <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-bold text-gray-800">Reset all settings</p>
               <p className="text-[11px] font-medium text-gray-500">
-                Restores billing, collection, notification, payment, and preference defaults.
-                Invoices and buildings are untouched.
+                Restores billing, collection, notification, payment, and preference defaults. Invoices and buildings are untouched.
               </p>
             </div>
             {!confirmReset ? (
-              <button
-                onClick={() => setConfirmReset(true)}
-                className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-600"
-              >
-                <RotateCcw size={14} />
-                Reset…
+              <button onClick={() => setConfirmReset(true)} className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-600">
+                <RotateCcw size={14} /> Reset…
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={handleReset}
-                  disabled={resetting}
-                  className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
-                >
+                <button onClick={handleReset} disabled={resetting} className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 disabled:opacity-50">
                   {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                   Confirm reset
                 </button>
-                <button
-                  onClick={() => setConfirmReset(false)}
-                  className="rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-gray-600 ring-1 ring-gray-200 transition hover:bg-gray-50"
-                >
+                <button onClick={() => setConfirmReset(false)} className="rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-gray-600 ring-1 ring-gray-200 transition hover:bg-gray-50">
                   Cancel
                 </button>
               </div>
@@ -187,17 +108,14 @@ export default function DangerZone({ bundle, saveSettings }: SettingsSectionProp
           <div>
             <p className="text-xs font-bold text-gray-500">Deactivate / delete company</p>
             <p className="text-[11px] font-medium text-gray-400">
-              Requires an account-lifecycle foundation (active flag + approval flow) — planned with Phase SEC.
-              Nothing destructive is offered before it can be done safely.
+              Requires an account-lifecycle foundation (active flag + approval flow) — planned with Phase SEC. Nothing destructive is offered before it can be done safely.
             </p>
           </div>
         </div>
       </div>
 
       {feedback && (
-        <div className={`mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${
-          feedback.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"
-        }`}>
+        <div className={`mt-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-semibold ${feedback.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
           {feedback.type === "success" ? <CircleCheck size={14} /> : <TriangleAlert size={14} />}
           {feedback.text}
         </div>

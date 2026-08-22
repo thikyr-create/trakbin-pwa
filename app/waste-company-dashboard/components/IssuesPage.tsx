@@ -1,13 +1,17 @@
+// app/waste-company-dashboard/components/IssuesPage.tsx
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
   TriangleAlert, CalendarX, MapPin, Clock, CircleCheck, ShieldCheck,
   Building2, Hash, Inbox, ArrowUpRight,
 } from 'lucide-react';
+import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { useCompanySession } from '@/lib/store/useCompanySession';
 
+const supabase = supabaseBrowser;
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
 const EASE = [0.22, 1, 0.36, 1] as [number, number, number, number];
@@ -16,6 +20,10 @@ type FilterId = 'all' | 'dump' | 'miss' | 'other';
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'all', label: 'All' }, { id: 'dump', label: 'Dumping' }, { id: 'miss', label: 'Missed' }, { id: 'other', label: 'Other' },
 ];
+
+// Lifecycle: pending/open → acknowledged → resolving → resolved
+const NEXT: Record<string, string> = { pending: 'acknowledged', open: 'acknowledged', acknowledged: 'resolving', resolving: 'resolved' };
+const ACTION_LABEL: Record<string, string> = { acknowledged: 'Acknowledge', resolving: 'Start resolving', resolved: 'Mark resolved' };
 
 const TYPE: Record<string, { label: string; chip: string; rail: string; Icon: typeof TriangleAlert }> = {
   illegal_dumping: { label: 'Illegal dumping', chip: 'bg-amber-50 text-amber-700 ring-amber-200', rail: 'bg-amber-400', Icon: TriangleAlert },
@@ -32,8 +40,26 @@ function relTime(iso?: string) {
 }
 
 export default function IssuesPage({ issues }: { issues: any[] }) {
+  const { addNotification } = useCompanySession();
   const [filter, setFilter] = useState<FilterId>('all');
-  const all = issues || [];
+  const [items, setItems] = useState<any[]>(issues || []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  useEffect(() => { setItems(issues || []); }, [issues]);
+  const all = items;
+
+  const advance = async (it: any) => {
+    const next = NEXT[(it.status || 'open').toLowerCase()];
+    if (!next) return;
+    setBusyId(it.id);
+    const patch: any = { status: next };
+    if (next === 'resolved') patch.resolved_at = new Date().toISOString();
+    const { error } = await supabase.from('environmental_issues').update(patch).eq('id', it.id);
+    setBusyId(null);
+    if (error) { addNotification('Update failed: ' + error.message, 'error'); return; }
+    setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, ...patch } : x)));
+    addNotification(`Issue ${it.issue_number || ''} → ${next}. Caretaker notified.`, 'success');
+  };
 
   const list = useMemo(() => all.filter((it) => {
     if (filter === 'all') return true;
@@ -106,8 +132,11 @@ export default function IssuesPage({ issues }: { issues: any[] }) {
               const missMatch = String(it.description || '').match(/Date missed:\s*([^\n]+)/);
               const winMatch = String(it.description || '').match(/Time window:\s*([^\n]+)/);
               const st = (it.status || 'open').toLowerCase();
-              const stChip = st.includes('resolv') || st.includes('clos') ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : st.includes('progress') || st.includes('review') ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-amber-50 text-amber-700 ring-amber-200';
-              const stLabel = st.includes('resolv') || st.includes('clos') ? 'Resolved' : st.includes('progress') || st.includes('review') ? 'In progress' : 'Open';
+              const resolved = st.includes('resolv') || st.includes('clos');
+              const inProgress = st.includes('progress') || st.includes('review') || st === 'acknowledged' || st === 'resolving';
+              const stChip = resolved ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : inProgress ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-amber-50 text-amber-700 ring-amber-200';
+              const stLabel = resolved ? 'Resolved' : inProgress ? 'In progress' : 'Open';
+              const next = NEXT[st];
               return (
                 <motion.li key={it.id || i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: i * 0.04, ease: EASE }} className="relative overflow-hidden px-6 py-5">
                   <span aria-hidden className={`absolute inset-y-0 left-0 w-1 ${meta.rail}`} />
@@ -126,7 +155,20 @@ export default function IssuesPage({ issues }: { issues: any[] }) {
                         </p>
                       </div>
                     </div>
-                    <span className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400"><Clock className="h-3 w-3" /> {relTime(it.created_at)}</span>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-wider text-gray-400"><Clock className="h-3 w-3" /> {relTime(it.created_at)}</span>
+                      {next ? (
+                        <button
+                          onClick={() => advance(it)}
+                          disabled={busyId === it.id}
+                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:bg-gray-300"
+                        >
+                          {busyId === it.id ? 'Saving…' : ACTION_LABEL[next]}
+                        </button>
+                      ) : (
+                        <CircleCheck className="h-5 w-5 text-emerald-500" />
+                      )}
+                    </div>
                   </div>
 
                   {it.issue_type === 'illegal_dumping' && locMatch ? (

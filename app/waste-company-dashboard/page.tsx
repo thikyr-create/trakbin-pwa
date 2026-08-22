@@ -65,7 +65,6 @@ export default function WasteCompanyDashboard() {
   const [activePage, setActivePage] = useState<PageView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-
   const [trucks, setTrucks] = useState<any[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [buildings, setBuildings] = useState<any[]>([]);
@@ -186,7 +185,7 @@ export default function WasteCompanyDashboard() {
     { Icon: Truck, label: 'On the road', value: onRoad, accent: 'text-emerald-300', live: onRoad > 0 },
     { Icon: Users, label: 'Crew', value: drivers.length, accent: 'text-emerald-100' },
     { Icon: Building2, label: 'Buildings served', value: served, accent: 'text-emerald-100' },
-    { Icon: Inbox, label: 'Pending requests', value: pendingRequests, accent: pendingRequests > 0 ? 'text-amber-300' : 'text-emerald-100', pulse: pendingRequests> 0 },
+    { Icon: Inbox, label: 'Pending requests', value: pendingRequests, accent: pendingRequests > 0 ? 'text-amber-300' : 'text-emerald-100', pulse: pendingRequests > 0 },
   ];
 
   return (
@@ -200,7 +199,7 @@ export default function WasteCompanyDashboard() {
 
         <NotificationsPanel />
 
-        {sidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity:1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
+        {sidebarOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />}
 
         <aside className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
           <div className="flex items-center justify-between border-b border-gray-100 p-4">
@@ -235,12 +234,12 @@ export default function WasteCompanyDashboard() {
           </nav>
 
           <div className="absolute bottom-0 left-0 right-0 border-t border-gray-100 bg-white p-3">
-            <button onClick={() => { localStorage.removeItem('trakbin_company');router.push('/'); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-red-600 transition-all hover:bg-red-50"><LogOut size={18} /> Logout</button>
+            <button onClick={() => { localStorage.removeItem('trakbin_company'); router.push('/'); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-red-600 transition-all hover:bg-red-50"><LogOut size={18} /> Logout</button>
           </div>
         </aside>
 
         <main className="relative z-10 flex min-w-0 flex-col lg:pl-64">
-          <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1,y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-30 border-b border-gray-200/70 bg-[#f6f7f6]/85 px-4 py-3 backdrop-blur-md">
+          <motion.header initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="sticky top-0 z-30 border-b border-gray-200/70 bg-[#f6f7f6]/85 px-4 py-3 backdrop-blur-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 text-gray-700 hover:bg-gray-100 lg:hidden"><Menu size={22} /></button>
@@ -329,7 +328,12 @@ export default function WasteCompanyDashboard() {
 
           <div className="flex-1 p-4 sm:p-6 lg:p-8">
             <motion.div key={activePage} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE }}>
-              {activePage === 'overview' && (<div className="space-y-4"><CompanyVerificationCard companyId={companyId} /><OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} /></div>)}
+              {activePage === 'overview' && (
+                <div className="space-y-4">
+                  <CompanyVerificationCard companyId={companyId} onGoToSettings={() => setActivePage('settings')} />
+                  <OverviewPage trucks={trucks} drivers={drivers} buildings={buildings} collections={collections} issues={issues} setActivePage={setActivePage} />
+                </div>
+              )}
               {activePage === 'service-requests' && <ServiceRequestsPage />}
               {activePage === 'earnings' && <FinancePage onNavigateToBuildings={() => setActivePage('buildings')} />}
               {activePage === 'fleet' && <FleetPage trucks={trucks} drivers={driverOptions} onRefetch={fetchData} />}
