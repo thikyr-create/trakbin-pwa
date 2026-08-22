@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import PickupNotifications from './components/PickupNotifications';
+import CaretakerNotificationCenter from './components/CaretakerNotificationCenter';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
@@ -142,7 +142,7 @@ export default function CaretakerDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <PickupNotifications />
+                            <CaretakerNotificationCenter />
               <motion.button whileTap={{ scale: 0.96 }} onClick={logout} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-red-50 hover:text-red-600"><LogOut size={16} /> <span className="hidden sm:inline">Logout</span></motion.button>
             </div>
           </div>
