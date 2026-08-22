@@ -20,6 +20,7 @@ interface Props {
 export default function CompanyVerificationCard({ companyId, onGoToSettings }: Props) {
   const [hauler, setHauler] = useState<any>(null);
   const [sessionUser, setSessionUser] = useState<any>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
@@ -32,12 +33,24 @@ export default function CompanyVerificationCard({ companyId, onGoToSettings }: P
       if (!alive) return;
       setSessionUser(sess.data?.session?.user ?? null);
       const healed = await healEmailVerified(supabase, row.data);
-      if (alive) setHauler(healed);
+      if (!alive) return;
+      setHauler(healed);
+      setReady(true);
     })();
     return () => { alive = false; };
   }, [companyId]);
 
   const v = getCompanyVerification(hauler, sessionUser);
+
+  // UNKNOWN → neutral skeleton. Never flash a false negative.
+  if (!ready) {
+    return (
+      <div className="inline-flex animate-pulse items-center gap-2 rounded-full bg-gray-100 px-4 py-2 ring-1 ring-gray-200">
+        <span className="h-4 w-4 rounded-full bg-gray-200" />
+        <span className="h-3 w-32 rounded bg-gray-200" />
+      </div>
+    );
+  }
 
   if (v.canOperate) {
     return (

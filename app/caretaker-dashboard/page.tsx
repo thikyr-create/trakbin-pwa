@@ -66,9 +66,8 @@ export default function CaretakerDashboard() {
   const router = useRouter();
   const {
     building, collectionHistory, billingProcessing, fullHistory, fullHistoryLoaded,
-    walletBalance, initializeSession, teardownRealtime, logout, activeAssignment, companyProfile,
+        walletBalance, initializeSession, teardownRealtime, logout, activeAssignment, companyProfile, loading,
   } = useCaretakerSession();
-
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [checkout, setCheckout] = useState<CheckoutIntent>(null);
   const [showAddBank, setShowAddBank] = useState(false);
@@ -193,6 +192,16 @@ export default function CaretakerDashboard() {
                               </p>
                             </div>
                             <button onClick={() => setActiveTab('service')} className="relative z-10 hidden shrink-0 items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold ring-1 ring-white/15 transition-colors hover:bg-white/20 sm:flex">Details <ArrowRight className="h-3 w-3" /></button>
+                          </div>
+                        </motion.div>
+                                            ) : loading ? (
+                        <motion.div key="loading-provider" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                          <div className="flex animate-pulse items-center gap-4 rounded-2xl border border-gray-200 bg-gray-100/70 p-4">
+                            <div className="h-12 w-12 shrink-0 rounded-2xl bg-gray-200" />
+                            <div className="flex-1 space-y-2">
+                              <div className="h-3 w-40 rounded bg-gray-200" />
+                              <div className="h-4 w-56 rounded bg-gray-200" />
+                            </div>
                           </div>
                         </motion.div>
                       ) : (
