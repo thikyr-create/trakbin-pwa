@@ -1,7 +1,9 @@
+// app/caretaker-dashboard/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import PickupNotifications from './components/PickupNotifications';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
@@ -91,12 +93,10 @@ export default function CaretakerDashboard() {
   if (!building) return null;
     const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
-  // A building counts as assigned if company_id is set OR there's an active assignment row
-  // (repairs past activations that failed to update Buildings.company_id due to race/policy)
   const assignedCompany = !!building?.company_id || !!activeAssignment;
   const autopayOn = !!building?.autopay_enabled;
   const provider = companyProfile?.business_name || 'your waste provider';
-  const needsPay = false; // billing surfaces its own state; no dot needed here
+  const needsPay = false; 
   const needsService = !isActive;
 
   const lat = building.latitude; const lng = building.longitude;
@@ -141,7 +141,10 @@ export default function CaretakerDashboard() {
                 <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-gray-400">operations</span>
               </div>
             </div>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={logout} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-red-50 hover:text-red-600"><LogOut size={16} /> <span className="hidden sm:inline">Logout</span></motion.button>
+            <div className="flex items-center gap-3">
+              <PickupNotifications />
+              <motion.button whileTap={{ scale: 0.96 }} onClick={logout} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-red-50 hover:text-red-600"><LogOut size={16} /> <span className="hidden sm:inline">Logout</span></motion.button>
+            </div>
           </div>
         </div>
       </motion.header>
@@ -357,7 +360,7 @@ export default function CaretakerDashboard() {
               </div>
             )}
 
-                        {activeTab === 'report' && (assignedCompany ? (
+            {activeTab === 'report' && (assignedCompany ? (
               <ReportConsole />
             ) : (
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="relative overflow-hidden rounded-[24px] border border-amber-200/70 bg-amber-50/60 p-8 text-center">

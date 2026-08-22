@@ -1,3 +1,4 @@
+// app/waste-company-dashboard/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
@@ -22,6 +23,7 @@ import DriversPage from './components/drivers/DriversPage';
 import BuildingsPage from './components/buildings/BuildingsPage';
 import AssignmentsPage from './components/AssignmentsPage';
 import IssuesPage from './components/IssuesPage';
+import PickupDisputesPanel from './components/PickupDisputesPanel';
 import AnalyticsPage from './components/analytics/AnalyticsPage';
 import MaintenancePage from './components/MaintenancePage';
 import ZonesPage from './components/zones/ZonesPage';
@@ -334,7 +336,12 @@ export default function WasteCompanyDashboard() {
               {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
               {activePage === 'buildings' && <BuildingsPage />}
               {activePage === 'assignments' && <AssignmentsPage />}
-              {activePage === 'issues' && <IssuesPage issues={issues} />}
+              {activePage === 'issues' && (
+                <div className="space-y-4">
+                  <PickupDisputesPanel />
+                  <IssuesPage issues={issues} />
+                </div>
+              )}
               {activePage === 'analytics' && <AnalyticsPage />}
               {activePage === 'maintenance' && <MaintenancePage trucks={trucks} />}
               {activePage === 'zones' && <ZonesPage />}
