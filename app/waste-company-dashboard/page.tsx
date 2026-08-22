@@ -121,10 +121,9 @@ export default function WasteCompanyDashboard() {
     bootstrapEventBus();
     const offBus = bus.subscribe(['BUILDING_UPDATED', 'SERVICE_ACTIVATED'], 'company-deck', () => fetchData());
 
-    const t = setTimeout(() => { fetchData(); }, 400);
+        fetchData();
     const cleanup = subscribeToRealtime();
     return () => {
-      clearTimeout(t);
       offBus();
       if (typeof cleanup === 'function') cleanup(); else unsubscribeFromRealtime();
     };

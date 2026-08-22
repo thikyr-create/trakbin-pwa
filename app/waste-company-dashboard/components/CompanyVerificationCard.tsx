@@ -6,7 +6,7 @@ import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { motion } from 'framer-motion';
 import { JetBrains_Mono } from 'next/font/google';
 import { ShieldCheck, TriangleAlert, ArrowRight } from 'lucide-react';
-import { getCompanyVerification } from '@/lib/auth/companyVerification';
+import { getCompanyVerification, healEmailVerified } from '@/lib/auth/companyVerification';
 
 const supabase = supabaseBrowser;
 const mono = JetBrains_Mono({ subsets: ['latin'], display: 'swap', variable: '--font-mono' });
@@ -19,13 +19,25 @@ interface Props {
 
 export default function CompanyVerificationCard({ companyId, onGoToSettings }: Props) {
   const [hauler, setHauler] = useState<any>(null);
+  const [sessionUser, setSessionUser] = useState<any>(null);
 
   useEffect(() => {
     if (!companyId) return;
-    supabase.from('haulers').select('*').eq('id', Number(companyId)).maybeSingle().then(({ data }) => setHauler(data));
+    let alive = true;
+    (async () => {
+      const [row, sess] = await Promise.all([
+        supabase.from('haulers').select('*').eq('id', Number(companyId)).maybeSingle(),
+        supabase.auth.getSession(),
+      ]);
+      if (!alive) return;
+      setSessionUser(sess.data?.session?.user ?? null);
+      const healed = await healEmailVerified(supabase, row.data);
+      if (alive) setHauler(healed);
+    })();
+    return () => { alive = false; };
   }, [companyId]);
 
-  const v = getCompanyVerification(hauler);
+  const v = getCompanyVerification(hauler, sessionUser);
 
   if (v.canOperate) {
     return (

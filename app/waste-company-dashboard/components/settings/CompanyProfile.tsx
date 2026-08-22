@@ -22,7 +22,12 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
-  const [resending, setResending] = useState(false);
+    const [resending, setResending] = useState(false);
+  const [sessionUser, setSessionUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSessionUser(data?.session?.user ?? null));
+  }, []);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -35,7 +40,7 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
     }
   }, [bundle]);
 
-  const v = getCompanyVerification(bundle?.profile);
+   const v = getCompanyVerification(bundle?.profile, sessionUser);
   const missing = [
     !businessName.trim() && "business name",
     !licenseNumber.trim() && "license number",
@@ -74,7 +79,7 @@ export default function CompanyProfile({ bundle, loading, saveProfile }: Setting
     setResending(true);
     setFeedback(null);
     const { data } = await supabase.auth.getUser();
-    const email = data.user?.email;
+        const email = sessionUser?.email;
     if (!email) {
       setResending(false);
       setFeedback({ type: "error", text: "No email on this session — sign in again." });

@@ -79,7 +79,8 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
 
   initializeSession: async () => {
     // Caretakers have REAL Supabase sessions (Building ID identity)
-    const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     const stored = typeof window !== 'undefined' ? localStorage.getItem('trakbin_caretaker') : null;
 
     const buildingId = user?.user_metadata?.building_id ||
@@ -108,9 +109,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (building.next_billing_date) {
       await get().checkAndGenerateInvoice(building.custom_id, building.next_billing_date, building.autopay_enabled, building.wallet_balance || 0);
     }
-    await get().refreshAll();
-    await get().fetchFullHistory();
-    await get().fetchLedger();
+        await Promise.all([get().refreshAll(), get().fetchFullHistory(), get().fetchLedger()]);
 
     get().teardownRealtime();
     get().subscribeRealtime();

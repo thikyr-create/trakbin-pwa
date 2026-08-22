@@ -94,14 +94,22 @@ export const authEngine = {
           return { ok: true, message: '✅ Admin detected — redirecting...', role: 'driver' };
         }
 
-        const res = await authAdapter.queryUserByAuthOrEmail(data.user.id, email);
-        const companyId = res?.user?.company_id ?? profile?.company_id ?? null;
-        const accountType = res?.accountType || (profile?.role === 'driver' ? 'Driver' : 'WasteCompany');
+                // Fast path: profiles already carries company_id — skip the legacy
+        // users-table round trip unless it's missing.
+        let companyId = profile?.company_id ?? null;
+        let accountType = profile?.role === 'driver' ? 'Driver' : 'WasteCompany';
+        let legacyUser: any = null;
+        if (!companyId) {
+          const res = await authAdapter.queryUserByAuthOrEmail(data.user.id, email);
+          legacyUser = res?.user || null;
+          companyId = legacyUser?.company_id ?? null;
+          accountType = res?.accountType || accountType;
+        }
 
-        const row = { ...(res?.user || { email }), id: companyId, company_id: companyId };
+        const row = { ...(legacyUser || { email }), id: companyId, company_id: companyId };
 
         if (data.user.email_confirmed_at && companyId) {
-          await authAdapter.markEmailVerified(companyId).catch(() => {});
+          authAdapter.markEmailVerified(companyId).catch(() => {}); // fire-and-forget
         }
 
         const role: Role = accountType === 'Driver' ? 'driver' : 'company';
