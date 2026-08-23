@@ -62,6 +62,45 @@ function Detail({ Icon, label, value }: { Icon: typeof Users; label: string; val
   );
 }
 
+// Server-rendered boot skeleton: pure HTML/CSS so the browser paints
+// something meaningful BEFORE any JavaScript executes. Kills the blank shell.
+function BootSkeleton() {
+  return (
+    <div className={`${body.className} relative min-h-screen bg-[#f6f7f6] text-gray-900`}>
+      <header className="sticky top-0 z-40 border-b border-gray-200/70 bg-[#f6f7f6]/85 backdrop-blur-md">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 shadow-lg shadow-emerald-200"><span className={`${display.className} text-lg font-extrabold text-white`}>T</span></div>
+              <div className="leading-none">
+                <span className={`${display.className} block text-lg font-extrabold tracking-tight text-gray-900`}>Trakbin</span>
+                <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em] text-gray-400">operations</span>
+              </div>
+            </div>
+            <div className="h-9 w-24 animate-pulse rounded-lg bg-gray-200" />
+          </div>
+        </div>
+      </header>
+      <main className="relative z-10 mx-auto max-w-3xl px-4 pb-32 pt-6 sm:px-6">
+        <div className="space-y-4">
+          <div className="relative overflow-hidden rounded-[24px] border border-gray-200/80 bg-white p-6 shadow-sm sm:p-7">
+            <div className="animate-pulse space-y-3">
+              <div className="h-3 w-32 rounded bg-gray-200" />
+              <div className="h-8 w-56 rounded bg-gray-200" />
+              <div className="h-4 w-40 rounded bg-gray-100" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="h-52 animate-pulse rounded-[22px] bg-emerald-200/50" />
+            <div className="h-52 animate-pulse rounded-[24px] border border-gray-200/80 bg-white" />
+            <div className="h-52 animate-pulse rounded-[24px] border border-gray-200/80 bg-white" />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default function CaretakerDashboard() {
   const router = useRouter();
   const {
@@ -89,7 +128,7 @@ export default function CaretakerDashboard() {
     return { completed, missed, total, rate, weeks, weekMax: Math.max(1, ...weeks) };
   }, [fullHistory, now.getMonth(), now.getFullYear()]);
 
-  if (!building) return null;
+    if (!building) return <BootSkeleton />;
     const isActive = !!activeAssignment && !!companyProfile;
   const address = building.address || 'Unregistered address';
   const assignedCompany = !!building?.company_id || !!activeAssignment;
