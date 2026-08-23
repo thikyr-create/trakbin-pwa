@@ -1,7 +1,7 @@
 // app/hauler-dashboard/components/more/ToolsList.tsx
 "use client";
 
-import { Pause, Play, Flag, Power, LifeBuoy, ChevronRight } from 'lucide-react';
+import { Pause, Play, Flag, Power, ChevronRight } from 'lucide-react';
 import { useDriverSession } from '@/lib/store/useDriverSession';
 import { useConsoleStore } from '@/lib/features/driver-console/store/consoleStore';
 
@@ -21,13 +21,6 @@ export default function ToolsList() {
       icon: Flag,
       label: 'Report an Issue',
       hint: 'Send a field report to dispatch',
-      onClick: () => setShowReportModal(true),
-      show: true,
-    },
-    {
-      icon: LifeBuoy,
-      label: 'Help & Support',
-      hint: 'Guidance and contact',
       onClick: () => setShowReportModal(true),
       show: true,
     },
