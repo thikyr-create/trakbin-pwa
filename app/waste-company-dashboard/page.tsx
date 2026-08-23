@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
+import { readSnapshot, writeSnapshot } from '@/lib/core/snapshot';
 import { motion, AnimatePresence, animate, useMotionValue, useTransform, type Variants } from 'framer-motion';
 import { Sora, Plus_Jakarta_Sans } from 'next/font/google';
 import {
@@ -101,6 +102,13 @@ export default function WasteCompanyDashboard() {
       if (buildingsData.data) setBuildings(buildingsData.data);
       if (collectionsData.data) setCollections(collectionsData.data);
       if (issuesData.data) setIssues(issuesData.data);
+      writeSnapshot(`trakbin_snapshot_company_${currentCompanyId}`, {
+        trucks: trucksData.data || [],
+        drivers: driversData.data || [],
+        buildings: buildingsData.data || [],
+        collections: (collectionsData.data || []).slice(0, 100),
+        issues: issuesData.data || [],
+      });
     } catch (error) { console.error('Error fetching data:', error); }
     finally { setLoading(false); }
   };
@@ -113,6 +121,17 @@ export default function WasteCompanyDashboard() {
     setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
 
+    // SWR: paint last-known deck instantly; fetchData reconciles
+    const snapKey = `trakbin_snapshot_company_${userData.company_id ?? userData.id}`;
+    const snap = readSnapshot<any>(snapKey);
+    if (snap) {
+      if (Array.isArray(snap.trucks)) setTrucks(snap.trucks);
+      if (Array.isArray(snap.drivers)) setDrivers(snap.drivers);
+      if (Array.isArray(snap.buildings)) setBuildings(snap.buildings);
+      if (Array.isArray(snap.collections)) setCollections(snap.collections);
+      if (Array.isArray(snap.issues)) setIssues(snap.issues);
+    }
+
     loadTenantContext();
 
     if (tenant.role === 'driver') { router.push('/hauler-dashboard'); return; }
@@ -121,7 +140,7 @@ export default function WasteCompanyDashboard() {
     bootstrapEventBus();
     const offBus = bus.subscribe(['BUILDING_UPDATED', 'SERVICE_ACTIVATED'], 'company-deck', () => fetchData());
 
-        fetchData();
+    fetchData();
     const cleanup = subscribeToRealtime();
     return () => {
       offBus();

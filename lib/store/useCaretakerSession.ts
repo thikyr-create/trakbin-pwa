@@ -1,8 +1,10 @@
+// lib/store/useCaretakerSession.ts
 "use client";
 
 import { create } from 'zustand';
 import { supabaseBrowser } from '@/lib/supabaseBrowser';
 import { settleKey, topupKey } from '@/lib/utils/money';
+import { readSnapshot, writeSnapshot, clearSnapshot } from '@/lib/core/snapshot';
 
 const supabase = supabaseBrowser;
 
@@ -70,7 +72,29 @@ function synthesizeContacts(company: any | null, profile: any | null): Caretaker
   return list;
 }
 
-export const useCaretakerSession = create<CaretakerSessionState>((set, get) => ({
+export const useCaretakerSession = create<CaretakerSessionState>((set, get) => {
+  // SWR: persist a render-only snapshot so the next visit paints instantly
+  const persistSnapshot = () => {
+    const s = get();
+    const bId = s.building?.custom_id;
+    if (!bId) return;
+    writeSnapshot(`trakbin_snapshot_caretaker_${bId}`, {
+      building: s.building,
+      collectionHistory: (s.collectionHistory || []).slice(0, 20),
+      walletBalance: s.walletBalance,
+      schedule: s.schedule,
+      invoices: (s.invoices || []).slice(0, 30),
+      invoiceCount: s.invoiceCount,
+      activeAssignment: s.activeAssignment,
+      companyProfile: s.companyProfile,
+      companyContacts: s.companyContacts,
+      platformFeeBps: s.platformFeeBps,
+      fullHistory: (s.fullHistory || []).slice(0, 100),
+      ledger: (s.ledger || []).slice(0, 40),
+    });
+  };
+
+  return ({
   building: null, collectionHistory: [], fullHistory: [], fullHistoryLoaded: false, walletBalance: 0,
   paymentMethods: [], schedule: null, invoices: [], invoiceCount: { paid: 0, due: 0 }, platformFeeBps: null,
   issues: [], activeAssignment: null, companyProfile: null, companyContacts: [], ledger: [],
@@ -79,7 +103,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
 
   initializeSession: async () => {
     // Caretakers have REAL Supabase sessions (Building ID identity)
-        const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user ?? null;
     const stored = typeof window !== 'undefined' ? localStorage.getItem('trakbin_caretaker') : null;
 
@@ -91,6 +115,26 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
       return;
     }
 
+    // SWR: paint last-known state instantly; network reconciles below
+    const snap = readSnapshot<any>(`trakbin_snapshot_caretaker_${buildingId}`);
+    if (snap?.building?.custom_id === buildingId) {
+      set({
+        building: snap.building,
+        collectionHistory: snap.collectionHistory || [],
+        walletBalance: snap.walletBalance ?? 0,
+        schedule: snap.schedule ?? null,
+        invoices: snap.invoices || [],
+        invoiceCount: snap.invoiceCount || { paid: 0, due: 0 },
+        activeAssignment: snap.activeAssignment ?? null,
+        companyProfile: snap.companyProfile ?? null,
+        companyContacts: snap.companyContacts || [],
+        platformFeeBps: snap.platformFeeBps ?? null,
+        fullHistory: snap.fullHistory || [],
+        fullHistoryLoaded: (snap.fullHistory || []).length > 0,
+        ledger: snap.ledger || [],
+      });
+    }
+
     // RLS scopes this read to the caretaker's own building via get_caretaker_building()
     const { data: building, error } = await supabase
       .from('Buildings')
@@ -100,6 +144,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
 
     if (error || !building) {
       localStorage.removeItem('trakbin_caretaker');
+      clearSnapshot(`trakbin_snapshot_caretaker_${buildingId}`);
       window.location.href = '/auth';
       return;
     }
@@ -109,7 +154,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (building.next_billing_date) {
       await get().checkAndGenerateInvoice(building.custom_id, building.next_billing_date, building.autopay_enabled, building.wallet_balance || 0);
     }
-        await Promise.all([get().refreshAll(), get().fetchFullHistory(), get().fetchLedger()]);
+    await Promise.all([get().refreshAll(), get().fetchFullHistory(), get().fetchLedger()]);
 
     get().teardownRealtime();
     get().subscribeRealtime();
@@ -158,6 +203,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     set({ platformFeeBps: companyCommissionBps ?? settingsRes.data?.commission_bps ?? 1000 });
 
     await get().fetchIssues();
+    persistSnapshot();
     set({ loading: false });
   },
 
@@ -165,13 +211,13 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     if (!force && get().fullHistoryLoaded) return;
     const building = get().building; if (!building) return;
     const { data } = await supabase.from('collections').select('*').eq('building_id', building.custom_id).order('collection_date', { ascending: false });
-    if (data) set({ fullHistory: data, fullHistoryLoaded: true });
+    if (data) { set({ fullHistory: data, fullHistoryLoaded: true }); persistSnapshot(); }
   },
 
   fetchLedger: async () => {
     const building = get().building; if (!building) return;
     const { data } = await supabase.from('ledger_transactions').select('*').eq('building_id', building.custom_id).order('created_at', { ascending: false }).limit(40);
-    if (data) set({ ledger: data });
+    if (data) { set({ ledger: data }); persistSnapshot(); }
   },
 
   payInvoice: async (invoiceId) => {
@@ -271,7 +317,7 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     }
   },
 
-  addFunds: async (amount, methodId) => {
+    addFunds: async (amount, methodId) => {
     const { building, walletBalance } = get(); if (!building) return;
     const nonce = Date.now();
     const { data, error } = await supabase.rpc('record_topup', {
@@ -308,4 +354,5 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => (
     supabase.auth.signOut().catch(() => {});
     window.location.href = '/';
   },
-}));
+  });
+});

@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import { supabaseBrowser as supabase } from '@/lib/supabaseBrowser';
+import { readSnapshot, writeSnapshot } from '@/lib/core/snapshot';
 import { useCompanySession } from '@/lib/store/useCompanySession';
 import { recordActivity, type DriverEventType } from '@/lib/features/driver/activity';
 import { deviationDetector } from '@/lib/features/driver/deviation/deviationDetector';
@@ -120,11 +121,25 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
   navigationDestination: null,
 
   initializeSession: async () => {
-       const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     const user = session?.user ?? null;
+
     if (!user) {
       window.location.href = '/auth';
       return;
+    }
+
+    // SWR: paint last-known session instantly; network reconciles below
+    const snap = readSnapshot<any>(`trakbin_snapshot_driver_${user.id}`);
+    if (snap?.driver) {
+      set({
+        driver: snap.driver,
+        driverCompanyId: snap.driverCompanyId ?? null,
+        route: snap.route ?? null,
+        routeStops: snap.routeStops || [],
+        currentStop: snap.currentStop ?? null,
+        isLoading: false,
+      });
     }
 
     const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
@@ -171,6 +186,7 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
 
       if (routeError || !routeData) {
         set({ route: null, routeStops: [], isLoading: false });
+        writeSnapshot(`trakbin_snapshot_driver_${user.id}`, { driver, driverCompanyId: cid, route: null, routeStops: [], currentStop: null });
         return;
       }
 
@@ -213,7 +229,9 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
         } as any;
       });
 
-      set({ routeStops: mergedStops, currentStop: mergedStops.find((s: any) => s.status === 'pending') || null, isLoading: false });
+      const currentStop0 = mergedStops.find((s: any) => s.status === 'pending') || null;
+      set({ routeStops: mergedStops, currentStop: currentStop0, isLoading: false });
+      writeSnapshot(`trakbin_snapshot_driver_${user.id}`, { driver, driverCompanyId: cid, route: routeData, routeStops: mergedStops, currentStop: currentStop0 });
     } catch (error) {
       console.error(error);
       set({ isLoading: false });
@@ -482,6 +500,8 @@ export const useDriverSession = create<DriverSessionState>((set, get) => {
         progressStats: { distance: 0, eta: 0 },
         navigationDestination: null
       });
+      const uid = (get().driver as any)?.user_id;
+      if (uid) writeSnapshot(`trakbin_snapshot_driver_${uid}`, { driver: get().driver, driverCompanyId: get().driverCompanyId, route: null, routeStops: [], currentStop: null });
     } catch (error) {
       console.error('Error ending shift:', error);
       alert('Error ending shift. Please try again.');
