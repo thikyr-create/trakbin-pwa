@@ -118,9 +118,21 @@ export default function WasteCompanyDashboard() {
     if (!storedCompany) { router.push('/auth'); return; }
 
     const userData = JSON.parse(storedCompany);
-    setCompanyName(userData.company_name || 'Waste Company');
+        setCompanyName(userData.company_name || 'Waste Company');
     setCompanyId(userData.id || '');
 
+    // Self-heal: sessions stored before the name fix have no company_name
+    if (!userData.company_name) {
+      const cid = Number(userData.company_id ?? userData.id);
+      if (cid) {
+        supabase.from('haulers').select('business_name').eq('id', cid).maybeSingle().then(({ data }) => {
+          if (data?.business_name) {
+            setCompanyName(data.business_name);
+            try { localStorage.setItem('trakbin_company', JSON.stringify({ ...userData, company_name: data.business_name })); } catch {}
+          }
+        });
+      }
+    }
     // SWR: paint last-known deck instantly; fetchData reconciles
     const snapKey = `trakbin_snapshot_company_${userData.company_id ?? userData.id}`;
     const snap = readSnapshot<any>(snapKey);

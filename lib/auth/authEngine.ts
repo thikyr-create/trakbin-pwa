@@ -106,7 +106,12 @@ export const authEngine = {
           accountType = res?.accountType || accountType;
         }
 
-        const row = { ...(legacyUser || { email }), id: companyId, company_id: companyId };
+                const row: any = { ...(legacyUser || { email }), id: companyId, company_id: companyId };
+        if (!row.company_name && companyId) {
+          const { data: h } = await supabaseBrowser
+            .from('haulers').select('business_name').eq('id', companyId).maybeSingle();
+          if (h?.business_name) row.company_name = h.business_name;
+        }
 
         if (data.user.email_confirmed_at && companyId) {
           authAdapter.markEmailVerified(companyId).catch(() => {}); // fire-and-forget

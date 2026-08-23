@@ -72,6 +72,20 @@ function synthesizeContacts(company: any | null, profile: any | null): Caretaker
   return list;
 }
 
+// Synchronous boot hydration: paint last-known state on the VERY FIRST frame.
+// This kills the blank flash between first render and initializeSession().
+function bootSnapshot() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('trakbin_caretaker');
+    const buildingId = stored ? (JSON.parse(stored) as any)?.custom_id : null;
+    if (!buildingId) return null;
+    const snap = readSnapshot<any>(`trakbin_snapshot_caretaker_${buildingId}`);
+    return snap?.building?.custom_id === buildingId ? snap : null;
+  } catch { return null; }
+}
+const boot = bootSnapshot();
+
 export const useCaretakerSession = create<CaretakerSessionState>((set, get) => {
   // SWR: persist a render-only snapshot so the next visit paints instantly
   const persistSnapshot = () => {
@@ -94,12 +108,24 @@ export const useCaretakerSession = create<CaretakerSessionState>((set, get) => {
     });
   };
 
-  return ({
-  building: null, collectionHistory: [], fullHistory: [], fullHistoryLoaded: false, walletBalance: 0,
-  paymentMethods: [], schedule: null, invoices: [], invoiceCount: { paid: 0, due: 0 }, platformFeeBps: null,
-  issues: [], activeAssignment: null, companyProfile: null, companyContacts: [], ledger: [],
+    return ({
+  building: boot?.building ?? null,
+  collectionHistory: boot?.collectionHistory || [],
+  fullHistory: boot?.fullHistory || [],
+  fullHistoryLoaded: (boot?.fullHistory || []).length > 0,
+  walletBalance: boot?.walletBalance ?? 0,
+  paymentMethods: [],
+  schedule: boot?.schedule ?? null,
+  invoices: boot?.invoices || [],
+  invoiceCount: boot?.invoiceCount || { paid: 0, due: 0 },
+  platformFeeBps: boot?.platformFeeBps ?? null,
+  issues: [],
+  activeAssignment: boot?.activeAssignment ?? null,
+  companyProfile: boot?.companyProfile ?? null,
+  companyContacts: boot?.companyContacts || [],
+  ledger: boot?.ledger || [],
   showAddFunds: false, showAutopay: false, autopaySource: 'wallet', autopayLoading: false,
-  selectedMethod: '', loading: true, billingProcessing: false,
+  selectedMethod: '', loading: !boot, billingProcessing: false,
 
   initializeSession: async () => {
     // Caretakers have REAL Supabase sessions (Building ID identity)
