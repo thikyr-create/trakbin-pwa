@@ -1,0 +1,69 @@
+{
+  "expo": {
+    "name": "Trakbin",
+    "slug": "trakbin-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "trakbin",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#064e3b"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.trakbin.app"
+    },
+    "android": {
+      "package": "com.trakbin.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#064e3b"
+      },
+      
+      "config": {
+        "googleMaps": {
+          "apiKey": "PASTE_YOUR_ANDROID_GOOGLE_MAPS_KEY_HERE"
+        }
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#064e3b"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Trakbin to use your location for route tracking and arrival detection.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Trakbin to track your route in the background while on shift."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Trakbin to take proof-of-collection photos.",
+          "photosPermission": "Allow Trakbin to attach photos to field reports."
+        }
+      ],
+      "react-native-maps"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
