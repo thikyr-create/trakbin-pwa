@@ -23,7 +23,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#064e3b"
       },
-      
       "config": {
         "googleMaps": {
           "apiKey": "PASTE_YOUR_ANDROID_GOOGLE_MAPS_KEY_HERE"
@@ -60,7 +59,8 @@
           "photosPermission": "Allow Trakbin to attach photos to field reports."
         }
       ],
-      "react-native-maps"
+      "react-native-maps",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": false

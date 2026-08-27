@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!amount || amount <= 0 || !buildingId || !email || !purpose) {
       return NextResponse.json({ ok: false, error: 'invalid_request' }, { status: 400 });
     }
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || '';
+    const origin = process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || 'https://trakbin.vercel.app';
     const result = await initializePayment({
       amount, purpose, invoiceId, buildingId, email, method,
       provider: provider || DEFAULT_PROVIDER,
