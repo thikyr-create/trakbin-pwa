@@ -15,6 +15,15 @@ import { text } from '../../../theme/typography';
 
 type Seg = 'invoices' | 'history' | 'methods';
 
+/** Last-4 digits of a saved card, tolerant of whichever column the backend used. */
+/** Last-4 digits of a saved card or bank, matching the PWA schema exactly. */
+const last4Of = (m: any) => {
+  if (m.instrument_type === 'card') {
+    return String(m.card_last_four ?? '').replace(/\D/g, '').slice(-4);
+  }
+  return String(m.account_last4 ?? m.account_number ?? '').replace(/\D/g, '').slice(-4);
+};
+
 export default function BillingScreen() {
   const router = useRouter();
   const { invoices, outstandingTotal, nextDueDate, paymentMethods, building, loading, loaded, load } =
@@ -41,6 +50,29 @@ export default function BillingScreen() {
     [outstanding]
   );
 
+  // Composed activity feed: money movement + payment-method actions
+  const activity = useMemo(() => {
+    const money = ledger.map((l) => ({
+      id: `l-${l.id}`, kind: 'money' as const,
+      title: l.type ?? 'Transaction',
+      sub: dateTime(l.created_at),
+      amount: l.amount ?? null,
+      date: l.created_at,
+      method: null as string | null,
+    }));
+    const methods = paymentMethods.map((m) => ({
+      id: `m-${m.id}`, kind: 'method' as const,
+      title: m.instrument_type === 'card'
+        ? `Card added · ${m.bank_name ?? 'Card'} •••• ${last4Of(m)}`
+        : `Bank linked · ${m.bank_name ?? ''}`,
+      sub: dateTime(m.created_at),
+      amount: null as number | null,
+      date: m.created_at,
+      method: m.instrument_type,
+    }));
+    return [...money, ...methods].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }, [ledger, paymentMethods]);
+
   const payNext = async () => {
     if (!nextInvoice) return;
     setPaying(true);
@@ -60,11 +92,11 @@ export default function BillingScreen() {
   };
 
   const invList = showAllInv ? invoices : invoices.slice(0, 3);
-  const histList = showAllHist ? ledger : ledger.slice(0, 3);
+  const actList = showAllHist ? activity : activity.slice(0, 3);
 
   return (
     <TabScreen>
-      {/* OUTSTANDING CARD */}
+      {/* OUTSTANDING */}
       <Rise delay={0}>
         {outstandingTotal > 0 ? (
           <View style={styles.outstandingActive}>
@@ -144,25 +176,30 @@ export default function BillingScreen() {
         </Rise>
       ) : null}
 
-      {/* PAYMENT HISTORY */}
+      {/* HISTORY — composed activity feed */}
       {seg === 'history' ? (
         <Rise delay={180}>
-          {ledger.length === 0 ? (
-            <Text style={styles.none}>No payments yet.</Text>
+          {activity.length === 0 ? (
+            <Text style={styles.none}>No payment activity yet.</Text>
           ) : (
-            histList.map((l, idx) => (
-              <View key={l.id ?? idx} style={styles.row}>
-                <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{l.type ?? 'Transaction'}</Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>{dateTime(l.created_at)}</Text>
+            actList.map((a) => (
+              <View key={a.id} style={styles.row}>
+                <View style={styles.methodIcon}>
+                  {a.kind === 'method'
+                    ? (a.method === 'card' ? <CreditCard size={16} color={colors.brand[400]} /> : <Landmark size={16} color={colors.brand[400]} />)
+                    : <Zap size={16} color={colors.brand[400]} />}
                 </View>
-                <Text style={styles.rowAmount}>{naira(Math.abs(l.amount ?? 0))}</Text>
+                <View style={styles.rowMain}>
+                  <Text style={styles.rowTitle}>{a.title}</Text>
+                  <Text style={styles.rowSub} numberOfLines={1}>{a.sub}</Text>
+                </View>
+                {a.amount != null ? <Text style={styles.rowAmount}>{naira(Math.abs(a.amount))}</Text> : null}
               </View>
             ))
           )}
-          {ledger.length > 3 ? (
+          {activity.length > 3 ? (
             <Pressable style={styles.viewAll} onPress={() => setShowAllHist((v) => !v)} accessibilityRole="button">
-              <Text style={styles.viewAllLabel}>{showAllHist ? 'Show less' : `View all (${ledger.length})`}</Text>
+              <Text style={styles.viewAllLabel}>{showAllHist ? 'Show less' : `View all (${activity.length})`}</Text>
             </Pressable>
           ) : null}
         </Rise>
@@ -180,8 +217,14 @@ export default function BillingScreen() {
                   {m.instrument_type === 'card' ? <CreditCard size={16} color={colors.brand[400]} /> : <Landmark size={16} color={colors.brand[400]} />}
                 </View>
                 <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{m.bank_name ?? m.instrument_type}</Text>
-                  <Text style={styles.rowSub}>{m.account_number ?? ''}</Text>
+                  <Text style={styles.rowTitle}>
+                    {m.instrument_type === 'card'
+                      ? `${m.bank_name ?? 'Card'} •••• ${last4Of(m) || '····'}`
+                      : (m.bank_name ?? 'Bank')}
+                  </Text>
+                  <Text style={styles.rowSub}>
+                    {m.instrument_type === 'card' ? (m.account_name ?? 'Card') : (m.account_number ?? '')}
+                  </Text>
                 </View>
                 {m.is_default ? <StatusPill value="active" /> : null}
                 <Pressable style={styles.delBtn} onPress={() => removeMethod(m)} accessibilityRole="button" accessibilityLabel="Delete method">
@@ -192,12 +235,7 @@ export default function BillingScreen() {
           )}
 
           <View style={styles.addRow}>
-            <Pressable
-              style={[styles.addBtn, styles.addBtnEmerald]}
-              onPress={() => router.push('/customer/add-card')}
-              accessibilityRole="button"
-              accessibilityLabel="Add card"
-            >
+            <Pressable style={[styles.addBtn, styles.addBtnEmerald]} onPress={() => router.push('/customer/add-card')} accessibilityRole="button" accessibilityLabel="Add card">
               <Plus size={16} color={colors.text.inverse} />
               <Text style={styles.addLabel}>Add card</Text>
             </Pressable>

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, useWindowDimensions } from 'react-native';
-import { Calendar, Clock, MapPin, ReceiptText, Wallet } from 'lucide-react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, useWindowDimensions } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Calendar, Clock, MapPin, ReceiptText, Wallet, ArrowRight } from 'lucide-react-native';
 import { StatusPill } from '../ui/StatusPill';
 import { useCaretakerStore } from '../../store/caretakerStore';
 import { dayLabel, naira, nextPickupISO } from '../../services/format';
@@ -12,6 +13,7 @@ const PEEK = 12;
 const GAP = 12;
 
 export function StatusCarousel() {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const building = useCaretakerStore((s) => s.building);
   const assignment = useCaretakerStore((s) => s.assignment);
@@ -39,7 +41,7 @@ export function StatusCarousel() {
     {
       id: 'billing',
       kind: 'billing' as const,
-      eyebrow: 'STATEMENT',
+      eyebrow: 'INVOICE',
       title: naira(outstandingTotal),
       subtitle: nextDueDate ? `Due ${dayLabel(nextDueDate)}` : 'Nothing due',
       statusValue: outstandingTotal > 0 ? 'pending' : 'paid',
@@ -69,22 +71,24 @@ export function StatusCarousel() {
         scrollEventThrottle={16}
         renderItem={({ item, index }) => {
           const isCollection = item.kind === 'collection';
+          const isBilling = item.kind === 'billing';
           const Icon = isCollection ? Calendar : ReceiptText;
-          return (
-            <View
-              style={[
-                styles.card,
-                { width: cardWidth, marginRight: index === cards.length - 1 ? 0 : GAP },
-                isCollection ? styles.cardCollection : styles.cardBilling,
-              ]}
-            >
+
+          const content = (
+            <>
               <View style={styles.cardTop}>
                 <View style={[styles.iconWrap, !isCollection && styles.iconWrapInverse]}>
-                  <Icon size={18} color={isCollection ? colors.brand[700] : colors.text.inverse} />
+                  <Icon size={18} color={isCollection ? colors.brand[700] : 'rgba(255,255,255,0.85)'} />
                 </View>
                 <Text style={[styles.eyebrow, !isCollection && styles.eyebrowInverse]}>
                   {item.eyebrow}
                 </Text>
+                {isBilling ? (
+                  <>
+                    <View style={styles.spacer} />
+                    <ArrowRight size={16} color="rgba(255,255,255,0.6)" />
+                  </>
+                ) : null}
               </View>
 
               <Text style={[styles.title, !isCollection && styles.titleInverse]}>
@@ -115,8 +119,26 @@ export function StatusCarousel() {
                   )}
                 </View>
               </View>
-            </View>
+            </>
           );
+
+          const base = [styles.card, { width: cardWidth, marginRight: index === cards.length - 1 ? 0 : GAP }];
+
+          // Billing slide = glass Invoice card, pressable → Billing tab
+          if (isBilling) {
+            return (
+              <Pressable
+                style={[...base, styles.cardGlass]}
+                onPress={() => router.push('/customer/(tabs)/statement')}
+                accessibilityRole="button"
+                accessibilityLabel="Open billing"
+              >
+                {content}
+              </Pressable>
+            );
+          }
+
+          return <View style={[...base, styles.cardCollection]}>{content}</View>;
         }}
       />
 
@@ -142,10 +164,23 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardCollection: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border.subtle },
-  cardBilling: { backgroundColor: colors.card.amber, borderWidth: 0, shadowColor: colors.card.amber, shadowOpacity: 0.4 },
+
+  // Translucent glass "smoke" — replaces the old amber billing card
+  cardGlass: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: sp.x2, marginBottom: sp.x4 },
+  spacer: { flex: 1 },
   iconWrap: { width: 32, height: 32, borderRadius: radius.md, backgroundColor: colors.brand[50], alignItems: 'center', justifyContent: 'center' },
-  iconWrapInverse: { backgroundColor: 'rgba(255,255,255,0.2)' },
+  iconWrapInverse: { backgroundColor: 'rgba(255,255,255,0.15)' },
   eyebrow: { ...text.eyebrow, color: colors.text.muted },
   eyebrowInverse: { color: 'rgba(255,255,255,0.75)' },
   title: { ...text.display, color: colors.text.primary, marginBottom: sp.x1 },

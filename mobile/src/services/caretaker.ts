@@ -129,14 +129,13 @@ export async function markNotificationsRead(ids: (string | number)[]) {
 }
 
 // ── PAYMENTS ────────────────────────────────────────────────
-export async function settleInvoice(invoiceId: string | number): Promise<any> {
-  const { data, error } = await supabase.rpc('settle_invoice', {
-    p_invoice_id: String(invoiceId),
-    p_idempotency_key: `settle-${invoiceId}`,
-    p_source: 'wallet',
+export async function settleInvoice(invoiceId: number | string) {
+  const res = await fetch(`${API_BASE}/api/payments/settle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invoiceId }),
   });
-  if (error) return { ok: false, reason: 'rpc_error', error: error.message };
-  return (data ?? {}) as any;
+  return safeJson(res);
 }
 
 export async function setAutopay(customId: string, enabled: boolean, source?: string) {
@@ -160,9 +159,10 @@ export async function addCardMethod(p: {
     provider: 'paystack',
     country: 'NG',
     currency: 'NGN',
-    bank_name: p.brand,
-    account_number: `**** ${p.last4}`,
+    card_brand: p.brand,            // ← real PWA column
+    card_last_four: p.last4,        // ← real PWA column (with 'r')
     account_name: p.holder || 'Card',
+    account_last4: p.last4,         // mirror for bank-style readers
     is_default: false,
   }]);
   return { ok: !error, error: error?.message };
@@ -205,4 +205,133 @@ export async function initializeCardSave(buildingId: string, email: string) {
 export async function verifyPayment(reference: string) {
   const res = await fetch(`${API_BASE}/api/payments/verify?reference=${encodeURIComponent(reference)}`);
   return safeJson(res);
+}
+
+export async function saveCardMethod(p: {
+  buildingId: string;
+  cardLast4: string;
+  cardBrand: string;
+  isDefault?: boolean;
+}) {
+  const res = await fetch(`${API_BASE}/api/payment-methods`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      buildingId: p.buildingId,
+      instrumentType: 'card',
+      provider: 'paystack',
+      type: 'card',
+      cardLast4: p.cardLast4,     // ← PWA route reads this
+      cardBrand: p.cardBrand,     // ← PWA route reads this
+      is_default: p.isDefault ?? false,
+    }),
+  });
+  return safeJson(res);
+}
+export async function setDefaultMethod(id: number | string, buildingId: string) {
+  await supabase.from('payment_methods').update({ is_default: false }).eq('building_id', buildingId);
+  const { error } = await supabase.from('payment_methods').update({ is_default: true }).eq('id', id);
+  return { ok: !error, error: error?.message };
+}
+
+// ── ENVIRONMENTAL ISSUES (PWA ReportConsole) ────────────────
+export async function createEnvironmentalIssue(p: {
+  buildingId: string;
+  companyId: number | null;
+  issue_type: 'illegal_dumping' | 'missed_collection';
+  description: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  photo_url?: string;
+  media?: string[];
+  missed_date?: string;
+  missed_window?: string | null;
+}) {
+  const issue_number = `ENV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 90 + 10)}`;
+
+  // Phase 1 — INSERT core fields only (these columns always exist)
+  const { data, error } = await supabase
+    .from('environmental_issues')
+    .insert([{
+      issue_number,
+      building_id: p.buildingId,
+      reported_by: p.buildingId,
+      company_id: p.companyId ?? null,
+      issue_type: p.issue_type,
+      description: p.description,
+    }])
+    .select('id')
+    .single();
+  if (error || !data) return { ok: false, error: error?.message ?? 'insert_failed' };
+
+  const id = data.id;
+
+  // Phase 2 — per-column touch, each isolated so a missing column never fails the insert
+  const touch = async (patch: Record<string, any>) => {
+    try { await supabase.from('environmental_issues').update(patch).eq('id', id); } catch {}
+  };
+
+  await touch({ status: 'open' });
+  if (p.location) await touch({ location: p.location });
+  if (p.latitude != null) await touch({ latitude: p.latitude });
+  if (p.longitude != null) await touch({ longitude: p.longitude });
+  if (p.photo_url) await touch({ photo_url: p.photo_url });
+  if (p.media?.length) await touch({ media: p.media });
+  if (p.missed_date) await touch({ missed_date: p.missed_date });
+  if (p.missed_window) await touch({ missed_window: p.missed_window });
+
+  // History entry (best-effort, mirrors PWA)
+  try {
+    await supabase.from('environmental_issue_history').insert([{
+      issue_id: id,
+      action: 'REPORT_CREATED',
+      performed_by: 'caretaker',
+      metadata: { type: p.issue_type },
+    }]);
+  } catch {}
+
+  return { ok: true, id, issue_number };
+}
+
+export async function fetchEnvironmentalIssues(buildingId: string) {
+  const { data } = await supabase
+    .from('environmental_issues')
+    .select('*')
+    .eq('building_id', buildingId)
+    .in('issue_type', ['illegal_dumping', 'missed_collection'])
+    .order('created_at', { ascending: false });
+  return (data as any[]) ?? [];
+}
+
+// ── ON-DEMAND PICKUP REQUESTS ───────────────────────────────
+export type PickupStatus =
+  | 'REQUESTED' | 'UNDER_REVIEW' | 'APPROVED' | 'INVOICE_SENT' | 'PAYMENT_PENDING'
+  | 'PAID' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED'
+  | 'REJECTED' | 'CANCELLED' | 'EXPIRED' | 'PAYMENT_FAILED';
+
+export async function createPickupRequest(p: {
+  buildingId: string; companyId: number | null;
+  requestedDate: string; reason: string; notes?: string; timeWindow?: string;
+}) {
+  const request_number = `PKP-${Date.now().toString().slice(-6)}`;
+  const { data, error } = await supabase.from('pickup_requests').insert([{
+    request_number,
+    building_id: p.buildingId,
+    company_id: p.companyId ?? null,
+    requested_date: p.requestedDate,
+    time_window: p.timeWindow ?? null,
+    reason: p.reason,
+    notes: p.notes ?? null,
+    status: 'REQUESTED',
+  }]).select('id').single();
+  return { ok: !error, id: data?.id, request_number, error: error?.message };
+}
+
+export async function fetchPickupRequests(buildingId: string) {
+  const { data } = await supabase
+    .from('pickup_requests').select('*')
+    .eq('building_id', buildingId)
+    .order('created_at', { ascending: false });
+  return (data as any[]) ?? [];
 }

@@ -6,11 +6,11 @@ import { Screen } from '../../components/ui/Screen';
 import { Header } from '../../components/ui/Header';
 import { Rise } from '../../components/ui/motion';
 import { useCaretakerStore } from '../../store/caretakerStore';
-import { initializeCardSave } from '../../services/caretaker';
-import { supabase } from '../../services/supabase';
+import { saveCardMethod } from '../../services/caretaker';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
+import { validateCard } from '../../services/cardValidator';
 
 function detectBrand(num: string): string {
   const n = num.replace(/\D/g, '');
@@ -50,6 +50,7 @@ const formatExpiry = (v: string) => { const d = v.replace(/\D/g, '').slice(0, 4)
 export default function AddCardScreen() {
   const router = useRouter();
   const building = useCaretakerStore((s) => s.building);
+  const load = useCaretakerStore((s) => s.load);
 
   const [number, setNumber] = useState('');
   const [holder, setHolder] = useState('');
@@ -59,18 +60,19 @@ export default function AddCardScreen() {
   const [saveCard, setSaveCard] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const digits = number.replace(/\D/g, '');
-  const brand = detectBrand(number);
-  const expErr = expiryError(expiry);
-  const numErr = digits.length >= 16 && !luhn(digits) ? 'Invalid card number' : null;
-  const cvvErr = cvv.length > 0 && cvv.length < 3 ? '3-digit code' : null;
+    const digits = number.replace(/\D/g, '');
+  const v = validateCard(number, expiry, cvv);
+  const brand = v.network?.name ?? '';
+  const numErr = v.numberError;
+  const expErr = v.expiryError;
+  const cvvErr = v.cvvError;
+  const needCvv = v.network?.cvv ?? 3;
 
-  // Self-explaining validation: the button tells you what's missing
   const missing: string[] = [];
-  if (!(digits.length === 16 && luhn(digits))) missing.push('valid card number');
+  if (!v.numberComplete) missing.push('valid card number');
   if (holder.trim().length < 2) missing.push('cardholder name');
   if (!expiry || expErr) missing.push('valid expiry');
-  if (cvv.length < 3) missing.push('CVV');
+  if (cvv.length !== needCvv) missing.push(`CVV`);
   if (address.trim().length < 4) missing.push('billing address');
   const valid = missing.length === 0;
 
@@ -82,21 +84,27 @@ export default function AddCardScreen() {
   const cvvHelp = () =>
     Alert.alert('CVV', 'The 3-digit security code on the back of your card (4 digits on the front for Amex).');
 
+  // Mirrors the PWA: save last-4 + brand only. No transaction. No WebView.
   const submit = async () => {
     if (!valid || !building?.custom_id) return;
     setBusy(true);
     try {
-      const { data } = await supabase.auth.getSession();
-      const email = data.session?.user?.email;
-      if (!email) { Alert.alert('Session', 'Sign in again to add a card.'); setBusy(false); return; }
-
-      const { authorizationUrl, reference } = await initializeCardSave(building.custom_id, email);
-      router.push({
-        pathname: '/customer/paystack-checkout',
-        params: { reference, authorizationUrl },
+      const res = await saveCardMethod({
+        buildingId: building.custom_id,
+        cardLast4: digits.slice(-4),
+        cardBrand: brand || 'Card',
+        isDefault: false,
       });
+      if (res.ok) {
+        await load(true);
+        Alert.alert('Card added', `${brand || 'Card'} •••• ${digits.slice(-4)} saved.`, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        Alert.alert('Failed', res.error ?? 'Could not save card.');
+      }
     } catch (e: any) {
-      Alert.alert('Failed', e.message ?? 'Could not start checkout.');
+      Alert.alert('Failed', e.message ?? 'Could not save card.');
     } finally {
       setBusy(false);
     }
@@ -106,7 +114,6 @@ export default function AddCardScreen() {
     <Screen scroll keyboard>
       <Header title="Add Card" subtitle="Visa · Mastercard · Verve" />
 
-      {/* LIVE CARD PREVIEW */}
       <Rise delay={0}>
         <View style={styles.preview}>
           <View style={styles.previewTop}>
@@ -254,19 +261,7 @@ function Field({ label, error, right, children }: { label: string; error: string
 }
 
 const styles = StyleSheet.create({
-  preview: {
-    backgroundColor: colors.brand[800],
-    borderRadius: radius.xxl,
-    padding: sp.x5,
-    marginBottom: sp.x5,
-    borderWidth: 1,
-    borderColor: colors.brand[600],
-    shadowColor: colors.brand[900],
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
+  preview: { backgroundColor: colors.brand[800], borderRadius: radius.xxl, padding: sp.x5, marginBottom: sp.x5, borderWidth: 1, borderColor: colors.brand[600], shadowColor: colors.brand[900], shadowOpacity: 0.3, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   previewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: sp.x5 },
   chip: { width: 34, height: 24, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.4)' },
   previewBrand: { ...text.titleS, color: colors.text.inverse },
@@ -274,51 +269,25 @@ const styles = StyleSheet.create({
   previewBottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: sp.x5 },
   previewLabel: { ...text.label, fontSize: 9, color: colors.brand[200] },
   previewValue: { ...text.semibold, color: colors.text.inverse, marginTop: 2, maxWidth: 180 },
-
   fieldWrap: { marginBottom: sp.x1 },
   fieldLabel: { ...text.label, fontSize: 10, color: colors.text.secondary, marginBottom: sp.x1 },
-  inputBox: {
-    minHeight: touch.field,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: colors.border.subtle,
-    paddingHorizontal: sp.x4,
-  },
+  inputBox: { minHeight: touch.field, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border.subtle, paddingHorizontal: sp.x4 },
   inputBoxFocused: { borderColor: colors.brand[500] },
   inputBoxError: { borderColor: colors.state.danger },
   inputInner: { flex: 1 },
   input: { ...text.bodyL, color: colors.text.primary, paddingVertical: sp.x3 },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
   errorSlot: { minHeight: 16, ...text.bodyXs, color: colors.state.danger, marginTop: 2 },
-
   row: { flexDirection: 'row', gap: sp.x3 },
   half: { flex: 1 },
-
   saveRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.material.surface, borderRadius: radius.lg, padding: sp.x4, marginTop: sp.x3, borderWidth: 1, borderColor: colors.material.border },
   saveMain: { flex: 1 },
   saveLabel: { ...text.semibold, color: colors.text.primary },
   saveSub: { ...text.bodyS, color: colors.text.muted, marginTop: 1 },
-
-  cta: {
-    marginTop: sp.x5,
-    backgroundColor: colors.brand[600],
-    borderRadius: radius.xl,
-    paddingVertical: sp.x4,
-    alignItems: 'center',
-    shadowColor: colors.brand[900],
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 4,
-  },
+  cta: { marginTop: sp.x5, backgroundColor: colors.brand[600], borderRadius: radius.xl, paddingVertical: sp.x4, alignItems: 'center', shadowColor: colors.brand[900], shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
   ctaDisabled: { opacity: 0.45 },
   ctaLabel: { ...text.button, color: colors.text.inverse },
-
   missing: { ...text.bodyS, color: colors.text.muted, textAlign: 'center', marginTop: sp.x3 },
-
   secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.x1, marginTop: sp.x4 },
   secureText: { ...text.bodyS, color: colors.text.muted },
 });

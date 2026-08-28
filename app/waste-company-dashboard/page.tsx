@@ -35,6 +35,8 @@ import FinancePage from './components/finance/FinancePage';
 import FieldIntelligencePage from './components/FieldIntelligencePage';
 import { canOperate } from '@/lib/auth/companyVerification';
 import CompanyVerificationCard from './components/CompanyVerificationCard';
+import PickupRequestsPage from './pickup-requests/page';
+import { CalendarPlus } from 'lucide-react';
 
 const display = Sora({ subsets: ['latin'], display: 'swap', variable: '--font-display' });
 const body = Plus_Jakarta_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-body' });
@@ -45,7 +47,8 @@ const supabase = supabaseBrowser;
 type PageView =
   | 'overview' | 'fleet' | 'drivers' | 'buildings' | 'assignments'
   | 'issues' | 'analytics' | 'maintenance' | 'zones'
-  | 'settings' | 'service-requests' | 'earnings' | 'field-intelligence';
+  | 'service-requests' | 'pickup-requests'
+  | 'earnings' | 'settings' | 'field-intelligence';
 
 function Counter({ value, prefix = '', duration = 1.1 }: { value: number; prefix?: string; duration?: number }) {
   const mv = useMotionValue(0);
@@ -181,6 +184,7 @@ export default function WasteCompanyDashboard() {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, roles: ['company', 'admin', 'government'] },
     { id: 'service-requests', label: 'Service Requests', icon: Inbox, roles: ['company', 'admin'] },
     { id: 'earnings', label: 'Finance', icon: Wallet, roles: ['company', 'admin'] },
+    { id: 'pickup-requests', label: 'Pickups', icon: CalendarPlus, roles: ['company', 'admin'] },
     { id: 'fleet', label: 'Fleet', icon: Truck, roles: ['company', 'admin'] },
     { id: 'drivers', label: 'Drivers', icon: Users, roles: ['company', 'admin'] },
     { id: 'buildings', label: 'Buildings', icon: Building2, roles: ['company', 'admin'] },
@@ -204,6 +208,7 @@ export default function WasteCompanyDashboard() {
     buildings: 'Service assets',
     assignments: 'Dispatch center',
     issues: 'Issue management',
+      'pickup-requests': 'On-demand pickups',
     analytics: 'Performance analytics',
     maintenance: 'Fleet maintenance',
     zones: 'Zone management',
@@ -369,6 +374,7 @@ export default function WasteCompanyDashboard() {
               {activePage === 'fleet' && <FleetPage trucks={trucks} drivers={driverOptions} onRefetch={fetchData} />}
               {activePage === 'drivers' && <DriversPage drivers={drivers} trucks={truckOptions} onRefetch={fetchData} />}
               {activePage === 'buildings' && <BuildingsPage />}
+              {activePage === 'pickup-requests' && <PickupRequestsPage />}
               {activePage === 'assignments' && <AssignmentsPage />}
               {activePage === 'issues' && (
                 <div className="space-y-4">

@@ -117,7 +117,7 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         svc.fetchCollections(custom, cid),
         svc.fetchInvoices(custom, cid),
         svc.fetchNotifications(custom),
-        supabase.from('payment_methods').select('*').eq('building_id', custom).eq('company_id', cid),
+                supabase.from('payment_methods').select('*').eq('building_id', custom),
         svc.fetchServiceRequests(custom),
         supabase
           .from('service_assignments')

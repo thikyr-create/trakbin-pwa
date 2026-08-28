@@ -24,16 +24,20 @@ export default function BuildingScreen() {
   const lng = building?.longitude != null ? Number(building.longitude) : null;
   const coords = lat != null && lng != null ? `${lat}, ${lng}` : '—';
 
-  const copyCoords = async () => {
-    try {
-      const Clipboard = require('expo-clipboard');
-      await Clipboard.setStringAsync(coords);
-      Alert.alert('Copied', 'GPS coordinates copied to clipboard.');
-    } catch {
-      Alert.alert('Copy unavailable', 'Clipboard needs a native rebuild. Use the map button instead.');
+   const copyCoords = async () => {
+    // Only touch expo-clipboard if the native module is actually present in the binary.
+    const { NativeModules } = require('react-native');
+    if (NativeModules.ExpoClipboard) {
+      try {
+        const Clipboard = require('expo-clipboard');
+        await Clipboard.setStringAsync(coords);
+        Alert.alert('Copied', 'GPS coordinates copied to clipboard.');
+        return;
+      } catch {}
     }
+    // Fallback: surface the value so it's not lost (no native clipboard available).
+    Alert.alert('Coordinates', coords);
   };
-
   const openMap = () => {
     if (lat == null || lng == null) return;
     Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`);
