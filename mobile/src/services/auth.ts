@@ -51,3 +51,21 @@ export async function detectRole(): Promise<{ role: 'driver' | 'caretaker' | nul
 export async function signOut() {
   await supabase.auth.signOut();
 }
+
+export async function registerCaretaker(input: {
+  passcode: string;
+  buildingType: string;
+  officialAddress: string;
+  estate: string | null;
+  gpsAddress: string;
+  latitude: number;
+  longitude: number;
+  numberOfFlats: string | null;
+  numberOfShops: string | null;
+}) {
+  return post('/api/auth/register-caretaker', input);
+}
+
+export async function resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
+  return post('/api/auth/reset-caretaker-passcode', { buildingId, officialAddress, newPasscode });
+}

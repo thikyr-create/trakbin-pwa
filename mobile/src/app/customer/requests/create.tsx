@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Alert, Activi
 import { useRouter } from 'expo-router';
 import { CalendarPlus, Truck, CircleCheck, CircleX, Clock } from 'lucide-react-native';
 import { Screen } from '../../../components/ui/Screen';
-import { Header } from '../../../components/ui/Header';
+
 import { StatusPill } from '../../../components/ui/StatusPill';
 import { Rise } from '../../../components/ui/motion';
 import { useCaretakerStore } from '../../../store/caretakerStore';
@@ -79,9 +79,7 @@ export default function CreateRequestScreen() {
   };
 
   return (
-    <Screen scroll keyboard>
-      <Header title="Request pickup" subtitle="Need a pickup before your scheduled day?" />
-
+        <Screen scroll keyboard>
       <Rise delay={0}>
         <Text style={styles.label}>Requested date</Text>
         <View style={styles.chipRow}>

@@ -8,11 +8,14 @@ import { useAuthStore } from '../../../store/authStore';
 import { colors } from '../../../theme/colors';
 import { radius, sp } from '../../../theme/spacing';
 import { text } from '../../../theme/typography';
+import { useRouter } from 'expo-router';
+import { supabase } from '../../../services/supabase';
 
 const fmtDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
 export default function BuildingScreen() {
+  const router = useRouter();
   const building = useCaretakerStore((s) => s.building);
   const company = useCaretakerStore((s) => s.company);
   const signOut = useAuthStore((s) => s.signOut);
@@ -24,7 +27,7 @@ export default function BuildingScreen() {
   const lng = building?.longitude != null ? Number(building.longitude) : null;
   const coords = lat != null && lng != null ? `${lat}, ${lng}` : '—';
 
-   const copyCoords = async () => {
+  const copyCoords = async () => {
     // Only touch expo-clipboard if the native module is actually present in the binary.
     const { NativeModules } = require('react-native');
     if (NativeModules.ExpoClipboard) {
@@ -38,6 +41,7 @@ export default function BuildingScreen() {
     // Fallback: surface the value so it's not lost (no native clipboard available).
     Alert.alert('Coordinates', coords);
   };
+
   const openMap = () => {
     if (lat == null || lng == null) return;
     Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`);
@@ -46,7 +50,31 @@ export default function BuildingScreen() {
   const handleSignOut = () => {
     Alert.alert('Sign out?', 'You will need your Building ID and passcode to sign back in.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: signOut },
+      { 
+        text: 'Sign out', 
+        style: 'destructive', 
+        onPress: async () => {
+          // Clear the caretaker store
+          useCaretakerStore.setState({
+            building: null,
+            assignment: null,
+            schedules: [],
+            collections: [],
+            invoices: [],
+            notifications: [],
+            paymentMethods: [],
+            loaded: false,
+            loading: false,
+          });
+          
+          // Sign out from Supabase auth
+          await supabase.auth.signOut();
+          
+          // Clear auth store and redirect to auth
+          signOut();
+          router.replace('/(auth)');
+        }
+      },
     ]);
   };
 
@@ -137,10 +165,12 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
+      {/* SIGN OUT */}
       <Rise delay={300}>
         <Pressable style={styles.signOutBtn} onPress={handleSignOut} accessibilityRole="button">
-  <Text style={styles.signOutLabel}>Sign out</Text>
-</Pressable>
+          <LogOut size={16} color={colors.state.danger} />
+          <Text style={styles.signOutLabel}>Sign out</Text>
+        </Pressable>
         <Text style={styles.note}>Building ID and provider relationships are managed by your waste company.</Text>
       </Rise>
     </TabScreen>
