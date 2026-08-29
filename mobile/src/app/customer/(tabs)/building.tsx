@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, Pressable, Alert, Linking } from 'react-native';
-import { LogOut, Copy, ExternalLink, MapPin, Radio, Users, CalendarDays, ShieldCheck, Building2 } from 'lucide-react-native';
+import { Copy, ExternalLink, MapPin, Radio, Users, CalendarDays, ShieldCheck, Building2 } from 'lucide-react-native';
 import { TabScreen } from '../../../components/layout/TabScreen';
 import { StatusPill } from '../../../components/ui/StatusPill';
 import { Rise } from '../../../components/ui/motion';
@@ -28,18 +28,13 @@ export default function BuildingScreen() {
   const coords = lat != null && lng != null ? `${lat}, ${lng}` : '—';
 
   const copyCoords = async () => {
-    // Only touch expo-clipboard if the native module is actually present in the binary.
-    const { NativeModules } = require('react-native');
-    if (NativeModules.ExpoClipboard) {
-      try {
-        const Clipboard = require('expo-clipboard');
-        await Clipboard.setStringAsync(coords);
-        Alert.alert('Copied', 'GPS coordinates copied to clipboard.');
-        return;
-      } catch {}
+    try {
+      const Clipboard = require('expo-clipboard');
+      await Clipboard.setStringAsync(coords);
+      Alert.alert('Copied', 'GPS coordinates copied to clipboard.');
+    } catch {
+      Alert.alert('Coordinates', coords);
     }
-    // Fallback: surface the value so it's not lost (no native clipboard available).
-    Alert.alert('Coordinates', coords);
   };
 
   const openMap = () => {
@@ -54,25 +49,30 @@ export default function BuildingScreen() {
         text: 'Sign out', 
         style: 'destructive', 
         onPress: async () => {
-          // Clear the caretaker store
           useCaretakerStore.setState({
             building: null,
+            company: null,
+            companyDetails: null,
+            contacts: [],
+            zone: null,
             assignment: null,
             schedules: [],
             collections: [],
             invoices: [],
+            invoiceCount: { paid: 0, due: 0 },
+            outstandingTotal: 0,
+            nextDueDate: null,
             notifications: [],
             paymentMethods: [],
+            requests: [],
             loaded: false,
             loading: false,
+            unreadCount: 0,
           });
           
-          // Sign out from Supabase auth
           await supabase.auth.signOut();
-          
-          // Clear auth store and redirect to auth
           signOut();
-          router.replace('/(auth)');
+          router.replace('/auth');
         }
       },
     ]);
@@ -80,7 +80,6 @@ export default function BuildingScreen() {
 
   return (
     <TabScreen>
-      {/* IDENTITY HERO — emerald-tinted material */}
       <Rise delay={0}>
         <View style={styles.hero}>
           <View style={styles.heroTop}>
@@ -94,7 +93,6 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* OCCUPANCY + REGISTERED — half tiles */}
       <Rise delay={70}>
         <View style={styles.row}>
           <View style={styles.tileHalf}>
@@ -110,7 +108,6 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* OFFICIAL ADDRESS */}
       <Rise delay={140}>
         <View style={styles.tile}>
           <View style={styles.tileHead}>
@@ -121,7 +118,6 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* DETECTED MAP LOCATION */}
       <Rise delay={180}>
         <View style={styles.tile}>
           <View style={styles.tileHead}>
@@ -132,7 +128,6 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* GPS COORDINATES + actions */}
       <Rise delay={220}>
         <View style={styles.tile}>
           <View style={styles.tileHead}>
@@ -151,7 +146,6 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* SERVICE */}
       <Rise delay={260}>
         <View style={styles.tile}>
           <View style={styles.tileHead}>
@@ -165,10 +159,8 @@ export default function BuildingScreen() {
         </View>
       </Rise>
 
-      {/* SIGN OUT */}
       <Rise delay={300}>
         <Pressable style={styles.signOutBtn} onPress={handleSignOut} accessibilityRole="button">
-          <LogOut size={16} color={colors.state.danger} />
           <Text style={styles.signOutLabel}>Sign out</Text>
         </Pressable>
         <Text style={styles.note}>Building ID and provider relationships are managed by your waste company.</Text>
@@ -178,7 +170,6 @@ export default function BuildingScreen() {
 }
 
 const styles = StyleSheet.create({
-  // Emerald-tinted frosted hero
   hero: {
     backgroundColor: colors.material.emerald,
     borderRadius: radius.xxl,
@@ -246,10 +237,8 @@ const styles = StyleSheet.create({
   serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: sp.x2 },
 
   signOutBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: sp.x2,
     backgroundColor: colors.state.dangerSoft,
     borderRadius: radius.lg,
     paddingVertical: sp.x4,

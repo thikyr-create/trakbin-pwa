@@ -1,5 +1,7 @@
+// src/services/caretaker.ts
 import { supabase } from './supabase';
-import type { Building, Collection, CollectionSchedule, Invoice, AppNotification } from '../types/caretaker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Building, Collection, CollectionSchedule, Invoice, AppNotification, CaretakerNotificationKind } from '../types/caretaker';
 
 // Inline type since ServiceRequest isn't exported from types/caretaker
 interface ServiceRequest {
@@ -113,19 +115,106 @@ export async function createServiceRequest(req: {
   return { ok: !error, error: error?.message };
 }
 
-// ── NOTIFICATIONS ───────────────────────────────────────────
-export async function fetchNotifications(customId: string): Promise<AppNotification[]> {
-  const { data } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('building_id', customId)
-    .order('created_at', { ascending: false });
-  return (data as AppNotification[]) ?? [];
+// ── NOTIFICATIONS (4-Table Read Model) ──────────────────────
+export async function fetchCaretakerNotifications(
+  buildingId: string,
+  companyName?: string | null
+): Promise<AppNotification[]> {
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const out: AppNotification[] = [];
+
+  const [stopsRes, issuesRes, invoicesRes, assignRes] = await Promise.all([
+    supabase
+      .from('route_stops')
+      .select('id, completion_time, disputed')
+      .eq('building_id', buildingId)
+      .eq('status', 'completed')
+      .gte('completion_time', weekAgo),
+    supabase
+      .from('environmental_issues')
+      .select('id, issue_type, status, updated_at')
+      .eq('building_id', buildingId)
+      .neq('status', 'pending')
+      .gte('updated_at', weekAgo),
+    supabase
+      .from('invoices')
+      .select('id, amount, status, description, created_at')
+      .eq('building_id', buildingId)
+      .eq('status', 'paid')
+      .gte('created_at', weekAgo),
+    supabase
+      .from('service_assignments')
+      .select('id, created_at, service_status')
+      .eq('building_id', buildingId)
+      .eq('service_status', 'active')
+      .gte('created_at', weekAgo),
+  ]);
+
+  (stopsRes.data || []).forEach((s: any) =>
+    out.push({
+      id: `pickup-${s.id}`,
+      kind: s.disputed ? 'pickup_disputed' : 'pickup',
+      label: s.disputed ? 'Pickup disputed' : 'Pickup completed',
+      sub: s.disputed ? 'Reported to your waste company' : 'Confirm or dispute this pickup',
+      at: s.completion_time,
+      refId: s.id,
+      disputed: !!s.disputed,
+    })
+  );
+
+  (issuesRes.data || []).forEach((i: any) =>
+    out.push({
+      id: `issue-${i.id}`,
+      kind: 'issue_update',
+      label: i.status === 'resolved' ? 'Your report was resolved' : `Report ${i.status}`,
+      sub: i.issue_type,
+      at: i.updated_at,
+      refId: null,
+      disputed: false,
+    })
+  );
+
+  (invoicesRes.data || []).forEach((v: any) =>
+    out.push({
+      id: `invoice-${v.id}`,
+      kind: 'invoice_paid',
+      label: 'Invoice settled',
+      sub: `₦${Number(v.amount || 0).toLocaleString()} · ${v.description || 'Monthly collection'}`,
+      at: v.created_at,
+      refId: null,
+      disputed: false,
+    })
+  );
+
+  (assignRes.data || []).forEach((a: any) =>
+    out.push({
+      id: `service-${a.id}`,
+      kind: 'service_activated',
+      label: 'Service activated',
+      sub: companyName ? `Provider: ${companyName}` : 'Your waste provider is now active',
+      at: a.created_at ?? new Date().toISOString(),
+      refId: null,
+      disputed: false,
+    })
+  );
+
+  out.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  return out.slice(0, 20);
 }
 
-export async function markNotificationsRead(ids: (string | number)[]) {
-  if (!ids.length) return;
-  await supabase.from('notifications').update({ is_read: true }).in('id', ids);
+export async function disputePickup(stopId: string, note?: string) {
+  return supabase
+    .from('route_stops')
+    .update({ disputed: true, disputed_at: new Date().toISOString(), dispute_note: note || null })
+    .eq('id', stopId);
+}
+
+export async function getSeenAt(buildingId: string): Promise<string | null> {
+  return AsyncStorage.getItem(`trakbin_caretaker_notif_seen_${buildingId}`);
+}
+
+export async function setSeenAt(buildingId: string, iso: string) {
+  await AsyncStorage.setItem(`trakbin_caretaker_notif_seen_${buildingId}`, iso);
 }
 
 // ── PAYMENTS ────────────────────────────────────────────────
@@ -159,10 +248,10 @@ export async function addCardMethod(p: {
     provider: 'paystack',
     country: 'NG',
     currency: 'NGN',
-    card_brand: p.brand,            // ← real PWA column
-    card_last_four: p.last4,        // ← real PWA column (with 'r')
+    card_brand: p.brand,
+    card_last_four: p.last4,
     account_name: p.holder || 'Card',
-    account_last4: p.last4,         // mirror for bank-style readers
+    account_last4: p.last4,
     is_default: false,
   }]);
   return { ok: !error, error: error?.message };
@@ -221,13 +310,14 @@ export async function saveCardMethod(p: {
       instrumentType: 'card',
       provider: 'paystack',
       type: 'card',
-      cardLast4: p.cardLast4,     // ← PWA route reads this
-      cardBrand: p.cardBrand,     // ← PWA route reads this
+      cardLast4: p.cardLast4,
+      cardBrand: p.cardBrand,
       is_default: p.isDefault ?? false,
     }),
   });
   return safeJson(res);
 }
+
 export async function setDefaultMethod(id: number | string, buildingId: string) {
   await supabase.from('payment_methods').update({ is_default: false }).eq('building_id', buildingId);
   const { error } = await supabase.from('payment_methods').update({ is_default: true }).eq('id', id);
@@ -250,7 +340,6 @@ export async function createEnvironmentalIssue(p: {
 }) {
   const issue_number = `ENV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 90 + 10)}`;
 
-  // Phase 1 — INSERT core fields only (these columns always exist)
   const { data, error } = await supabase
     .from('environmental_issues')
     .insert([{
@@ -267,7 +356,6 @@ export async function createEnvironmentalIssue(p: {
 
   const id = data.id;
 
-  // Phase 2 — per-column touch, each isolated so a missing column never fails the insert
   const touch = async (patch: Record<string, any>) => {
     try { await supabase.from('environmental_issues').update(patch).eq('id', id); } catch {}
   };
@@ -281,7 +369,6 @@ export async function createEnvironmentalIssue(p: {
   if (p.missed_date) await touch({ missed_date: p.missed_date });
   if (p.missed_window) await touch({ missed_window: p.missed_window });
 
-  // History entry (best-effort, mirrors PWA)
   try {
     await supabase.from('environmental_issue_history').insert([{
       issue_id: id,

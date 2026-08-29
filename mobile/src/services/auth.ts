@@ -1,4 +1,3 @@
-// mobile/services/auth.ts
 import { supabase, API_BASE } from './supabase';
 
 async function post(path: string, body: any) {
@@ -7,7 +6,13 @@ async function post(path: string, body: any) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return res.json();
+  const txt = await res.text();
+  try {
+    return JSON.parse(txt);
+  } catch {
+    // HTML response = route missing / server error page
+    return { ok: false, message: `Server error (${res.status}). Endpoint may not be deployed yet.` };
+  }
 }
 
 async function adoptSession(json: any): Promise<{ ok: boolean; message?: string }> {
@@ -18,16 +23,45 @@ async function adoptSession(json: any): Promise<{ ok: boolean; message?: string 
   return { ok: true };
 }
 
-export async function driverLogin(driver_id: string, password: string) {
-  const json = await post('/api/auth/driver-login', { driver_id, password });
+// ── CARETAKER: Building ID + passcode → API validates → returns synthetic
+//    email+password → mint a real Supabase session (mirrors PWA authEngine) ──
+export async function caretakerLogin(buildingId: string, passcode: string) {
+  const json = await post('/api/auth/caretaker-login', { buildingId, passcode });
+  if (!json.ok) return { ok: false, message: json.message || 'Invalid Building ID or passcode' };
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: json.email,
+    password: json.password,
+  });
+  if (error) return { ok: false, message: 'Session error: ' + error.message };
+  return { ok: true };
+}
+
+// ── DRIVER: employee ID + password → API mints session → adopt it ──
+export async function driverLogin(employeeId: string, password: string) {
+  const json = await post('/api/auth/driver-login', { employeeId, password });
   if (!json.ok) return { ok: false, message: json.message || 'Invalid Driver ID or password' };
   return adoptSession(json);
 }
 
-export async function caretakerLogin(building_id: string, passcode: string) {
-  const json = await post('/api/auth/caretaker-login', { building_id, passcode });
-  if (!json.ok) return { ok: false, message: json.message || 'Invalid Building ID or passcode' };
-  return adoptSession(json);
+// ── CARETAKER REGISTRATION ──
+export async function registerCaretaker(input: {
+  passcode: string;
+  buildingType: string;
+  officialAddress: string;
+  estate: string | null;
+  gpsAddress: string;
+  latitude: number;
+  longitude: number;
+  numberOfFlats: string | null;
+  numberOfShops: string | null;
+}) {
+  return post('/api/auth/register-caretaker', input);
+}
+
+// ── CARETAKER PASSCODE RESET ──
+export async function resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
+  return post('/api/auth/reset-caretaker-passcode', { buildingId, officialAddress, newPasscode });
 }
 
 /** Role detection mirrors the web identity guards. */
@@ -50,22 +84,4 @@ export async function detectRole(): Promise<{ role: 'driver' | 'caretaker' | nul
 
 export async function signOut() {
   await supabase.auth.signOut();
-}
-
-export async function registerCaretaker(input: {
-  passcode: string;
-  buildingType: string;
-  officialAddress: string;
-  estate: string | null;
-  gpsAddress: string;
-  latitude: number;
-  longitude: number;
-  numberOfFlats: string | null;
-  numberOfShops: string | null;
-}) {
-  return post('/api/auth/register-caretaker', input);
-}
-
-export async function resetCaretakerPasscode(buildingId: string, officialAddress: string, newPasscode: string) {
-  return post('/api/auth/reset-caretaker-passcode', { buildingId, officialAddress, newPasscode });
 }

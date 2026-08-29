@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, AppState, Pressable, Linking } from 'react-native';
+import { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ShieldCheck, ExternalLink, RefreshCw, CheckCircle2 } from 'lucide-react-native';
+import { ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { verifyPayment } from '../../services/caretaker';
 import { useCaretakerStore } from '../../store/caretakerStore';
 import { Rise } from '../../components/ui/motion';
+import PaystackSheet from '../../components/payments/PaystackSheet';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
@@ -14,18 +15,13 @@ export default function PaystackCheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const load = useCaretakerStore((s) => s.load);
-  const { reference, authorizationUrl } = useLocalSearchParams<{ reference: string; authorizationUrl: string }>();
+  const { authorizationUrl } = useLocalSearchParams<{ authorizationUrl: string }>();
 
   const [verifying, setVerifying] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const opened = useRef(false);
-  const verifyingRef = useRef(false);
+  const [sheetTitle, setSheetTitle] = useState<string>('Secure checkout');
 
-  const verify = async (silent = false) => {
-    if (verifyingRef.current) return;
-    verifyingRef.current = true;
+  const handleRedirect = async (reference: string) => {
     setVerifying(true);
-    setNote(null);
     try {
       const res = await verifyPayment(reference);
       if (res.ok) {
@@ -33,53 +29,34 @@ export default function PaystackCheckoutScreen() {
         Alert.alert('Card added', 'Your card is saved and ready for payments.', [
           { text: 'OK', onPress: () => router.back() },
         ]);
-      } else if (!silent) {
-        setNote('Not confirmed yet — Paystack may still be processing. Wait a few seconds and try again.');
+      } else {
+        setVerifying(false);
+        Alert.alert('Not confirmed yet', 'Paystack may still be processing. Wait a few seconds and try again.');
       }
     } catch {
-      if (!silent) setNote('Network error. Check your connection and try again.');
+      setVerifying(false);
+      Alert.alert('Network error', 'Check your connection and try again.');
     }
-    verifyingRef.current = false;
-    setVerifying(false);
   };
-
-  // Open the secure checkout in the browser once on mount
-  useEffect(() => {
-    if (!opened.current && authorizationUrl) {
-      opened.current = true;
-      Linking.openURL(authorizationUrl);
-    }
-  }, [authorizationUrl]);
-
-  // When the user returns from the browser, verify automatically
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setTimeout(() => verify(true), 1500);
-    });
-    return () => sub.remove();
-  }, [reference]);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + sp.x4 }]}>
       <Rise delay={0}>
         <View style={styles.card}>
           <View style={styles.iconWrap}><ShieldCheck size={24} color={colors.brand[400]} /></View>
-          <Text style={styles.title}>Complete payment in your browser</Text>
+          <Text style={styles.title}>Secure checkout</Text>
           <Text style={styles.body}>
-            Paystack's secure page opened in your browser. Enter your card there — your details never touch Trakbin.
-            Return here when done.
+            Enter your card details in the secure Paystack window. Your details never touch Trakbin.
           </Text>
 
-          {note ? <Text style={styles.note}>{note}</Text> : null}
-
-          <Pressable style={styles.primaryBtn} onPress={() => verify(false)} disabled={verifying} accessibilityRole="button" accessibilityLabel="I have completed payment">
-            {verifying ? <ActivityIndicator color={colors.text.inverse} /> : <CheckCircle2 size={18} color={colors.text.inverse} />}
-            <Text style={styles.primaryLabel}>{verifying ? 'Verifying…' : "I've completed payment"}</Text>
-          </Pressable>
-
-          <Pressable style={styles.secondaryBtn} onPress={() => authorizationUrl && Linking.openURL(authorizationUrl)} accessibilityRole="button" accessibilityLabel="Reopen checkout">
-            <ExternalLink size={16} color={colors.text.primary} />
-            <Text style={styles.secondaryLabel}>Reopen checkout</Text>
+          <Pressable
+            style={[styles.primaryBtn, !authorizationUrl && styles.btnDisabled]}
+            onPress={() => setSheetTitle('Secure checkout')}
+            disabled={!authorizationUrl}
+            accessibilityRole="button"
+            accessibilityLabel="Open checkout"
+          >
+            <Text style={styles.primaryLabel}>{verifying ? 'Verifying…' : 'Open secure checkout'}</Text>
           </Pressable>
 
           <Pressable style={styles.tertiaryBtn} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Cancel">
@@ -87,6 +64,14 @@ export default function PaystackCheckoutScreen() {
           </Pressable>
         </View>
       </Rise>
+
+      <PaystackSheet
+        visible={!!authorizationUrl}
+        authorizationUrl={authorizationUrl}
+        title={sheetTitle}
+        onRedirect={handleRedirect}
+        onClose={() => router.back()}
+      />
     </View>
   );
 }
@@ -112,33 +97,18 @@ const styles = StyleSheet.create({
   },
   title: { ...text.titleM, color: colors.text.primary, textAlign: 'center' },
   body: { ...text.bodyM, color: colors.text.muted, textAlign: 'center', marginTop: sp.x3 },
-  note: { ...text.bodyS, color: colors.state.warning, textAlign: 'center', marginTop: sp.x4 },
 
   primaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.x2,
     backgroundColor: colors.brand[600],
     borderRadius: radius.xl,
     height: touch.cta,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: sp.x6,
     width: '100%',
   },
+  btnDisabled: { opacity: 0.45 },
   primaryLabel: { ...text.button, color: colors.text.inverse },
-
-  secondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: sp.x2,
-    backgroundColor: colors.material.surfaceStrong,
-    borderRadius: radius.xl,
-    height: touch.field,
-    marginTop: sp.x3,
-    width: '100%',
-  },
-  secondaryLabel: { ...text.semibold, fontSize: 14, color: colors.text.primary },
 
   tertiaryBtn: { paddingVertical: sp.x3, marginTop: sp.x2 },
   tertiaryLabel: { ...text.semibold, fontSize: 13, color: colors.text.muted },

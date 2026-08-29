@@ -121,3 +121,24 @@ export async function verifyTopUp(reference: string) {
   const res = await fetch(`${API_BASE}/api/payments/verify?reference=${encodeURIComponent(reference)}`);
   return safeJson(res);
 }
+
+// Add this function to the existing wallet.ts file
+
+export async function topUpWithSavedCard(p: {
+  buildingId: string;
+  amountNaira: number;
+  authorizationCode: string;
+  email: string;
+}) {
+  const res = await fetch(`${API_BASE}/api/wallet/topup-saved-card`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      buildingId: p.buildingId,
+      amount: p.amountNaira * 100, // Convert to kobo
+      authorizationCode: p.authorizationCode,
+      email: p.email,
+    }),
+  });
+  return safeJson(res);
+}

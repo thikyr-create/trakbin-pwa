@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, Modal, Pressable, Alert,
-  ActivityIndicator, AppState, Linking, TextInput,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Landmark, CreditCard, CheckCircle2, ExternalLink } from 'lucide-react-native';
-import { initializeWalletTopUp, verifyTopUp } from '../../services/wallet';
+import { X, Landmark, CreditCard, CheckCircle } from 'lucide-react-native';
+import { initializeWalletTopUp, verifyTopUp, topUpWithSavedCard } from '../../services/wallet';
 import { useCaretakerStore } from '../../store/caretakerStore';
 import { supabase } from '../../services/supabase';
 import { naira } from '../../services/format';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
+import PaystackSheet from '../payments/PaystackSheet';
 
 const AMOUNTS = [1000, 2500, 5000, 10000, 20000];
 
@@ -23,70 +24,94 @@ export function AddFundsSheet({ onClose, onSuccess }: Props) {
   const paymentMethods = useCaretakerStore((s) => s.paymentMethods);
   const load = useCaretakerStore((s) => s.load);
 
+  const savedCard = paymentMethods.find((m) => m.instrument_type === 'card' && m.authorization_code);
   const hasBank = paymentMethods.some((m) => m.instrument_type === 'bank_account');
 
   const [chip, setChip] = useState<number | null>(5000);
   const [custom, setCustom] = useState('');
   const [busy, setBusy] = useState(false);
-  const [awaiting, setAwaiting] = useState(false);
-  const [reference, setReference] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
-  const verifyingRef = useRef(false);
+  const [sheetTitle, setSheetTitle] = useState<string>('Secure checkout');
+  const amountRef = useRef(0);
 
-  // NAIRA — the value the user typed. Backend converts to kobo (*100), exactly like the PWA.
   const amount = custom ? Number(custom.replace(/\D/g, '')) : chip ?? 0;
 
-  const verify = async (silent = false) => {
-    if (!reference || verifyingRef.current) return;
-    verifyingRef.current = true;
-    setVerifying(true);
+  const handleRedirect = async (reference: string) => {
+    setAuthUrl(null);
     try {
       const res = await verifyTopUp(reference);
       if (res.ok) {
         await load(true);
-        Alert.alert('Wallet funded', `${naira(amount)} added to your wallet.`, [
+        Alert.alert('Wallet funded', `${naira(amountRef.current)} added to your wallet.`, [
           { text: 'OK', onPress: () => { onSuccess(); onClose(); } },
         ]);
-      } else if (!silent) {
+      } else {
         Alert.alert('Not confirmed yet', 'Paystack may still be processing. Wait a few seconds and try again.');
       }
     } catch {
-      if (!silent) Alert.alert('Network error', 'Check your connection and try again.');
+      Alert.alert('Network error', 'Check your connection and try again.');
     }
-    verifyingRef.current = false;
-    setVerifying(false);
   };
 
-  // Auto-verify when the user returns from the browser
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active' && awaiting) setTimeout(() => verify(true), 1500);
-    });
-    return () => sub.remove();
-  }, [awaiting, reference]);
-
-  const start = async () => {
+  const chargeSavedCard = async () => {
     if (!amount || amount < 100) { Alert.alert('Enter amount', 'Minimum top-up is ₦100.'); return; }
     if (!building?.custom_id) { Alert.alert('No building', 'Link a building first.'); return; }
+    if (!savedCard) return;
+
     setBusy(true);
     try {
       const { data } = await supabase.auth.getSession();
       const email = data.session?.user?.email;
       if (!email) { Alert.alert('Session', 'Sign in again to add funds.'); setBusy(false); return; }
 
-      // Mirrors PWA CheckoutSheet: amount in NAIRA, purpose 'topup' (set in wallet.ts).
-      // Bank linked → bank channel primary; else all channels (card/bank/ussd).
-      const { authorizationUrl, reference: ref } = await initializeWalletTopUp({
+      const res = await topUpWithSavedCard({
+        buildingId: building.custom_id,
+        amountNaira: amount,
+        authorizationCode: savedCard.authorization_code,
+        email,
+      });
+
+      if (res.ok) {
+        await load(true);
+        Alert.alert('Wallet funded', `${naira(amount)} added to your wallet.`, [
+          { text: 'OK', onPress: () => { onSuccess(); onClose(); } },
+        ]);
+      } else {
+        Alert.alert('Payment failed', res.error || 'Could not charge saved card. Try Paystack checkout.');
+      }
+    } catch (e: any) {
+      Alert.alert('Failed', e.message ?? 'Could not charge saved card.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const start = async () => {
+    if (!amount || amount < 100) { Alert.alert('Enter amount', 'Minimum top-up is ₦100.'); return; }
+    if (!building?.custom_id) { Alert.alert('No building', 'Link a building first.'); return; }
+
+    // If saved card exists, charge it directly
+    if (savedCard) {
+      await chargeSavedCard();
+      return;
+    }
+
+    // Otherwise, open Paystack checkout
+    setBusy(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const email = data.session?.user?.email;
+      if (!email) { Alert.alert('Session', 'Sign in again to add funds.'); setBusy(false); return; }
+
+      const { authorizationUrl } = await initializeWalletTopUp({
         buildingId: building.custom_id,
         email,
         amountNaira: amount,
         method: hasBank ? 'bank' : undefined,
       });
-      setReference(ref);
+      amountRef.current = amount;
+      setSheetTitle(`Add ${naira(amount)}`);
       setAuthUrl(authorizationUrl);
-      setAwaiting(true);
-      Linking.openURL(authorizationUrl);
     } catch (e: any) {
       Alert.alert('Failed', e.message ?? 'Could not start checkout.');
     } finally {
@@ -95,88 +120,106 @@ export function AddFundsSheet({ onClose, onSuccess }: Props) {
   };
 
   return (
-    <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={styles.root}>
-        <View style={[styles.header, { paddingTop: insets.top + sp.x2 }]}>
-          <Text style={styles.title}>Add funds</Text>
-          <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
-            <X size={22} color={colors.text.primary} />
-          </Pressable>
+    <>
+      <Modal visible animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+        <View style={styles.root}>
+          <View style={[styles.header, { paddingTop: insets.top + sp.x2 }]}>
+            <Text style={styles.title}>Add funds</Text>
+            <Pressable onPress={onClose} style={styles.close} accessibilityRole="button" accessibilityLabel="Close">
+              <X size={22} color={colors.text.primary} />
+            </Pressable>
+          </View>
+
+          <View style={styles.content}>
+            <Text style={styles.label}>Amount</Text>
+
+            <View style={styles.chipRow}>
+              {AMOUNTS.map((c) => (
+                <Pressable
+                  key={c}
+                  style={[styles.chip, chip === c && !custom && styles.chipActive]}
+                  onPress={() => { setChip(c); setCustom(''); }}
+                  accessibilityRole="button"
+                >
+                  <Text style={[styles.chipLabel, chip === c && !custom && styles.chipLabelActive]}>{naira(c)}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.customBox}>
+              <Text style={styles.nairaSign}>₦</Text>
+              <TextInput
+                style={styles.customInput}
+                value={custom}
+                onChangeText={(v) => setCustom(v.replace(/[^\d]/g, ''))}
+                placeholder="Custom amount"
+                keyboardType="number-pad"
+                placeholderTextColor={colors.text.muted}
+              />
+            </View>
+
+            {/* Payment source detection */}
+            <View style={styles.sourceRow}>
+              {savedCard ? (
+                <>
+                  <CreditCard size={16} color={colors.brand[400]} />
+                  <Text style={styles.sourceText}>
+                    Saved card ending in {savedCard.card_last_four} — tap to charge directly.
+                  </Text>
+                </>
+              ) : hasBank ? (
+                <>
+                  <Landmark size={16} color={colors.brand[400]} />
+                  <Text style={styles.sourceText}>
+                    Linked bank detected — bank transfer is primary.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <CreditCard size={16} color={colors.brand[400]} />
+                  <Text style={styles.sourceText}>
+                    No saved card — you'll pay via Paystack checkout (card / bank / ussd).
+                  </Text>
+                </>
+              )}
+            </View>
+
+            <Pressable
+              style={[styles.cta, (!amount || amount < 100 || busy) && styles.ctaDisabled]}
+              onPress={start}
+              disabled={!amount || amount < 100 || busy}
+              accessibilityRole="button"
+              accessibilityLabel={savedCard ? 'Charge saved card' : 'Continue to Paystack'}
+            >
+              {busy ? (
+                <ActivityIndicator color={colors.text.inverse} />
+              ) : (
+                <>
+                  {savedCard && <CheckCircle size={16} color={colors.text.inverse} />}
+                  <Text style={styles.ctaLabel}>
+                    {savedCard ? 'Charge saved card' : 'Continue'} · {naira(amount || 0)}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+
+            <Text style={styles.note}>
+              {savedCard
+                ? 'Charges your saved card directly · secured by Paystack.'
+                : 'Checkout opens here · secured by Paystack · card details never touch Trakbin.'}
+            </Text>
+          </View>
         </View>
+      </Modal>
 
-        <View style={styles.content}>
-          {!awaiting ? (
-            <>
-              <Text style={styles.label}>Amount</Text>
-
-              <View style={styles.chipRow}>
-                {AMOUNTS.map((c) => (
-                  <Pressable
-                    key={c}
-                    style={[styles.chip, chip === c && !custom && styles.chipActive]}
-                    onPress={() => { setChip(c); setCustom(''); }}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.chipLabel, chip === c && !custom && styles.chipLabelActive]}>{naira(c)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              <View style={styles.customBox}>
-                <Text style={styles.nairaSign}>₦</Text>
-                <TextInput
-                  style={styles.customInput}
-                  value={custom}
-                  onChangeText={(v) => setCustom(v.replace(/[^\d]/g, ''))}
-                  placeholder="Custom amount"
-                  keyboardType="number-pad"
-                  placeholderTextColor={colors.text.muted}
-                />
-              </View>
-
-              {/* Source detection */}
-              <View style={styles.sourceRow}>
-                {hasBank ? <Landmark size={16} color={colors.brand[400]} /> : <CreditCard size={16} color={colors.brand[400]} />}
-                <Text style={styles.sourceText}>
-                  {hasBank
-                    ? 'Linked bank detected — bank transfer is primary.'
-                    : "No linked bank — you'll pay via Paystack checkout (card / bank / ussd)."}
-                </Text>
-              </View>
-
-              <Pressable
-                style={[styles.cta, (!amount || amount < 100 || busy) && styles.ctaDisabled]}
-                onPress={start}
-                disabled={!amount || amount < 100 || busy}
-                accessibilityRole="button"
-                accessibilityLabel="Continue to Paystack"
-              >
-                {busy ? <ActivityIndicator color={colors.text.inverse} /> : <Text style={styles.ctaLabel}>Continue · {naira(amount || 0)}</Text>}
-              </Pressable>
-
-              <Text style={styles.note}>Checkout opens in your browser · secured by Paystack · card details never touch Trakbin.</Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.awaitIcon}><CheckCircle2 size={26} color={colors.brand[400]} /></View>
-              <Text style={styles.awaitTitle}>Complete payment in your browser</Text>
-              <Text style={styles.awaitBody}>
-                Paystack opened in your browser for {naira(amount)}. Return here when done — we'll confirm automatically.
-              </Text>
-
-              <Pressable style={styles.cta} onPress={() => verify(false)} disabled={verifying} accessibilityRole="button" accessibilityLabel="I have completed payment">
-                {verifying ? <ActivityIndicator color={colors.text.inverse} /> : <Text style={styles.ctaLabel}>I've completed payment</Text>}
-              </Pressable>
-
-              <Pressable style={styles.reopen} onPress={() => authUrl && Linking.openURL(authUrl)} accessibilityRole="button" accessibilityLabel="Reopen checkout">
-                <ExternalLink size={15} color={colors.text.primary} />
-                <Text style={styles.reopenLabel}>Reopen checkout</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
+      <PaystackSheet
+        visible={!!authUrl}
+        authorizationUrl={authUrl}
+        title={sheetTitle}
+        onRedirect={handleRedirect}
+        onClose={() => setAuthUrl(null)}
+      />
+    </>
   );
 }
 
@@ -239,36 +282,15 @@ const styles = StyleSheet.create({
   sourceText: { flex: 1, ...text.bodyS, color: colors.text.secondary },
 
   cta: {
-    backgroundColor: colors.brand[600],
-    borderRadius: radius.xl,
-    height: touch.cta,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaDisabled: { opacity: 0.45 },
-  ctaLabel: { ...text.button, color: colors.text.inverse },
-  note: { ...text.bodyS, color: colors.text.muted, textAlign: 'center', marginTop: sp.x4 },
-
-  awaitIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.material.emerald,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: sp.x4,
-  },
-  awaitTitle: { ...text.titleM, color: colors.text.primary, textAlign: 'center' },
-  awaitBody: { ...text.bodyM, color: colors.text.muted, textAlign: 'center', marginTop: sp.x3, marginBottom: sp.x5 },
-
-  reopen: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: sp.x2,
-    paddingVertical: sp.x3,
-    marginTop: sp.x3,
+    backgroundColor: colors.brand[600],
+    borderRadius: radius.xl,
+    height: touch.cta,
   },
-  reopenLabel: { ...text.semibold, fontSize: 13, color: colors.text.primary },
+  ctaDisabled: { opacity: 0.45 },
+  ctaLabel: { ...text.button, color: colors.text.inverse },
+  note: { ...text.bodyS, color: colors.text.muted, textAlign: 'center', marginTop: sp.x4 },
 });

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Building2, KeyRound, ArrowLeft } from 'lucide-react-native';
+import { Building2 } from 'lucide-react-native';
 import { caretakerLogin, resetCaretakerPasscode } from '../../services/auth';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
+import { PasswordInput } from '../../components/ui/PasswordInput';
 
 type Mode = 'login' | 'recover';
 
@@ -45,7 +47,7 @@ export default function AuthScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen}>
       <View style={styles.container}>
         {mode === 'login' ? (
           <>
@@ -53,7 +55,7 @@ export default function AuthScreen() {
               <View style={styles.brandIcon}><Text style={styles.brandLetter}>T</Text></View>
               <Text style={styles.brandName}>Trakbin</Text>
             </View>
-            <Text style={styles.title}>Welcome back</Text>
+            
             <Text style={styles.subtitle}>Sign in with your Building ID</Text>
 
             <View style={styles.field}>
@@ -71,17 +73,7 @@ export default function AuthScreen() {
               <Text style={styles.hint}>Format: TRK-XXXXXX (6 characters after dash)</Text>
             ) : null}
 
-            <View style={styles.field}>
-              <KeyRound size={16} color={colors.text.muted} style={styles.fieldIcon} />
-              <TextInput
-                style={styles.input}
-                value={passcode}
-                onChangeText={setPasscode}
-                placeholder="Passcode"
-                placeholderTextColor={colors.text.muted}
-                secureTextEntry
-              />
-            </View>
+            <PasswordInput value={passcode} onChangeText={setPasscode} placeholder="Passcode" />
 
             <Pressable style={styles.recoverLink} onPress={() => { setMode('recover'); setBuildingId(''); }}>
               <Text style={styles.recoverLinkLabel}>Forgot passcode?</Text>
@@ -98,11 +90,6 @@ export default function AuthScreen() {
           </>
         ) : (
           <>
-            <Pressable style={styles.backBtn} onPress={() => { setMode('login'); setNewPasscode(''); }}>
-              <ArrowLeft size={16} color={colors.text.secondary} />
-              <Text style={styles.backLabel}>Back to login</Text>
-            </Pressable>
-
             <Text style={styles.title}>Reset passcode</Text>
             <Text style={styles.subtitle}>Enter your Building ID and the official address you registered with.</Text>
 
@@ -128,25 +115,19 @@ export default function AuthScreen() {
               numberOfLines={2}
             />
 
-            <View style={styles.field}>
-              <KeyRound size={16} color={colors.text.muted} style={styles.fieldIcon} />
-              <TextInput
-                style={styles.input}
-                value={newPasscode}
-                onChangeText={setNewPasscode}
-                placeholder="New passcode"
-                placeholderTextColor={colors.text.muted}
-                secureTextEntry
-              />
-            </View>
+            <PasswordInput value={newPasscode} onChangeText={setNewPasscode} placeholder="New passcode" />
 
             <Pressable style={[styles.cta, loading && styles.ctaDisabled]} onPress={submitRecover} disabled={loading}>
               {loading ? <ActivityIndicator color={colors.text.inverse} /> : <Text style={styles.ctaLabel}>Set new passcode</Text>}
             </Pressable>
+
+            <Pressable style={styles.switchLink} onPress={() => { setMode('login'); setNewPasscode(''); }}>
+              <Text style={styles.switchAction}>← Back to login</Text>
+            </Pressable>
           </>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -173,6 +154,4 @@ const styles = StyleSheet.create({
   switchLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: sp.x5 },
   switchLabel: { ...text.bodyM, color: colors.text.muted },
   switchAction: { ...text.bodyM, color: colors.brand[500], fontWeight: '600' },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: sp.x2, marginBottom: sp.x5 },
-  backLabel: { ...text.semibold, fontSize: 12, color: colors.text.secondary },
 });

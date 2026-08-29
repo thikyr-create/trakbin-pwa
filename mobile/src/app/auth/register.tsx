@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Alert, ScrollView, Share } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Building2, MapPin, ArrowLeft, CheckCircle, AlertCircle, Navigation } from 'lucide-react-native';
+import { MapPin, CheckCircle, AlertCircle, Download } from 'lucide-react-native';
 import { registerCaretaker } from '../../services/auth';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
+import { PasswordInput } from '../../components/ui/PasswordInput';
 
 const BUILDING_TYPES = [
   { value: 'Residential Single Unit', label: 'Residential Single Unit' },
@@ -30,64 +32,73 @@ export default function RegisterScreen() {
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'requesting' | 'captured' | 'error'>('idle');
   const [loading, setLoading] = useState(false);
   const [showIdCard, setShowIdCard] = useState<null | { id: string; passcode: string; address: string }>(null);
+  const cardRef = useRef<View>(null);
 
   const passcodeMismatch = confirmPasscode.length > 0 && passcode !== confirmPasscode;
   const canSubmit = !loading && !passcodeMismatch && passcode.length > 0 && gpsStatus === 'captured' && officialAddress.trim().length > 0 &&
     (buildingType !== 'Residential Multi-Unit' || !!numberOfFlats) &&
     (buildingType !== 'Commercial' || !!numberOfShops);
 
-  useEffect(() => {
-    requestGps();
-  }, []);
+  useEffect(() => { requestGps(); }, []);
 
   const requestGps = async () => {
     const Loc = getLocationModule();
-    if (!Loc) { setGpsStatus('error'); Alert.alert('GPS unavailable', 'Location module not available. Build the app with `npx expo install expo-location` to enable GPS.'); return; }
+    if (!Loc) { setGpsStatus('error'); Alert.alert('GPS unavailable', 'Location module not available on this build.'); return; }
     setGpsStatus('requesting');
     try {
       const { status } = await Loc.requestForegroundPermissionsAsync();
       if (status !== 'granted') { setGpsStatus('error'); Alert.alert('Permission denied', 'Enable location in settings to register.'); return; }
       const pos = await Loc.getCurrentPositionAsync({ accuracy: Loc.Accuracy.High });
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      setCoords({ lat, lon });
-      setGpsAddress(`${lat.toFixed(6)}, ${lon.toFixed(6)}`);
+      setCoords({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+      setGpsAddress(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
       setGpsStatus('captured');
-    } catch {
-      setGpsStatus('error');
-    }
+    } catch { setGpsStatus('error'); }
   };
 
   const submit = async () => {
     if (!canSubmit || !coords) return;
     if (buildingType === 'Residential Multi-Unit' && !numberOfFlats) { Alert.alert('Missing', 'Select number of flats.'); return; }
     if (buildingType === 'Commercial' && !numberOfShops) { Alert.alert('Missing', 'Select number of shops.'); return; }
-
     setLoading(true);
     const res = await registerCaretaker({
-      passcode,
-      buildingType,
+      passcode, buildingType,
       officialAddress: officialAddress.trim(),
       estate: estate.trim() || null,
       gpsAddress,
-      latitude: coords.lat,
-      longitude: coords.lon,
+      latitude: coords.lat, longitude: coords.lon,
       numberOfFlats: buildingType === 'Residential Multi-Unit' ? numberOfFlats : null,
       numberOfShops: buildingType === 'Commercial' ? numberOfShops : null,
     });
     setLoading(false);
-    if (res.ok && res.buildingId) {
-      setShowIdCard({ id: res.buildingId, passcode, address: officialAddress.trim() });
-    } else {
-      Alert.alert('Registration failed', res.message || 'Could not register. Try again.');
+    if (res.ok && res.buildingId) setShowIdCard({ id: res.buildingId, passcode, address: officialAddress.trim() });
+    else Alert.alert('Registration failed', res.message || 'Could not register. Try again.');
+  };
+
+  const saveCard = async () => {
+    if (!showIdCard) return;
+    try {
+      const VS = require('react-native-view-shot');
+      const ML = require('expo-media-library');
+      const perm = await ML.requestPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission needed', 'Allow photo access to save your ID card.');
+        return;
+      }
+      const uri = await VS.captureRef(cardRef.current, { format: 'png', quality: 1 });
+      await ML.createAssetAsync(uri);
+      Alert.alert('Saved', 'Your Building ID card is in your gallery.');
+    } catch {
+      await Share.share({
+        message: `TRAKBIN BUILDING ID CARD\n\nBuilding ID: ${showIdCard.id}\nPasscode: ${showIdCard.passcode}\nAddress: ${showIdCard.address}\n\nKeep this safe — you need it to sign in.`,
+      });
     }
   };
 
   if (showIdCard) {
     return (
-      <View style={styles.screen}>
+      <SafeAreaView style={styles.screen}>
         <View style={styles.idCardWrap}>
-          <View style={styles.idCard}>
+          <View ref={cardRef} style={styles.idCard} collapsable={false}>
             <View style={styles.idCardHeader}>
               <Text style={styles.idCardBrand}>T · Trakbin</Text>
               <Text style={styles.idCardRole}>CARETAKER</Text>
@@ -102,27 +113,22 @@ export default function RegisterScreen() {
             <Text style={styles.idCardBody}>{showIdCard.address}</Text>
             <Text style={styles.idCardFooter}>Use these credentials to sign in</Text>
           </View>
-
           <Text style={styles.idCardWarning}>⚠️ Save this card. You need it to log in.</Text>
-
+          <Pressable style={styles.idCardSave} onPress={saveCard}>
+            <Download size={16} color={colors.text.inverse} />
+            <Text style={styles.idCardSaveLabel}>Save card to phone</Text>
+          </Pressable>
           <Pressable style={styles.idCardCta} onPress={() => router.replace('/auth')}>
             <Text style={styles.idCardCtaLabel}>I've saved my card →</Text>
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/auth')}>
-          <ArrowLeft size={16} color={colors.text.secondary} />
-          <Text style={styles.backLabel}>Back to login</Text>
-        </Pressable>
-
-        
-        {/* GPS status */}
         <View style={[styles.gpsCard, gpsStatus === 'captured' ? styles.gpsCardOk : styles.gpsCardNeutral]}>
           <View style={styles.gpsRow}>
             {gpsStatus === 'requesting' ? <ActivityIndicator size="small" color={colors.brand[500]} /> : null}
@@ -133,21 +139,17 @@ export default function RegisterScreen() {
               {gpsStatus === 'requesting' ? 'Locating…' : gpsStatus === 'captured' ? 'Location locked' : gpsStatus === 'error' ? 'Location unavailable' : 'Waiting for GPS'}
             </Text>
             {gpsStatus !== 'requesting' ? (
-              <Pressable onPress={requestGps}>
-                <Text style={styles.gpsRefresh}>Refresh</Text>
-              </Pressable>
+              <Pressable onPress={requestGps}><Text style={styles.gpsRefresh}>Refresh</Text></Pressable>
             ) : null}
           </View>
           {gpsAddress ? <Text style={styles.gpsAddress} numberOfLines={2}>{gpsAddress}</Text> : null}
         </View>
 
-        {/* Passcode */}
         <Text style={styles.fieldLabel}>Passcode</Text>
-        <TextInput style={styles.input} value={passcode} onChangeText={setPasscode} placeholder="Create a passcode" placeholderTextColor={colors.text.muted} secureTextEntry />
-        <TextInput style={[styles.input, passcodeMismatch && styles.inputError]} value={confirmPasscode} onChangeText={setConfirmPasscode} placeholder="Confirm passcode" placeholderTextColor={colors.text.muted} secureTextEntry />
+        <PasswordInput value={passcode} onChangeText={setPasscode} placeholder="Create a passcode" />
+        <PasswordInput value={confirmPasscode} onChangeText={setConfirmPasscode} placeholder="Confirm passcode" style={passcodeMismatch ? styles.inputError : null} />
         {passcodeMismatch ? <Text style={styles.errorLabel}>Passcodes do not match.</Text> : null}
 
-        {/* Building type */}
         <Text style={styles.fieldLabel}>Building type</Text>
         <View style={styles.pickerRow}>
           {BUILDING_TYPES.map((bt) => (
@@ -170,7 +172,6 @@ export default function RegisterScreen() {
           </>
         ) : null}
 
-        {/* Address */}
         <Text style={styles.fieldLabel}>Official building address</Text>
         <TextInput style={[styles.input, styles.area]} value={officialAddress} onChangeText={setOfficialAddress} placeholder="e.g. House 12, Nsugbe Road" placeholderTextColor={colors.text.muted} multiline numberOfLines={2} />
 
@@ -181,18 +182,13 @@ export default function RegisterScreen() {
           {loading ? <ActivityIndicator color={colors.text.inverse} /> : <Text style={styles.ctaLabel}>Register</Text>}
         </Pressable>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: sp.x5, paddingBottom: sp.x12 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: sp.x2, marginBottom: sp.x4 },
-  backLabel: { ...text.semibold, fontSize: 12, color: colors.text.secondary },
-  title: { ...text.display, color: colors.text.primary, marginBottom: sp.x1 },
-  subtitle: { ...text.bodyM, color: colors.text.muted, marginBottom: sp.x5 },
-
   gpsCard: { borderRadius: radius.lg, padding: sp.x4, marginBottom: sp.x5, borderWidth: 1 },
   gpsCardOk: { backgroundColor: 'rgba(16,185,129,0.08)', borderColor: colors.state.success },
   gpsCardNeutral: { backgroundColor: colors.material.surface, borderColor: colors.material.border },
@@ -200,24 +196,20 @@ const styles = StyleSheet.create({
   gpsLabel: { flex: 1, ...text.semibold, color: colors.text.primary },
   gpsRefresh: { ...text.semibold, fontSize: 12, color: colors.brand[500] },
   gpsAddress: { ...text.bodyS, color: colors.text.secondary, marginTop: sp.x2 },
-
   fieldLabel: { ...text.label, fontSize: 10, color: colors.text.secondary, marginBottom: sp.x2, marginTop: sp.x2 },
   input: { backgroundColor: colors.material.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.material.border, paddingHorizontal: sp.x4, height: touch.field, ...text.bodyM, color: colors.text.primary, marginBottom: sp.x3 },
   inputError: { borderColor: colors.state.danger, backgroundColor: 'rgba(244,63,94,0.08)' },
   area: { minHeight: 72, textAlignVertical: 'top', paddingVertical: sp.x3 },
   errorLabel: { ...text.bodyS, color: colors.state.danger, marginTop: -sp.x2, marginBottom: sp.x3 },
   hintInline: { color: colors.text.muted, fontStyle: 'italic' },
-
   pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: sp.x2, marginBottom: sp.x3 },
   pill: { paddingHorizontal: sp.x3, paddingVertical: sp.x2, borderRadius: radius.md, backgroundColor: colors.material.surface, borderWidth: 1, borderColor: colors.material.border },
   pillActive: { backgroundColor: colors.material.emerald, borderColor: colors.brand[500] },
   pillLabel: { ...text.bodyS, color: colors.text.secondary },
   pillLabelActive: { color: colors.text.primary, fontWeight: '600' },
-
   cta: { backgroundColor: colors.brand[600], borderRadius: radius.xl, height: touch.cta, alignItems: 'center', justifyContent: 'center', marginTop: sp.x6 },
   ctaDisabled: { opacity: 0.45 },
   ctaLabel: { ...text.button, color: colors.text.inverse },
-
   idCardWrap: { flex: 1, justifyContent: 'center', padding: sp.x6 },
   idCard: { backgroundColor: colors.brand[600], borderRadius: radius.xxl, padding: sp.x6, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8 },
   idCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: sp.x5, paddingBottom: sp.x3, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)' },
@@ -230,6 +222,8 @@ const styles = StyleSheet.create({
   idCardBody: { ...text.bodyM, color: colors.text.inverse, marginTop: 2 },
   idCardFooter: { ...text.bodyS, color: 'rgba(255,255,255,0.75)', textAlign: 'center', marginTop: sp.x5, paddingTop: sp.x3, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
   idCardWarning: { ...text.bodyS, color: colors.text.muted, textAlign: 'center', marginTop: sp.x4 },
-  idCardCta: { backgroundColor: colors.brand[600], borderRadius: radius.xl, height: touch.cta, alignItems: 'center', justifyContent: 'center', marginTop: sp.x5 },
-  idCardCtaLabel: { ...text.button, color: colors.text.inverse },
+  idCardSave: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.x2, backgroundColor: colors.brand[600], borderRadius: radius.xl, height: touch.cta, marginTop: sp.x5 },
+  idCardSaveLabel: { ...text.button, color: colors.text.inverse },
+  idCardCta: { alignItems: 'center', justifyContent: 'center', borderRadius: radius.xl, height: touch.cta, marginTop: sp.x3, borderWidth: 1, borderColor: colors.material.border, backgroundColor: colors.material.surface },
+  idCardCtaLabel: { ...text.button, color: colors.text.secondary },
 });

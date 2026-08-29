@@ -1,9 +1,12 @@
+// src/store/caretakerStore.ts
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import * as svc from '../services/caretaker';
 import type { AppNotification, Building, Collection, CollectionSchedule, Invoice } from '../types/caretaker';
 
 interface Contact { type: string; label: string; value: string; }
+
+let notifChannel: any = null;
 
 interface CaretakerState {
   building: Building | null;
@@ -25,10 +28,11 @@ interface CaretakerState {
   loaded: boolean;
   unreadCount: number;
   load: (force?: boolean) => Promise<void>;
+  refreshNotifications: () => Promise<void>;
   markAllRead: () => Promise<void>;
+  disputePickup: (stopId: string, note?: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
-// Mirrors the PWA's synthesizeContacts exactly
 function synthesizeContacts(company: any, profile: any): Contact[] {
   const list: Contact[] = [];
   const seen = new Set<string>();
@@ -80,7 +84,6 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         return;
       }
 
-      // Identity resolution: metadata → synthetic-email parse → caretaker_email fallback
       const metaId = (user.user_metadata as any)?.building_id as string | undefined;
       const email = user.email ?? '';
       const SYNTH_SUFFIX = '@caretaker.trakbin.app';
@@ -95,6 +98,7 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
       if (!building) building = await svc.fetchBuildingByEmail(email);
 
       if (!building || !building.custom_id) {
+        if (notifChannel) { supabase.removeChannel(notifChannel); notifChannel = null; }
         set({ loading: false, loaded: true });
         return;
       }
@@ -102,12 +106,10 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
       const cid = Number(building.company_id) || 0;
       const custom = building.custom_id;
 
-      // Mirror the PWA's exact Promise.all — real backend, no guessing
       const [
         schedules,
         collections,
         invoices,
-        notifications,
         methodsResult,
         requests,
         assignmentRes,
@@ -116,8 +118,7 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         svc.fetchSchedules(custom, cid),
         svc.fetchCollections(custom, cid),
         svc.fetchInvoices(custom, cid),
-        svc.fetchNotifications(custom),
-                supabase.from('payment_methods').select('*').eq('building_id', custom),
+        supabase.from('payment_methods').select('*').eq('building_id', custom),
         svc.fetchServiceRequests(custom),
         supabase
           .from('service_assignments')
@@ -128,7 +129,6 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         supabase.from('company_profiles').select('*').eq('company_id', cid).maybeSingle(),
       ]);
 
-      // PWA pattern: haulers (company) + zone via exact zone_id join
       let company: any = null;
       let zone: { name: string } | null = null;
       if (assignmentRes.data) {
@@ -146,7 +146,7 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
                 .eq('company_id', assignmentRes.data.company_id)
                 .maybeSingle(),
         ]);
-                company = companyRes.data;
+        company = companyRes.data;
         zone = zoneRes.data
           ? { name: zoneRes.data.zone_name }
           : assignmentRes.data.zone_id
@@ -155,6 +155,10 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
       }
 
       const contacts = synthesizeContacts(company, detailsRes.data);
+      const companyName = company?.business_name || detailsRes.data?.business_name || null;
+
+      const notifications = await svc.fetchCaretakerNotifications(custom, companyName);
+      const seenAt = await svc.getSeenAt(custom);
 
       const paid = invoices.filter((i) => i.status === 'paid').length;
       const due = invoices.filter((i) => i.status !== 'paid' && i.status !== 'cancelled').length;
@@ -183,21 +187,54 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         notifications,
         paymentMethods: (methodsResult.data as any[]) ?? [],
         requests,
-        unreadCount: notifications.filter((n) => !n.read && !n.is_read).length,
+        unreadCount: seenAt ? notifications.filter((n) => n.at > seenAt).length : notifications.length,
         loading: false,
         loaded: true,
       });
+
+      // Register push token now that we have a user identity
+const userId = user.id;
+import('../services/push').then(({ registerPushToken }) => {
+  registerPushToken(userId).catch(() => {});
+});
+      // Setup Realtime Subscriptions
+      if (notifChannel) { supabase.removeChannel(notifChannel); notifChannel = null; }
+      notifChannel = supabase
+        .channel(`caretaker_notifs_${custom}`)
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'route_stops', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'environmental_issues', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'invoices', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'service_assignments', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
+        .subscribe();
     } catch {
       set({ loading: false, loaded: true });
     }
   },
 
-  markAllRead: async () => {
-    const ids = get().notifications.filter((n) => !n.read && !n.is_read).map((n) => n.id);
-    await svc.markNotificationsRead(ids);
+  refreshNotifications: async () => {
+    const custom = get().building?.custom_id;
+    if (!custom) return;
+    const companyName = get().company?.business_name || get().companyDetails?.business_name || null;
+    const notifications = await svc.fetchCaretakerNotifications(custom, companyName);
+    const seenAt = await svc.getSeenAt(custom);
     set({
-      notifications: get().notifications.map((n) => ({ ...n, read: true, is_read: true })),
-      unreadCount: 0,
+      notifications,
+      unreadCount: seenAt ? notifications.filter((n) => n.at > seenAt).length : notifications.length,
     });
+  },
+
+  markAllRead: async () => {
+    const buildingId = get().building?.custom_id;
+    if (!buildingId) return;
+    const now = new Date().toISOString();
+    await svc.setSeenAt(buildingId, now);
+    set({ unreadCount: 0 });
+  },
+
+  disputePickup: async (stopId: string, note?: string) => {
+    const { error } = await svc.disputePickup(stopId, note);
+    if (error) return { ok: false, error: error.message };
+    await get().refreshNotifications();
+    return { ok: true };
   },
 }));

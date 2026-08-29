@@ -53,12 +53,19 @@ export interface Invoice {
   created_at: string | null;
 }
 
+export type CaretakerNotificationKind =
+  | 'pickup'
+  | 'pickup_disputed'
+  | 'issue_update'
+  | 'service_activated'
+  | 'invoice_paid';
+
 export interface AppNotification {
   id: string;
-  title: string | null;
-  message: string | null;
-  type: string | null;
-  is_read: boolean | null;
-  read: boolean | null;
-  created_at: string | null;
+  kind: CaretakerNotificationKind;
+  label: string;
+  sub: string | null;
+  at: string;
+  refId: string | null; // route_stop id when disputable
+  disputed: boolean;
 }

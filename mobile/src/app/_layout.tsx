@@ -5,9 +5,11 @@ import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { addEventListener, parse } from 'expo-linking';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { OnlineProvider } from '../services/connectivity';
 import { verifyTopUp } from '../services/wallet';
+import { configurePush } from '../services/push';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,7 +23,10 @@ export default function RootLayout() {
     if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
-  // Deep links: trakbin://…?reference=… → silent payment verify on return
+  useEffect(() => {
+  configurePush();
+}, []);
+
   useEffect(() => {
     const sub = addEventListener('url', ({ url }) => {
       const { queryParams } = parse(url);
@@ -34,11 +39,13 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <ErrorBoundary>
-      <OnlineProvider>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }} />
-      </OnlineProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <OnlineProvider>
+          <StatusBar style="light" />
+          <Stack screenOptions={{ headerShown: false }} />
+        </OnlineProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
