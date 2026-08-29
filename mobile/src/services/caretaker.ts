@@ -301,6 +301,7 @@ export async function saveCardMethod(p: {
   cardLast4: string;
   cardBrand: string;
   isDefault?: boolean;
+  metadata?: any;
 }) {
   const res = await fetch(`${API_BASE}/api/payment-methods`, {
     method: 'POST',

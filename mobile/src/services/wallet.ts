@@ -109,7 +109,8 @@ export async function initializeWalletTopUp(a: any, b?: any, c?: any, d?: any) {
       amount: p.amountNaira,
       purpose: 'topup',
       provider: 'paystack',
-      ...(p.method ? { method: p.method } : {}),
+      // REMOVED: method parameter that restricted channels
+      // Paystack now shows all options (card, bank, USSD, bank_transfer)
     }),
   });
   const json = await safeJson(res);

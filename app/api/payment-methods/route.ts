@@ -18,9 +18,13 @@ export async function POST(req: NextRequest) {
       const full = String(b.accountNumber || '').replace(/[^\d]/g, '');
       if (!b.bankCode || !full || full.length < 8 || !b.accountName) return NextResponse.json({ ok: false, error: 'bank_details_required' }, { status: 400 });
       row.bank_code = b.bankCode; row.bank_name = b.bankName ?? null;
-      row.account_number = full; row.account_last4 = full.slice(-4); row.account_name = b.accountName; // full number server-side; UI shows last4 only
+      row.account_number = full; row.account_last4 = full.slice(-4); row.account_name = b.accountName;
     }
     if (b.instrumentType === 'card') { row.card_last_four = b.cardLast4 ?? null; row.card_brand = b.cardBrand ?? 'card'; }
+
+    // Structured billing address + issuer metadata (jsonb)
+    if (b.metadata) row.metadata = b.metadata;
+
     const { error } = await admin().from('payment_methods').insert([row]);
     if (error) throw error;
     return NextResponse.json({ ok: true });

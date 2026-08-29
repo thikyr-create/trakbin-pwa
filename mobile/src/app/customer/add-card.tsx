@@ -1,23 +1,53 @@
-import { useMemo, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, Switch, Alert, ActivityIndicator } from 'react-native';
+import { useEffect, useMemo, useRef, useState, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { View, Text, StyleSheet, TextInput, Pressable, Switch, Alert, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Lock, Info } from 'lucide-react-native';
+import { Lock, Info, ChevronDown, Search, Building2 } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Header } from '../../components/ui/Header';
 import { Rise } from '../../components/ui/motion';
 import { useCaretakerStore } from '../../store/caretakerStore';
 import { saveCardMethod } from '../../services/caretaker';
+import { COUNTRIES, flag, NO_POSTAL } from '../../data/countries';
 import { colors } from '../../theme/colors';
 import { radius, sp, touch } from '../../theme/spacing';
 import { text } from '../../theme/typography';
-import { validateCard } from '../../services/cardValidator';
 
+// ── BIN LOOKUP — live issuer identification (cache-first, non-blocking) ──
+const binCache = new Map<string, any>();
+
+async function lookupBin(bin: string): Promise<any | null> {
+  if (binCache.has(bin)) return binCache.get(bin);
+  try {
+    const res = await fetch(`https://lookup.binlist.net/${bin}`, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const info = {
+      scheme: j.scheme ?? null,
+      type: j.type ?? null,
+      bank: j.bank?.name ?? null,
+      country: j.country?.name ?? null,
+      countryCode: j.country?.alpha2 ?? null,
+    };
+    binCache.set(bin, info);
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+// ── BRAND DETECTION — fallback label when the registry is unreachable ────
 function detectBrand(num: string): string {
   const n = num.replace(/\D/g, '');
+  if (!n) return '';
+  if (/^3[47]/.test(n)) return 'Amex';
+  if (/^3(0[0-5]|[689])/.test(n)) return 'Diners';
+  if (/^35/.test(n)) return 'JCB';
   if (/^4/.test(n)) return 'Visa';
   if (/^(5[1-5]|2[2-7])/.test(n)) return 'Mastercard';
-  if (/^(506[01]|650[01])/.test(n)) return 'Verve';
-  return '';
+  if (/^(506|650|5078|5079)/.test(n)) return 'Verve';
+  if (/^62/.test(n)) return 'UnionPay';
+  if (/^(6011|64[4-9])/.test(n)) return 'Discover';
+  return 'Card';
 }
 
 function luhn(num: string): boolean {
@@ -32,19 +62,8 @@ function luhn(num: string): boolean {
   return sum % 10 === 0;
 }
 
-function expiryError(v: string): string | null {
-  if (!v) return null;
-  const m = /^(\d{2})\/(\d{2})$/.exec(v);
-  if (!m) return 'Use MM/YY';
-  const mm = Number(m[1]); const yy = Number(m[2]);
-  if (mm < 1 || mm > 12) return 'Invalid month';
-  const now = new Date();
-  const cy = now.getFullYear() % 100; const cm = now.getMonth() + 1;
-  if (yy < cy || (yy === cy && mm < cm)) return 'Card expired';
-  return null;
-}
-
-const group4 = (v: string) => v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const group4 = (v: string) => v.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim();
 const formatExpiry = (v: string) => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
 export default function AddCardScreen() {
@@ -56,35 +75,74 @@ export default function AddCardScreen() {
   const [holder, setHolder] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
-  const [address, setAddress] = useState('');
+  const [line1, setLine1] = useState('');
+  const [line2, setLine2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [country, setCountry] = useState<{ code: string; name: string }>({ code: 'NG', name: 'Nigeria' });
+  const [postal, setPostal] = useState('');
   const [saveCard, setSaveCard] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [issuer, setIssuer] = useState<any | null>(null);
+  const [countryOpen, setCountryOpen] = useState(false);
+  const [countryQuery, setCountryQuery] = useState('');
 
-    const digits = number.replace(/\D/g, '');
-  const v = validateCard(number, expiry, cvv);
-  const brand = v.network?.name ?? '';
-  const numErr = v.numberError;
-  const expErr = v.expiryError;
-  const cvvErr = v.cvvError;
-  const needCvv = v.network?.cvv ?? 3;
+  const digits = number.replace(/\D/g, '');
+  const postalRequired = !NO_POSTAL.has(country.code);
+
+  // Debounced BIN lookup — identifies issuer without blocking the form
+  useEffect(() => {
+    if (digits.length < 6) { setIssuer(null); return; }
+    const bin = digits.slice(0, 8);
+    const t = setTimeout(() => { lookupBin(bin).then((i) => setIssuer(i)); }, 350);
+    return () => clearTimeout(t);
+  }, [digits]);
+
+  const brand = issuer?.scheme ? cap(issuer.scheme) : detectBrand(number);
+
+  let numberError: string | null = null;
+  if (digits.length > 0 && digits.length < 12) numberError = 'Too short — cards have 12–19 digits';
+  else if (digits.length > 19) numberError = 'Too long — cards have 12–19 digits';
+  else if (digits.length >= 12 && !luhn(digits)) numberError = 'Invalid card number';
+  const numberComplete = digits.length >= 12 && digits.length <= 19 && luhn(digits);
+
+  let expErr: string | null = null;
+  if (expiry) {
+    const m = /^(\d{2})\/(\d{2})$/.exec(expiry);
+    if (!m) expErr = 'Use MM/YY';
+    else {
+      const mm = Number(m[1]); const yy = Number(m[2]);
+      if (mm < 1 || mm > 12) expErr = 'Invalid month';
+      else {
+        const now = new Date(); const cy = now.getFullYear() % 100; const cm = now.getMonth() + 1;
+        if (yy < cy || (yy === cy && mm < cm)) expErr = 'Card expired';
+      }
+    }
+  }
+
+  const cvvErr = cvv.length < 3 || cvv.length > 4 ? 'CVV is 3–4 digits' : null;
 
   const missing: string[] = [];
-  if (!v.numberComplete) missing.push('valid card number');
+  if (!numberComplete) missing.push('valid card number');
   if (holder.trim().length < 2) missing.push('cardholder name');
   if (!expiry || expErr) missing.push('valid expiry');
-  if (cvv.length !== needCvv) missing.push(`CVV`);
-  if (address.trim().length < 4) missing.push('billing address');
+  if (cvvErr) missing.push('CVV');
+  if (line1.trim().length < 4) missing.push('street address');
+  if (city.trim().length < 2) missing.push('city');
+  if (postalRequired && postal.trim().length < 3) missing.push('postal code');
   const valid = missing.length === 0;
 
   const previewNumber = useMemo(() => {
-    const padded = (digits + '••••••••••••••••').slice(0, 16);
-    return padded.replace(/(.{4})/g, '$1 ').trim();
+    const target = digits.length > 16 ? 19 : 16;
+    return (digits + '•'.repeat(target)).slice(0, target).replace(/(.{4})/g, '$1 ').trim();
   }, [digits]);
 
-  const cvvHelp = () =>
-    Alert.alert('CVV', 'The 3-digit security code on the back of your card (4 digits on the front for Amex).');
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return COUNTRIES;
+    return COUNTRIES.filter(([, name]) => name.toLowerCase().includes(q));
+  }, [countryQuery]);
 
-  // Mirrors the PWA: save last-4 + brand only. No transaction. No WebView.
   const submit = async () => {
     if (!valid || !building?.custom_id) return;
     setBusy(true);
@@ -94,10 +152,14 @@ export default function AddCardScreen() {
         cardLast4: digits.slice(-4),
         cardBrand: brand || 'Card',
         isDefault: false,
+        metadata: {
+          billing: { line1: line1.trim(), line2: line2.trim() || null, city: city.trim(), state: state.trim() || null, country: country.code, postal: postal.trim() || null },
+          issuer: issuer ? { bank: issuer.bank, country: issuer.country, type: issuer.type, scheme: issuer.scheme } : null,
+        },
       });
       if (res.ok) {
         await load(true);
-        Alert.alert('Card added', `${brand || 'Card'} •••• ${digits.slice(-4)} saved.`, [
+        Alert.alert('Card added', `${brand} •••• ${digits.slice(-4)} saved.`, [
           { text: 'OK', onPress: () => router.back() },
         ]);
       } else {
@@ -112,7 +174,7 @@ export default function AddCardScreen() {
 
   return (
     <Screen scroll keyboard>
-      <Header title="Add Card" subtitle="Visa · Mastercard · Verve" />
+      <Header title="Add Card" subtitle="Visa · Mastercard · Verve · Amex · UnionPay · more" />
 
       <Rise delay={0}>
         <View style={styles.preview}>
@@ -135,7 +197,7 @@ export default function AddCardScreen() {
       </Rise>
 
       <Rise delay={80}>
-        <Field label="Card number" error={numErr}>
+        <Field label="Card number" error={numberError}>
           <TextInput
             style={styles.input}
             value={number}
@@ -143,69 +205,81 @@ export default function AddCardScreen() {
             placeholder="1234 5678 9012 3456"
             placeholderTextColor={colors.text.muted}
             keyboardType="number-pad"
-            maxLength={19}
+            maxLength={23}
           />
         </Field>
 
+        {/* Live issuer identification */}
+        {issuer?.bank || issuer?.country ? (
+          <View style={styles.issuerRow}>
+            <Building2 size={13} color={colors.brand[400]} />
+            <Text style={styles.issuerText} numberOfLines={1}>
+              {[issuer?.bank, issuer?.type ? cap(issuer.type) : null, issuer?.country].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+        ) : null}
+
         <Field label="Cardholder name" error={holder.length > 0 && holder.trim().length < 2 ? 'Enter the name on the card' : null}>
-          <TextInput
-            style={styles.input}
-            value={holder}
-            onChangeText={setHolder}
-            placeholder="Name as on card"
-            placeholderTextColor={colors.text.muted}
-            autoCapitalize="characters"
-          />
+          <TextInput style={styles.input} value={holder} onChangeText={setHolder} placeholder="Name as on card" placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
         </Field>
 
         <View style={styles.row}>
           <View style={styles.half}>
             <Field label="Expiry date" error={expErr}>
-              <TextInput
-                style={styles.input}
-                value={expiry}
-                onChangeText={(v) => setExpiry(formatExpiry(v))}
-                placeholder="MM/YY"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="number-pad"
-                maxLength={5}
-              />
+              <TextInput style={styles.input} value={expiry} onChangeText={(v) => setExpiry(formatExpiry(v))} placeholder="MM/YY" placeholderTextColor={colors.text.muted} keyboardType="number-pad" maxLength={5} />
             </Field>
           </View>
           <View style={styles.half}>
-            <Field
-              label="CVV"
-              error={cvvErr}
-              right={
-                <Pressable onPress={cvvHelp} hitSlop={8} accessibilityRole="button" accessibilityLabel="What is CVV?">
-                  <Info size={16} color={colors.text.muted} />
-                </Pressable>
-              }
-            >
-              <TextInput
-                style={styles.input}
-                value={cvv}
-                onChangeText={(v) => setCvv(v.replace(/\D/g, '').slice(0, 4))}
-                placeholder="123"
-                placeholderTextColor={colors.text.muted}
-                keyboardType="number-pad"
-                secureTextEntry
-                maxLength={4}
-              />
+            <Field label="CVV" error={cvvErr} right={
+              <Pressable onPress={() => Alert.alert('CVV', 'The 3-digit security code on the back of your card (4 digits on the front for Amex).')} hitSlop={8} accessibilityRole="button">
+                <Info size={16} color={colors.text.muted} />
+              </Pressable>
+            }>
+              <TextInput style={styles.input} value={cvv} onChangeText={(v) => setCvv(v.replace(/\D/g, '').slice(0, 4))} placeholder="123" placeholderTextColor={colors.text.muted} keyboardType="number-pad" secureTextEntry maxLength={4} />
             </Field>
           </View>
         </View>
 
-        <Field label="Billing address" error={null}>
-          <TextInput
-            style={[styles.input, styles.inputMultiline]}
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Street, city"
-            placeholderTextColor={colors.text.muted}
-            multiline
-          />
+        {/* ── BILLING ADDRESS — structured, global ── */}
+        <Text style={styles.sectionLabel}>Billing address</Text>
+
+        <Field label="Street address" error={line1.length > 0 && line1.trim().length < 4 ? 'Enter the full street address' : null}>
+          <TextInput style={styles.input} value={line1} onChangeText={setLine1} placeholder="House number and street" placeholderTextColor={colors.text.muted} autoCapitalize="words" />
         </Field>
+
+        <Field label="Apt, suite, floor (optional)" error={null}>
+          <TextInput style={styles.input} value={line2} onChangeText={setLine2} placeholder="Apartment, suite, unit" placeholderTextColor={colors.text.muted} autoCapitalize="words" />
+        </Field>
+
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Field label="City" error={city.length > 0 && city.trim().length < 2 ? 'Enter city' : null}>
+              <TextInput style={styles.input} value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={colors.text.muted} autoCapitalize="words" />
+            </Field>
+          </View>
+          <View style={styles.half}>
+            <Field label="State / Region" error={null}>
+              <TextInput style={styles.input} value={state} onChangeText={setState} placeholder="State" placeholderTextColor={colors.text.muted} autoCapitalize="words" />
+            </Field>
+          </View>
+        </View>
+
+        <View style={styles.row}>
+          <View style={styles.half}>
+            <Field label="Country" error={null}>
+              <Pressable style={styles.countryBtn} onPress={() => { setCountryOpen(true); setCountryQuery(''); }} accessibilityRole="button">
+                <Text style={styles.countryFlag}>{flag(country.code)}</Text>
+                <Text style={styles.countryName} numberOfLines={1}>{country.name}</Text>
+                <ChevronDown size={14} color={colors.text.muted} />
+              </Pressable>
+            </Field>
+          </View>
+          <View style={styles.half}>
+            <Field label={postalRequired ? 'Postal code' : 'Postal code (optional)'} error={postalRequired && postal.length > 0 && postal.trim().length < 3 ? 'Enter postal code' : null}>
+              <TextInput style={styles.input} value={postal} onChangeText={setPostal} placeholder={postalRequired ? 'Postal code' : '—'} placeholderTextColor={colors.text.muted} autoCapitalize="characters" />
+            </Field>
+          </View>
+        </View>
 
         <View style={styles.saveRow}>
           <View style={styles.saveMain}>
@@ -217,37 +291,58 @@ export default function AddCardScreen() {
       </Rise>
 
       <Rise delay={140}>
-        <Pressable
-          style={[styles.cta, (!valid || busy) && styles.ctaDisabled]}
-          onPress={submit}
-          disabled={!valid || busy}
-          accessibilityRole="button"
-          accessibilityLabel="Add card"
-        >
+        <Pressable style={[styles.cta, (!valid || busy) && styles.ctaDisabled]} onPress={submit} disabled={!valid || busy} accessibilityRole="button" accessibilityLabel="Add card">
           {busy ? <ActivityIndicator color={colors.text.inverse} /> : <Text style={styles.ctaLabel}>Add Card</Text>}
         </Pressable>
-
         {!valid ? <Text style={styles.missing}>Still needed: {missing.join(' · ')}</Text> : null}
-
         <View style={styles.secureRow}>
           <Lock size={13} color={colors.text.muted} />
           <Text style={styles.secureText}>Your card details are securely encrypted</Text>
         </View>
       </Rise>
+
+      {/* Country picker */}
+      <Modal visible={countryOpen} animationType="slide" transparent onRequestClose={() => setCountryOpen(false)}>
+        <View style={styles.pickerBackdrop}>
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHead}>
+              <View style={styles.pickerSearch}>
+                <Search size={15} color={colors.text.muted} />
+                <TextInput style={styles.pickerSearchInput} value={countryQuery} onChangeText={setCountryQuery} placeholder="Search country" placeholderTextColor={colors.text.muted} />
+              </View>
+              <Pressable onPress={() => setCountryOpen(false)} style={styles.pickerClose} accessibilityRole="button">
+                <Text style={styles.pickerCloseLabel}>Done</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={filteredCountries}
+              keyExtractor={(item) => item[0]}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.pickerRow, item[0] === country.code && styles.pickerRowActive]}
+                  onPress={() => { setCountry({ code: item[0], name: item[1] }); setCountryOpen(false); }}
+                >
+                  <Text style={styles.pickerFlag}>{flag(item[0])}</Text>
+                  <Text style={styles.pickerName}>{item[1]}</Text>
+                </Pressable>
+              )}
+              style={styles.pickerList}
+            />
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
 
 function Field({ label, error, right, children }: { label: string; error: string | null; right?: ReactNode; children: ReactNode }) {
   const [focused, setFocused] = useState(false);
-
   const child = isValidElement(children)
     ? cloneElement(children as ReactElement<any>, {
         onFocus: (e: any) => { setFocused(true); (children as any)?.props?.onFocus?.(e); },
         onBlur: (e: any) => { setFocused(false); (children as any)?.props?.onBlur?.(e); },
       })
     : children;
-
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -269,6 +364,12 @@ const styles = StyleSheet.create({
   previewBottom: { flexDirection: 'row', justifyContent: 'space-between', marginTop: sp.x5 },
   previewLabel: { ...text.label, fontSize: 9, color: colors.brand[200] },
   previewValue: { ...text.semibold, color: colors.text.inverse, marginTop: 2, maxWidth: 180 },
+
+  issuerRow: { flexDirection: 'row', alignItems: 'center', gap: sp.x2, backgroundColor: colors.material.emerald, borderRadius: radius.md, paddingHorizontal: sp.x3, paddingVertical: sp.x2, marginBottom: sp.x3 },
+  issuerText: { ...text.bodyS, color: colors.text.secondary, flex: 1 },
+
+  sectionLabel: { ...text.label, fontSize: 10, color: colors.text.secondary, marginTop: sp.x4, marginBottom: sp.x2 },
+
   fieldWrap: { marginBottom: sp.x1 },
   fieldLabel: { ...text.label, fontSize: 10, color: colors.text.secondary, marginBottom: sp.x1 },
   inputBox: { minHeight: touch.field, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border.subtle, paddingHorizontal: sp.x4 },
@@ -276,10 +377,14 @@ const styles = StyleSheet.create({
   inputBoxError: { borderColor: colors.state.danger },
   inputInner: { flex: 1 },
   input: { ...text.bodyL, color: colors.text.primary, paddingVertical: sp.x3 },
-  inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
   errorSlot: { minHeight: 16, ...text.bodyXs, color: colors.state.danger, marginTop: 2 },
   row: { flexDirection: 'row', gap: sp.x3 },
   half: { flex: 1 },
+
+  countryBtn: { minHeight: touch.field, flexDirection: 'row', alignItems: 'center', gap: sp.x2, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.border.subtle, paddingHorizontal: sp.x4 },
+  countryFlag: { fontSize: 16 },
+  countryName: { flex: 1, ...text.bodyM, color: colors.text.primary },
+
   saveRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.material.surface, borderRadius: radius.lg, padding: sp.x4, marginTop: sp.x3, borderWidth: 1, borderColor: colors.material.border },
   saveMain: { flex: 1 },
   saveLabel: { ...text.semibold, color: colors.text.primary },
@@ -290,4 +395,17 @@ const styles = StyleSheet.create({
   missing: { ...text.bodyS, color: colors.text.muted, textAlign: 'center', marginTop: sp.x3 },
   secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: sp.x1, marginTop: sp.x4 },
   secureText: { ...text.bodyS, color: colors.text.muted },
+
+  pickerBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  pickerSheet: { backgroundColor: colors.bg, borderTopLeftRadius: radius.xxl, borderTopRightRadius: radius.xxl, maxHeight: '70%', paddingBottom: sp.x6 },
+  pickerHead: { flexDirection: 'row', alignItems: 'center', gap: sp.x3, padding: sp.x4 },
+  pickerSearch: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: sp.x2, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: sp.x3, height: 42 },
+  pickerSearchInput: { flex: 1, ...text.bodyM, color: colors.text.primary },
+  pickerClose: { padding: sp.x2 },
+  pickerCloseLabel: { ...text.semibold, fontSize: 13, color: colors.brand[400] },
+  pickerList: { flexGrow: 0 },
+  pickerRow: { flexDirection: 'row', alignItems: 'center', gap: sp.x3, paddingHorizontal: sp.x5, paddingVertical: sp.x3 },
+  pickerRowActive: { backgroundColor: colors.material.emerald },
+  pickerFlag: { fontSize: 18 },
+  pickerName: { ...text.bodyM, color: colors.text.primary },
 });

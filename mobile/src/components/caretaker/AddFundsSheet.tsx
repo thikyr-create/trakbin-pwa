@@ -104,11 +104,11 @@ export function AddFundsSheet({ onClose, onSuccess }: Props) {
       if (!email) { Alert.alert('Session', 'Sign in again to add funds.'); setBusy(false); return; }
 
       const { authorizationUrl } = await initializeWalletTopUp({
-        buildingId: building.custom_id,
-        email,
-        amountNaira: amount,
-        method: hasBank ? 'bank' : undefined,
-      });
+  buildingId: building.custom_id,
+  email,
+  amountNaira: amount,
+  // REMOVED: method: hasBank ? 'bank' : undefined,
+});
       amountRef.current = amount;
       setSheetTitle(`Add ${naira(amount)}`);
       setAuthUrl(authorizationUrl);
