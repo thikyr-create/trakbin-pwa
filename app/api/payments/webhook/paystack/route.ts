@@ -58,12 +58,14 @@ export async function POST(req: NextRequest) {
     });
 
     // ── CAPTURE AUTHORIZATION CODE (same as verify route) ──
-    const rawVerify = verify as any;
-    if (rawVerify.authorization?.authorization_code && payment.building_id) {
-      const authCode = rawVerify.authorization.authorization_code;
-      const reusable = rawVerify.authorization.reusable ?? false;
-      const brand = rawVerify.authorization.brand || rawVerify.metadata?.brand || 'Card';
-      const last4 = rawVerify.authorization.last4 || rawVerify.metadata?.last4 || '';
+    // NEW (reads the nested Paystack payload):
+const payload: any = (verify as any).raw ?? verify;
+const auth = payload?.authorization;
+if (auth?.authorization_code && payment.building_id) {
+  const authCode = auth.authorization_code;
+  const reusable = auth.reusable ?? false;
+  const brand = auth.brand || payload?.metadata?.brand || 'Card';
+  const last4 = auth.last4 || payload?.metadata?.last4 || '';
 
       const { data: existing } = await admin()
         .from('payment_methods')

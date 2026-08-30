@@ -41,13 +41,14 @@ async function processVerification(reference: string, providerName?: string) {
   });
 
   // ── CAPTURE AUTHORIZATION CODE (recurring charges) ──
-  const raw = verify as any;
-  if (raw.authorization?.authorization_code && payment.building_id) {
-    const authCode = raw.authorization.authorization_code;
-    const reusable = raw.authorization.reusable ?? false;
-    const brand = raw.authorization.brand || raw.metadata?.brand || 'Card';
-    const last4 = raw.authorization.last4 || raw.metadata?.last4 || '';
-
+  // NEW (reads the nested Paystack payload):
+const payload: any = (verify as any).raw ?? verify;
+const auth = payload?.authorization;
+if (auth?.authorization_code && payment.building_id) {
+  const authCode = auth.authorization_code;
+  const reusable = auth.reusable ?? false;
+  const brand = auth.brand || payload?.metadata?.brand || 'Card';
+  const last4 = auth.last4 || payload?.metadata?.last4 || '';
     const { data: existing } = await admin()
       .from('payment_methods')
       .select('id')
