@@ -423,3 +423,20 @@ export async function fetchPickupRequests(buildingId: string) {
     .order('created_at', { ascending: false });
   return (data as any[]) ?? [];
 }
+
+export async function fetchUserNotifications() {
+  const { data: session } = await supabase.auth.getSession();
+  const userId = session?.session?.user?.id;
+  if (!userId) return { ok: true, notifications: [] };
+  const res = await fetch(`${API_BASE}/api/notifications?userId=${encodeURIComponent(userId)}`);
+  return safeJson(res);
+}
+
+export async function markNotificationRead(notificationId: string) {
+  const res = await fetch(`${API_BASE}/api/notifications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ notificationId }),
+  });
+  return safeJson(res);
+}

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, Alert } from 'react-native';
-import { Bell, CheckCheck, CheckCircle, AlertTriangle, Receipt, Zap, ChevronDown, X } from 'lucide-react-native';
+import { Bell, CheckCheck, CheckCircle, AlertTriangle, Receipt, Zap, ChevronDown, X, Wallet, CreditCard, XCircle } from 'lucide-react-native';
 import { Screen } from '../../components/ui/Screen';
 import { Rise } from '../../components/ui/motion';
 import { useCaretakerStore } from '../../store/caretakerStore';
-import { dateTime } from '../../services/format';
+import { dateTime, naira } from '../../services/format';
 import { colors } from '../../theme/colors';
 import { radius, sp } from '../../theme/spacing';
 import { text } from '../../theme/typography';
@@ -16,6 +16,8 @@ const KIND_META: Record<CaretakerNotificationKind, { Icon: any; color: string }>
   issue_update: { Icon: AlertTriangle, color: colors.state.danger },
   service_activated: { Icon: Zap, color: colors.brand[500] },
   invoice_paid: { Icon: Receipt, color: colors.brand[400] },
+  wallet_topup: { Icon: Wallet, color: colors.state.success },
+  charge_failed: { Icon: XCircle, color: colors.state.danger },
 };
 
 export default function NotificationsScreen() {
@@ -26,6 +28,7 @@ export default function NotificationsScreen() {
 
   const [disputingId, setDisputingId] = useState<string | null>(null);
   const [disputeNote, setDisputeNote] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { load(true); }, []);
@@ -43,13 +46,14 @@ export default function NotificationsScreen() {
   };
 
   const metaFor = (n: AppNotification) => {
-    const base = KIND_META[n.kind];
-    // Resolved reports get success color instead of danger
+    const base = KIND_META[n.kind] ?? { Icon: Bell, color: colors.text.muted };
     if (n.kind === 'issue_update' && n.label === 'Your report was resolved') {
       return { Icon: CheckCircle, color: colors.state.success };
     }
     return base;
   };
+
+  const toggleExpand = (id: string) => setExpandedId(expandedId === id ? null : id);
 
   return (
     <Screen scroll>
@@ -67,7 +71,7 @@ export default function NotificationsScreen() {
           <View style={styles.empty}>
             <Bell size={32} color={colors.text.muted} />
             <Text style={styles.emptyTitle}>No notifications</Text>
-            <Text style={styles.emptyBody}>Pickup approvals, invoices and driver updates land here.</Text>
+            <Text style={styles.emptyBody}>Pickup approvals, invoices, topups and driver updates land here.</Text>
           </View>
         </Rise>
       ) : (
@@ -76,10 +80,16 @@ export default function NotificationsScreen() {
             const { Icon, color } = metaFor(n);
             const isDisputing = disputingId === n.id;
             const canDispute = n.kind === 'pickup' && !n.disputed;
+            const isExpanded = expandedId === n.id;
+            const hasDetail = n.data && Object.keys(n.data).length > 0;
 
             return (
               <Rise key={n.id} delay={60 + i * 40}>
-                <View style={styles.card}>
+                <Pressable
+                  style={styles.card}
+                  onPress={() => hasDetail && toggleExpand(n.id)}
+                  disabled={!hasDetail}
+                >
                   <View style={styles.cardHeader}>
                     <View style={[styles.iconWrap, { backgroundColor: `${color}15` }]}>
                       <Icon size={18} color={color} />
@@ -88,9 +98,60 @@ export default function NotificationsScreen() {
                       <Text style={styles.title} numberOfLines={1}>{n.label}</Text>
                       <Text style={styles.time}>{dateTime(n.at)}</Text>
                     </View>
+                    {hasDetail && (
+                      <ChevronDown
+                        size={16}
+                        color={colors.text.muted}
+                        style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}
+                      />
+                    )}
                   </View>
 
                   {n.sub && <Text style={styles.body}>{n.sub}</Text>}
+
+                  {/* Rich detail panel */}
+                  {isExpanded && n.data && (
+                    <View style={styles.detailPanel}>
+                      {n.data.amount != null && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Amount</Text>
+                          <Text style={styles.detailValue}>{naira(n.data.amount)}</Text>
+                        </View>
+                      )}
+                      {n.data.reference && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Reference</Text>
+                          <Text style={styles.detailValue} numberOfLines={1}>{n.data.reference}</Text>
+                        </View>
+                      )}
+                      {n.data.channel && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Channel</Text>
+                          <Text style={styles.detailValue}>{n.data.channel}</Text>
+                        </View>
+                      )}
+                      {n.data.card && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Card</Text>
+                          <Text style={styles.detailValue}>
+                            {n.data.card.brand ?? 'Card'} •••• {n.data.card.last4}
+                          </Text>
+                        </View>
+                      )}
+                      {n.data.psp && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Processor</Text>
+                          <Text style={styles.detailValue}>{n.data.psp}</Text>
+                        </View>
+                      )}
+                      {n.data.reason && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Reason</Text>
+                          <Text style={styles.detailValue}>{n.data.reason}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
 
                   {canDispute && (
                     <View style={styles.actions}>
@@ -129,7 +190,7 @@ export default function NotificationsScreen() {
                       </View>
                     </View>
                   )}
-                </View>
+                </Pressable>
               </Rise>
             );
           })}
@@ -161,6 +222,17 @@ const styles = StyleSheet.create({
   title: { ...text.semibold, fontSize: 15, color: colors.text.primary, marginBottom: 2 },
   time: { ...text.label, fontSize: 10, color: colors.text.muted },
   body: { ...text.bodyM, color: colors.text.secondary, lineHeight: 20, marginBottom: sp.x2 },
+
+  detailPanel: {
+    backgroundColor: colors.material.surfaceStrong,
+    borderRadius: radius.lg,
+    padding: sp.x3,
+    marginTop: sp.x2,
+    gap: sp.x2,
+  },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  detailLabel: { ...text.bodyS, color: colors.text.muted },
+  detailValue: { ...text.bodyS, color: colors.text.primary, flex: 1, textAlign: 'right', marginLeft: sp.x3 },
 
   actions: { marginTop: sp.x2 },
   disputeBtn: {

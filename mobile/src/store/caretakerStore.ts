@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import * as svc from '../services/caretaker';
 import type { AppNotification, Building, Collection, CollectionSchedule, Invoice } from '../types/caretaker';
+import { fetchUserNotifications } from '../services/caretaker';
 
 interface Contact { type: string; label: string; value: string; }
 
@@ -208,6 +209,22 @@ import('../services/push').then(({ registerPushToken }) => {
         .subscribe();
     } catch {
       set({ loading: false, loaded: true });
+      // Fetch notifications from the new table
+const notifRes = await fetchUserNotifications();
+const notifRows = (notifRes.notifications || []).map((n: any) => ({
+  id: n.id,
+  kind: n.type as any,
+  label: n.title,
+  sub: n.message,
+  at: n.created_at,
+  data: n.data,
+  disputed: false,
+}));
+
+// Merge with existing notifications (if any) — dedupe by id
+const existing = get().notifications || [];
+const merged = [...notifRows, ...existing.filter((e: any) => !notifRows.some((n: any) => n.id === e.id))];
+set({ notifications: merged });
     }
   },
 

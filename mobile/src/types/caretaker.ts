@@ -58,7 +58,9 @@ export type CaretakerNotificationKind =
   | 'pickup_disputed'
   | 'issue_update'
   | 'service_activated'
-  | 'invoice_paid';
+  | 'invoice_paid'
+  | 'wallet_topup'
+  | 'charge_failed';
 
 export interface AppNotification {
   id: string;
@@ -66,6 +68,16 @@ export interface AppNotification {
   label: string;
   sub: string | null;
   at: string;
-  refId: string | null; // route_stop id when disputable
+  refId: string | null;
   disputed: boolean;
+  data?: {
+    reference?: string;
+    amount?: number;
+    purpose?: string;
+    channel?: string;
+    psp?: string;
+    card?: { brand?: string; last4?: string };
+    reason?: string;
+    [key: string]: any;
+  };
 }

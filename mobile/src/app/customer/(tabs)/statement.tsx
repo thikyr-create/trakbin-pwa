@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CreditCard, Landmark, Plus, Zap, Trash2 } from 'lucide-react-native';
+import { CreditCard, Landmark, Plus, Zap, Trash2, Wallet } from 'lucide-react-native';
 import { TabScreen } from '../../../components/layout/TabScreen';
 import { StatusPill } from '../../../components/ui/StatusPill';
 import { Rise } from '../../../components/ui/motion';
@@ -15,8 +15,6 @@ import { text } from '../../../theme/typography';
 
 type Seg = 'invoices' | 'history' | 'methods';
 
-/** Last-4 digits of a saved card, tolerant of whichever column the backend used. */
-/** Last-4 digits of a saved card or bank, matching the PWA schema exactly. */
 const last4Of = (m: any) => {
   if (m.instrument_type === 'card') {
     return String(m.card_last_four ?? '').replace(/\D/g, '').slice(-4);
@@ -24,9 +22,9 @@ const last4Of = (m: any) => {
   return String(m.account_last4 ?? m.account_number ?? '').replace(/\D/g, '').slice(-4);
 };
 
-export default function BillingScreen() {
+export default function StatementScreen() {
   const router = useRouter();
-  const { invoices, outstandingTotal, nextDueDate, paymentMethods, building, loading, loaded, load } =
+  const { invoices, outstandingTotal, nextDueDate, paymentMethods, building, loading, loaded, load, notifications } =
     useCaretakerStore();
 
   const [seg, setSeg] = useState<Seg>('invoices');
@@ -50,7 +48,7 @@ export default function BillingScreen() {
     [outstanding]
   );
 
-  // Composed activity feed: money movement + payment-method actions
+  // Composed activity feed: money movement + payment events + payment-method actions
   const activity = useMemo(() => {
     const money = ledger.map((l) => ({
       id: `l-${l.id}`, kind: 'money' as const,
@@ -59,7 +57,21 @@ export default function BillingScreen() {
       amount: l.amount ?? null,
       date: l.created_at,
       method: null as string | null,
+      detail: null as any,
     }));
+
+    const paymentEvents = (notifications || [])
+      .filter((n) => ['wallet_topup', 'invoice_paid', 'charge_failed'].includes(n.kind))
+      .map((n) => ({
+        id: `n-${n.id}`, kind: 'event' as const,
+        title: n.label,
+        sub: dateTime(n.at),
+        amount: n.data?.amount ?? null,
+        date: n.at,
+        method: n.data?.channel ?? null,
+        detail: n.data,
+      }));
+
     const methods = paymentMethods.map((m) => ({
       id: `m-${m.id}`, kind: 'method' as const,
       title: m.instrument_type === 'card'
@@ -69,9 +81,11 @@ export default function BillingScreen() {
       amount: null as number | null,
       date: m.created_at,
       method: m.instrument_type,
+      detail: null as any,
     }));
-    return [...money, ...methods].sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  }, [ledger, paymentMethods]);
+
+    return [...money, ...paymentEvents, ...methods].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }, [ledger, paymentMethods, notifications]);
 
   const payNext = async () => {
     if (!nextInvoice) return;
@@ -187,11 +201,18 @@ export default function BillingScreen() {
                 <View style={styles.methodIcon}>
                   {a.kind === 'method'
                     ? (a.method === 'card' ? <CreditCard size={16} color={colors.brand[400]} /> : <Landmark size={16} color={colors.brand[400]} />)
+                    : a.kind === 'event'
+                    ? <Wallet size={16} color={a.title.includes('failed') ? colors.state.danger : colors.state.success} />
                     : <Zap size={16} color={colors.brand[400]} />}
                 </View>
                 <View style={styles.rowMain}>
                   <Text style={styles.rowTitle}>{a.title}</Text>
                   <Text style={styles.rowSub} numberOfLines={1}>{a.sub}</Text>
+                  {a.detail?.card && (
+                    <Text style={styles.rowDetail} numberOfLines={1}>
+                      {a.detail.card.brand} •••• {a.detail.card.last4}
+                    </Text>
+                  )}
                 </View>
                 {a.amount != null ? <Text style={styles.rowAmount}>{naira(Math.abs(a.amount))}</Text> : null}
               </View>
@@ -300,6 +321,7 @@ const styles = StyleSheet.create({
   rowSub: { ...text.bodyS, color: colors.text.muted, marginTop: 2 },
   rowRight: { alignItems: 'flex-end', gap: sp.x1 },
   rowAmount: { ...text.titleS, color: colors.brand[400] },
+  rowDetail: { ...text.bodyXs, color: colors.text.muted, marginTop: 2 },
   methodIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.material.surfaceStrong, alignItems: 'center', justifyContent: 'center' },
   delBtn: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: colors.state.dangerSoft, alignItems: 'center', justifyContent: 'center' },
 
