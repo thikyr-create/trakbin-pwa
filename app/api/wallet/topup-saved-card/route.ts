@@ -1,7 +1,7 @@
-// app/api/wallet/topup-saved-card/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { creditWalletForTopup } from '@/lib/server/payments/ledger';
+import { notify } from '@/lib/server/notify';
 
 const admin = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
@@ -33,6 +33,25 @@ export async function POST(req: NextRequest) {
       purpose: 'topup', method: 'card', channel: 'card',
       amount: amountNaira, currency: 'NGN', status: 'success',
       ledger_topup_tx: topup?.transaction_id ?? null,
+    });
+
+    // ── Notify: persist + push with rich detail ──
+    const auth = chargeData.data?.authorization ?? {};
+    const channel = chargeData.data?.channel ?? 'card';
+    await notify({
+      emails: [email],
+      buildingId,
+      type: 'wallet_topup',
+      title: 'Wallet funded',
+      body: `₦${amountNaira.toLocaleString()} added to your wallet via ${channel}.`,
+      data: {
+        reference,
+        amount: amountNaira,
+        purpose: 'topup',
+        channel,
+        psp: 'paystack',
+        card: auth.last4 ? { brand: auth.brand ?? 'Card', last4: auth.last4 } : null,
+      },
     });
 
     return NextResponse.json({ ok: true, reference, amount: amountNaira });
