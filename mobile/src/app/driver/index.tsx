@@ -50,14 +50,23 @@ export default function MapConsole() {
   const pending = useMemo(() => stops.filter((s) => s.status === 'pending'), [stops]);
   const next = pending[0] ?? null;
 
-  const distM = position && next?.latitude != null && next?.longitude != null
-    ? haversineM(position, { latitude: next.latitude, longitude: next.longitude })
+  const getStopCoordinates = (stop: any) => {
+    if (!stop) return null;
+    const lat = stop.latitude ?? stop.lat ?? stop.location?.latitude ?? stop.location?.lat ?? stop.coordinates?.latitude ?? stop.coordinates?.lat ?? stop.point?.latitude ?? stop.point?.lat ?? null;
+    const lng = stop.longitude ?? stop.lng ?? stop.location?.longitude ?? stop.location?.lng ?? stop.coordinates?.longitude ?? stop.coordinates?.lng ?? stop.point?.longitude ?? stop.point?.lng ?? null;
+    if (lat == null || lng == null) return null;
+    return { latitude: Number(lat), longitude: Number(lng) };
+  };
+
+  const nextCoords = getStopCoordinates(next);
+  const distM = position && nextCoords
+    ? haversineM(position, nextCoords)
     : null;
   const inZone = distM != null && distM <= ARRIVAL_RADIUS_M;
 
   const navigate = () => {
-    if (next?.latitude == null || next?.longitude == null) return;
-    Linking.openURL(`google.navigation:q=${next.latitude},${next.longitude}`);
+    if (!nextCoords) return;
+    Linking.openURL(`google.navigation:q=${nextCoords.latitude},${nextCoords.longitude}`);
   };
 
   const confirm = async () => {

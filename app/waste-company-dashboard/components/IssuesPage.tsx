@@ -48,18 +48,34 @@ export default function IssuesPage({ issues }: { issues: any[] }) {
   useEffect(() => { setItems(issues || []); }, [issues]);
   const all = items;
 
-  const advance = async (it: any) => {
-    const next = NEXT[(it.status || 'open').toLowerCase()];
-    if (!next) return;
-    setBusyId(it.id);
+ const advance = async (it: any) => {
+  const next = NEXT[(it.status || 'open').toLowerCase()];
+  if (!next) return;
+  setBusyId(it.id);
+  try {
+    const res = await fetch('/api/issues/advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId: it.id, nextStatus: next }),
+    });
+    const json = await res.json();
+    setBusyId(null);
+    if (!json.ok) {
+      addNotification('Update failed: ' + (json.error || 'Unknown error'), 'error');
+      return;
+    }
     const patch: any = { status: next };
     if (next === 'resolved') patch.resolved_at = new Date().toISOString();
-    const { error } = await supabase.from('environmental_issues').update(patch).eq('id', it.id);
-    setBusyId(null);
-    if (error) { addNotification('Update failed: ' + error.message, 'error'); return; }
     setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, ...patch } : x)));
-    addNotification(`Issue ${it.issue_number || ''} → ${next}. Caretaker notified.`, 'success');
-  };
+    addNotification(
+      `Issue ${it.issue_number || ''} → ${next}.${json.notified ? ' Caretaker notified.' : ' Caretaker email not found.'}`,
+      'success'
+    );
+  } catch (e: any) {
+    setBusyId(null);
+    addNotification('Update failed: ' + (e?.message || 'Network error'), 'error');
+  }
+};
 
   const list = useMemo(() => all.filter((it) => {
     if (filter === 'all') return true;

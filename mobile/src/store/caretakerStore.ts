@@ -158,8 +158,28 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
       const contacts = synthesizeContacts(company, detailsRes.data);
       const companyName = company?.business_name || detailsRes.data?.business_name || null;
 
-      const notifications = await svc.fetchCaretakerNotifications(custom, companyName);
+      const oldNotifications = await svc.fetchCaretakerNotifications(custom, companyName);
       const seenAt = await svc.getSeenAt(custom);
+
+      // ── SURGICAL EDIT 1: fetch new pipeline notifications + merge ──
+      let newNotifs: any[] = [];
+      try {
+        const notifRes = await fetchUserNotifications();
+        newNotifs = (notifRes.notifications || []).map((n: any) => ({
+          id: n.id,
+          kind: n.type as any,
+          label: n.title,
+          sub: n.message,
+          at: n.created_at,
+          data: n.data,
+          refId: null,
+          disputed: false,
+        }));
+      } catch (e) {
+        console.warn('new notifications fetch failed:', e);
+      }
+      const mergedNotifications = [...newNotifs, ...oldNotifications.filter((e: any) => !newNotifs.some((n: any) => n.id === e.id))];
+      // ──────────────────────────────────────────────────────────────────
 
       const paid = invoices.filter((i) => i.status === 'paid').length;
       const due = invoices.filter((i) => i.status !== 'paid' && i.status !== 'cancelled').length;
@@ -185,60 +205,67 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
         invoiceCount: { paid, due },
         outstandingTotal,
         nextDueDate,
-        notifications,
+        notifications: mergedNotifications,  // ← was: notifications
         paymentMethods: (methodsResult.data as any[]) ?? [],
         requests,
-        unreadCount: seenAt ? notifications.filter((n) => n.at > seenAt).length : notifications.length,
+        unreadCount: seenAt ? mergedNotifications.filter((n: any) => n.at > seenAt).length : mergedNotifications.length,
         loading: false,
         loaded: true,
       });
 
       // Register push token now that we have a user identity
-const userId = user.id;
-import('../services/push').then(({ registerPushToken }) => {
-  registerPushToken(userId).catch(() => {});
-});
+      const userId = user.id;
+      import('../services/push').then(({ registerPushToken }) => {
+        registerPushToken(userId).catch(() => {});
+      });
       // Setup Realtime Subscriptions
       if (notifChannel) { supabase.removeChannel(notifChannel); notifChannel = null; }
       notifChannel = supabase
         .channel(`caretaker_notifs_${custom}`)
         .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'route_stops', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
-        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'environmental_issues', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
+        // ── SURGICAL EDIT 3: environmental_issues also re-loads full state ──
+        .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'environmental_issues', filter: `building_id=eq.${custom}` }, () => {
+          get().refreshNotifications();
+          get().load(true);
+        })
+        // ───────────────────────────────────────────────────────────────────
         .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'invoices', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
         .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'service_assignments', filter: `building_id=eq.${custom}` }, () => get().refreshNotifications())
         .subscribe();
-    } catch {
+    } catch (err) {
+      // ── SURGICAL EDIT 1 (cleanup): old fetch was in catch — removed ──
+      console.warn('load failed:', err);
       set({ loading: false, loaded: true });
-      // Fetch notifications from the new table
-const notifRes = await fetchUserNotifications();
-const notifRows = (notifRes.notifications || []).map((n: any) => ({
-  id: n.id,
-  kind: n.type as any,
-  label: n.title,
-  sub: n.message,
-  at: n.created_at,
-  data: n.data,
-  disputed: false,
-}));
-
-// Merge with existing notifications (if any) — dedupe by id
-const existing = get().notifications || [];
-const merged = [...notifRows, ...existing.filter((e: any) => !notifRows.some((n: any) => n.id === e.id))];
-set({ notifications: merged });
     }
   },
 
+  // ── SURGICAL EDIT 2: refreshNotifications reads both old + new sources ──
   refreshNotifications: async () => {
     const custom = get().building?.custom_id;
     if (!custom) return;
     const companyName = get().company?.business_name || get().companyDetails?.business_name || null;
-    const notifications = await svc.fetchCaretakerNotifications(custom, companyName);
+    const [oldNotifs, newRes] = await Promise.all([
+      svc.fetchCaretakerNotifications(custom, companyName),
+      fetchUserNotifications().catch(() => ({ notifications: [] })),
+    ]);
+    const newNotifs = (newRes.notifications || []).map((n: any) => ({
+      id: n.id,
+      kind: n.type as any,
+      label: n.title,
+      sub: n.message,
+      at: n.created_at,
+      data: n.data,
+      refId: null,
+      disputed: false,
+    }));
+    const notifications = [...newNotifs, ...oldNotifs.filter((e: any) => !newNotifs.some((n: any) => n.id === e.id))];
     const seenAt = await svc.getSeenAt(custom);
     set({
       notifications,
-      unreadCount: seenAt ? notifications.filter((n) => n.at > seenAt).length : notifications.length,
+      unreadCount: seenAt ? notifications.filter((n: any) => n.at > seenAt).length : notifications.length,
     });
   },
+  // ───────────────────────────────────────────────────────────────────────
 
   markAllRead: async () => {
     const buildingId = get().building?.custom_id;
