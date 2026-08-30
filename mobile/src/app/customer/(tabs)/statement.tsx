@@ -33,6 +33,8 @@ export default function StatementScreen() {
   const [ledger, setLedger] = useState<any[]>([]);
   const [showLinkBank, setShowLinkBank] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [expandedInvId, setExpandedInvId] = useState<number | null>(null);
+  const [expandedHistId, setExpandedHistId] = useState<string | null>(null);
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -48,7 +50,6 @@ export default function StatementScreen() {
     [outstanding]
   );
 
-  // Composed activity feed: money movement + payment events + payment-method actions
   const activity = useMemo(() => {
     const money = ledger.map((l) => ({
       id: `l-${l.id}`, kind: 'money' as const,
@@ -157,7 +158,7 @@ export default function StatementScreen() {
         </View>
       </Rise>
 
-      {/* INVOICES */}
+      {/* INVOICES — expandable */}
       {seg === 'invoices' ? (
         <Rise delay={180}>
           {!loaded || loading ? (
@@ -167,18 +168,59 @@ export default function StatementScreen() {
               {invoices.length === 0 ? (
                 <Text style={styles.none}>No invoices yet.</Text>
               ) : (
-                invList.map((i) => (
-                  <View key={i.id} style={styles.row}>
-                    <View style={styles.rowMain}>
-                      <Text style={styles.rowTitle}>{naira(i.amount)}</Text>
-                      <Text style={styles.rowSub} numberOfLines={1}>{i.description ?? 'Waste service'}</Text>
-                    </View>
-                    <View style={styles.rowRight}>
-                      <Text style={styles.rowSub}>{i.due_date ? dayLabel(i.due_date) : ''}</Text>
-                      <StatusPill value={i.status ?? 'pending'} />
-                    </View>
-                  </View>
-                ))
+                invList.map((i) => {
+                  const isExpanded = expandedInvId === i.id;
+                  return (
+                    <Pressable
+                      key={i.id}
+                      style={styles.row}
+                      onPress={() => setExpandedInvId(isExpanded ? null : i.id)}
+                      accessibilityRole="button"
+                    >
+                      <View style={styles.rowMain}>
+                        <Text style={styles.rowTitle}>{naira(i.amount)}</Text>
+                        <Text style={styles.rowSub} numberOfLines={1}>{i.description ?? 'Waste service'}</Text>
+                      </View>
+                      <View style={styles.rowRight}>
+                        <Text style={styles.rowSub}>{i.due_date ? dayLabel(i.due_date) : ''}</Text>
+                        <StatusPill value={i.status ?? 'pending'} />
+                      </View>
+
+                      {isExpanded && (
+                        <View style={styles.detailPanel}>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Amount</Text>
+                            <Text style={styles.detailValue}>{naira(i.amount)}</Text>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Description</Text>
+                            <Text style={styles.detailValue}>{i.description ?? 'Waste collection service'}</Text>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Due date</Text>
+                            <Text style={styles.detailValue}>{i.due_date ? dayLabel(i.due_date) : 'No due date'}</Text>
+                          </View>
+                          <View style={styles.detailRow}>
+                            <Text style={styles.detailLabel}>Status</Text>
+                            <Text style={styles.detailValue}>{i.status ?? 'pending'}</Text>
+                          </View>
+                          {i.paid_at && (
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Paid at</Text>
+                              <Text style={styles.detailValue}>{dateTime(i.paid_at)}</Text>
+                            </View>
+                          )}
+                          {i.created_at && (
+                            <View style={styles.detailRow}>
+                              <Text style={styles.detailLabel}>Created</Text>
+                              <Text style={styles.detailValue}>{dateTime(i.created_at)}</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })
               )}
               {invoices.length > 3 ? (
                 <Pressable style={styles.viewAll} onPress={() => setShowAllInv((v) => !v)} accessibilityRole="button">
@@ -190,33 +232,84 @@ export default function StatementScreen() {
         </Rise>
       ) : null}
 
-      {/* HISTORY — composed activity feed */}
+      {/* HISTORY — expandable */}
       {seg === 'history' ? (
         <Rise delay={180}>
           {activity.length === 0 ? (
             <Text style={styles.none}>No payment activity yet.</Text>
           ) : (
-            actList.map((a) => (
-              <View key={a.id} style={styles.row}>
-                <View style={styles.methodIcon}>
-                  {a.kind === 'method'
-                    ? (a.method === 'card' ? <CreditCard size={16} color={colors.brand[400]} /> : <Landmark size={16} color={colors.brand[400]} />)
-                    : a.kind === 'event'
-                    ? <Wallet size={16} color={a.title.includes('failed') ? colors.state.danger : colors.state.success} />
-                    : <Zap size={16} color={colors.brand[400]} />}
-                </View>
-                <View style={styles.rowMain}>
-                  <Text style={styles.rowTitle}>{a.title}</Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>{a.sub}</Text>
-                  {a.detail?.card && (
-                    <Text style={styles.rowDetail} numberOfLines={1}>
-                      {a.detail.card.brand} •••• {a.detail.card.last4}
-                    </Text>
+            actList.map((a) => {
+              const isExpanded = expandedHistId === a.id;
+              const hasDetail = !!a.detail && Object.keys(a.detail).length > 0;
+              return (
+                <Pressable
+                  key={a.id}
+                  style={styles.row}
+                  onPress={() => hasDetail && setExpandedHistId(isExpanded ? null : a.id)}
+                  disabled={!hasDetail}
+                  accessibilityRole="button"
+                >
+                  <View style={styles.methodIcon}>
+                    {a.kind === 'method'
+                      ? (a.method === 'card' ? <CreditCard size={16} color={colors.brand[400]} /> : <Landmark size={16} color={colors.brand[400]} />)
+                      : a.kind === 'event'
+                      ? <Wallet size={16} color={a.title.includes('failed') ? colors.state.danger : colors.state.success} />
+                      : <Zap size={16} color={colors.brand[400]} />}
+                  </View>
+                  <View style={styles.rowMain}>
+                    <Text style={styles.rowTitle}>{a.title}</Text>
+                    <Text style={styles.rowSub} numberOfLines={1}>{a.sub}</Text>
+                    {a.detail?.card && !isExpanded && (
+                      <Text style={styles.rowDetail} numberOfLines={1}>
+                        {a.detail.card.brand} •••• {a.detail.card.last4}
+                      </Text>
+                    )}
+                  </View>
+                  {a.amount != null ? <Text style={styles.rowAmount}>{naira(Math.abs(a.amount))}</Text> : null}
+
+                  {isExpanded && a.detail && (
+                    <View style={styles.detailPanel}>
+                      {a.detail.amount != null && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Amount</Text>
+                          <Text style={styles.detailValue}>{naira(a.detail.amount)}</Text>
+                        </View>
+                      )}
+                      {a.detail.reference && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Reference</Text>
+                          <Text style={styles.detailValue} numberOfLines={1}>{a.detail.reference}</Text>
+                        </View>
+                      )}
+                      {a.detail.channel && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Channel</Text>
+                          <Text style={styles.detailValue}>{a.detail.channel}</Text>
+                        </View>
+                      )}
+                      {a.detail.card && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Card</Text>
+                          <Text style={styles.detailValue}>{a.detail.card.brand} •••• {a.detail.card.last4}</Text>
+                        </View>
+                      )}
+                      {a.detail.psp && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Processor</Text>
+                          <Text style={styles.detailValue}>{a.detail.psp}</Text>
+                        </View>
+                      )}
+                      {a.detail.reason && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Reason</Text>
+                          <Text style={styles.detailValue}>{a.detail.reason}</Text>
+                        </View>
+                      )}
+                    </View>
                   )}
-                </View>
-                {a.amount != null ? <Text style={styles.rowAmount}>{naira(Math.abs(a.amount))}</Text> : null}
-              </View>
-            ))
+                </Pressable>
+              );
+            })
           )}
           {activity.length > 3 ? (
             <Pressable style={styles.viewAll} onPress={() => setShowAllHist((v) => !v)} accessibilityRole="button">
@@ -315,7 +408,7 @@ const styles = StyleSheet.create({
   segLabel: { ...text.label, fontSize: 10, color: colors.text.muted },
   segLabelActive: { color: colors.text.inverse },
 
-  row: { flexDirection: 'row', alignItems: 'center', gap: sp.x3, backgroundColor: colors.surface, borderRadius: radius.xl, padding: sp.x4, marginTop: sp.x3, borderWidth: 1, borderColor: colors.border.subtle },
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: sp.x3, backgroundColor: colors.surface, borderRadius: radius.xl, padding: sp.x4, marginTop: sp.x3, borderWidth: 1, borderColor: colors.border.subtle },
   rowMain: { flex: 1 },
   rowTitle: { ...text.semibold, color: colors.text.primary },
   rowSub: { ...text.bodyS, color: colors.text.muted, marginTop: 2 },
@@ -324,6 +417,18 @@ const styles = StyleSheet.create({
   rowDetail: { ...text.bodyXs, color: colors.text.muted, marginTop: 2 },
   methodIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.material.surfaceStrong, alignItems: 'center', justifyContent: 'center' },
   delBtn: { width: 34, height: 34, borderRadius: radius.md, backgroundColor: colors.state.dangerSoft, alignItems: 'center', justifyContent: 'center' },
+
+  detailPanel: {
+    width: '100%',
+    backgroundColor: colors.material.surfaceStrong,
+    borderRadius: radius.lg,
+    padding: sp.x3,
+    marginTop: sp.x2,
+    gap: sp.x2,
+  },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  detailLabel: { ...text.bodyS, color: colors.text.muted },
+  detailValue: { ...text.bodyS, color: colors.text.primary, flex: 1, textAlign: 'right', marginLeft: sp.x3 },
 
   viewAll: { alignItems: 'center', paddingVertical: sp.x3, marginTop: sp.x3 },
   viewAllLabel: { ...text.semibold, fontSize: 13, color: colors.brand[400] },

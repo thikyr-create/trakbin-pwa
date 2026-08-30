@@ -8,8 +8,8 @@ const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY;
 
 export async function POST(req: NextRequest) {
   try {
-    const { buildingId, amount, authorizationCode, email } = await req.json();
-    if (!buildingId || !amount || !authorizationCode || !email)
+    const { buildingId, amount, authorizationCode, email, userId } = await req.json();
+    if (!buildingId || !amount || !authorizationCode || !email || !userId)
       return NextResponse.json({ ok: false, error: 'missing_fields' }, { status: 400 });
     if (!PAYSTACK_SECRET)
       return NextResponse.json({ ok: false, error: 'paystack_not_configured' }, { status: 500 });
@@ -35,11 +35,12 @@ export async function POST(req: NextRequest) {
       ledger_topup_tx: topup?.transaction_id ?? null,
     });
 
-    // ── Notify: persist + push with rich detail ──
     const auth = chargeData.data?.authorization ?? {};
     const channel = chargeData.data?.channel ?? 'card';
+    
+    // Use userId directly instead of email lookup
     await notify({
-      emails: [email],
+      userIds: [userId],
       buildingId,
       type: 'wallet_topup',
       title: 'Wallet funded',

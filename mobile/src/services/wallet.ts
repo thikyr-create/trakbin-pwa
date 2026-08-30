@@ -131,14 +131,21 @@ export async function topUpWithSavedCard(p: {
   authorizationCode: string;
   email: string;
 }) {
+  // ← Get userId HERE, before the fetch
+  const { data: session } = await supabase.auth.getSession();
+  const userId = session?.session?.user?.id;
+  if (!userId) throw new Error('Not signed in');
+
+  // ← Now userId is in scope for this fetch call
   const res = await fetch(`${API_BASE}/api/wallet/topup-saved-card`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       buildingId: p.buildingId,
-      amount: p.amountNaira * 100, // Convert to kobo
+      amount: p.amountNaira * 100,
       authorizationCode: p.authorizationCode,
       email: p.email,
+      userId,  // ← Now this works
     }),
   });
   return safeJson(res);
