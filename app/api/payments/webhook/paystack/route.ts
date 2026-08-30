@@ -14,37 +14,31 @@ export async function POST(req: NextRequest) {
   const secret = process.env.PAYSTACK_WEBHOOK_SECRET;
   if (!secret) return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 });
   
-  // Signature verification (already correct)
   const expected = crypto.createHmac('sha512', secret).update(raw).digest('hex');
   if (signature !== expected) return NextResponse.json({ ok: false, error: 'invalid_signature' }, { status: 400 });
 
   const event = JSON.parse(raw);
 
-  // money-IN: charge.success
   if (event.event === 'charge.success') {
     const ref = event.data?.reference;
     if (!ref) return NextResponse.json({ ok: true });
     
-    // HARDENED: Atomic optimistic lock — only one webhook wins the race
     const { data: payment, error: lockErr } = await admin()
       .from('payments')
       .update({ status: 'processing', updated_at: new Date().toISOString() })
       .eq('reference', ref)
-      .eq('status', 'pending') // ← Only if still pending
-      .select('id, purpose, invoice_id, building_id, amount')
+      .eq('status', 'pending')
+      .select('id, purpose, invoice_id, building_id, amount, provider')
       .maybeSingle();
     
     if (lockErr || !payment) {
-      // Either already processed (idempotent success) or unknown payment
       const { data: existing } = await admin().from('payments').select('status').eq('reference', ref).maybeSingle();
       if (existing?.status === 'success') return NextResponse.json({ ok: true, already: true });
       return NextResponse.json({ ok: false, error: 'unknown_payment' }, { status: 404 });
     }
     
-    // Verify with PSP (double-check)
     const verify = await paystackProvider.verify(ref);
     
-    // HARDENED: Cross-check amount
     if (verify.amount !== payment.amount) {
       await admin().from('payments').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('reference', ref);
       await markFailed(ref);
@@ -57,26 +51,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, status: 'failed' });
     }
     
-    // Process the payment
     await handleSuccessfulPayment(verify, { 
       purpose: payment.purpose, 
       invoiceId: payment.invoice_id, 
       buildingId: payment.building_id 
     });
-    
+
+    // ── CAPTURE AUTHORIZATION CODE (same as verify route) ──
+    const rawVerify = verify as any;
+    if (rawVerify.authorization?.authorization_code && payment.building_id) {
+      const authCode = rawVerify.authorization.authorization_code;
+      const reusable = rawVerify.authorization.reusable ?? false;
+      const brand = rawVerify.authorization.brand || rawVerify.metadata?.brand || 'Card';
+      const last4 = rawVerify.authorization.last4 || rawVerify.metadata?.last4 || '';
+
+      const { data: existing } = await admin()
+        .from('payment_methods')
+        .select('id')
+        .eq('building_id', payment.building_id)
+        .eq('card_last_four', last4)
+        .maybeSingle();
+
+      if (existing) {
+        await admin()
+          .from('payment_methods')
+          .update({ authorization_code: authCode, authorization_reusable: reusable, card_brand: brand })
+          .eq('id', existing.id);
+      } else {
+        await admin()
+          .from('payment_methods')
+          .insert({
+            building_id: payment.building_id,
+            instrument_type: 'card',
+            type: 'card',
+            provider: payment.provider || 'paystack',
+            card_brand: brand,
+            card_last_four: last4,
+            authorization_code: authCode,
+            authorization_reusable: reusable,
+            is_default: false,
+            country: 'NG',
+            currency: 'NGN',
+          });
+      }
+    }
+    // ─────────────────────────────────────────────────────────
+
     return NextResponse.json({ ok: true });
   }
 
-  // charge.failed: PSP rejected the payment
   if (event.event === 'charge.failed') {
     const ref = event.data?.reference;
     if (!ref) return NextResponse.json({ ok: true });
-    
     await markFailed(ref);
     return NextResponse.json({ ok: true, status: 'failed' });
   }
 
-  // money-OUT: transfer events
   if (event.event === 'transfer.success' || event.event === 'transfer.failed' || event.event === 'transfer.reversed') {
     const code = event.data?.transfer_code;
     if (!code) return NextResponse.json({ ok: true });
