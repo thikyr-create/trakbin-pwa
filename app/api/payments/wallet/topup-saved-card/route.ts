@@ -16,7 +16,6 @@ export async function POST(req: NextRequest) {
 
     const reference = `topup_saved_${buildingId}_${Date.now()}`;
 
-    // 1. Charge the saved authorization (synchronous — response IS the result)
     const chargeRes = await fetch('https://api.paystack.co/transaction/charge_authorization', {
       method: 'POST',
       headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, 'Content-Type': 'application/json' },
@@ -26,11 +25,9 @@ export async function POST(req: NextRequest) {
     if (!chargeData.status || chargeData.data?.status !== 'success')
       return NextResponse.json({ ok: false, error: chargeData.message || 'charge_failed' });
 
-    // 2. Credit via the SINGLE ledger choke point (same as verify/webhook)
     const amountNaira = Math.round(amount / 100);
     const topup = await creditWalletForTopup(buildingId, amountNaira, reference, 'paystack');
 
-    // 3. Audit row
     await admin().from('payments').insert({
       provider: 'paystack', reference, building_id: buildingId, payer_email: email,
       purpose: 'topup', method: 'card', channel: 'card',
