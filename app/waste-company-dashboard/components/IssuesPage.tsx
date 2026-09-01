@@ -68,7 +68,7 @@ export default function IssuesPage({ issues }: { issues: any[] }) {
     if (next === 'resolved') patch.resolved_at = new Date().toISOString();
     setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, ...patch } : x)));
     addNotification(
-      `Issue ${it.issue_number || ''} → ${next}.${json.notified ? ' Caretaker notified.' : ' Caretaker email not found.'}`,
+      `Issue ${it.issue_number || ''} → ${next}.${json.notified ? ' Caretaker notified.' : ' Caretaker not reachable.'}`,
       'success'
     );
   } catch (e: any) {

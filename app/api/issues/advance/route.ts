@@ -29,28 +29,18 @@ export async function POST(req: NextRequest) {
     const { error: updErr } = await admin().from('environmental_issues').update(patch).eq('id', issueId);
     if (updErr) return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 });
 
-    // ---- Resolve caretaker user_id: fallback chain ----
+    // Resolve caretaker UUID: Buildings.custom_id -> caretaker_email -> auth.users.id (secure RPC)
     let caretakerUserId: string | null = null;
-
     if (issue.building_id) {
-      // a) profiles keyed by building custom_id
-      const { data: rowsA } = await admin().from('profiles').select('user_id').eq('building_id', issue.building_id).limit(1);
-      caretakerUserId = rowsA?.[0]?.user_id ?? null;
+      const { data: building } = await admin()
+        .from('Buildings')
+        .select('caretaker_email')
+        .eq('custom_id', issue.building_id)
+        .maybeSingle();
 
-      if (!caretakerUserId) {
-        const { data: building } = await admin().from('Buildings').select('id, caretaker_email').eq('custom_id', issue.building_id).maybeSingle();
-        if (building) {
-          // b) profiles keyed by building UUID
-          const { data: rowsB } = await admin().from('profiles').select('user_id').eq('building_id', String(building.id)).limit(1);
-          caretakerUserId = rowsB?.[0]?.user_id ?? null;
-
-          if (!caretakerUserId && building.caretaker_email) {
-            // c) synthetic email -> auth uuid (admin-only, server-side)
-            const { data: page } = await admin().auth.admin.listUsers({ page: 1, perPage: 200 });
-            const match = (page?.users || []).find((u) => (u.email || '').toLowerCase() === String(building.caretaker_email).toLowerCase());
-            caretakerUserId = match?.id ?? null;
-          }
-        }
+      if (building?.caretaker_email) {
+        const { data: uid } = await admin().rpc('get_user_id_by_email', { em: building.caretaker_email });
+        caretakerUserId = (uid as string) ?? null;
       }
     }
 
