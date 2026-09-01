@@ -1,98 +1,82 @@
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from './supabase';
 
-const getN = () => { try { return require('expo-notifications'); } catch { return null; } };
-const getD = () => { try { return require('expo-device'); } catch { return null; } };
-
-const ANDROID_CHANNEL_ID = 'trakbin-default';
-
-/**
- * Call once at app boot (in root _layout.tsx). Sets up:
- *  - Android notification channel (required for Android 8+ to show anything)
- *  - Foreground presentation policy (show banners even when app is open)
- *  - Tap-response listener (route user when they tap a push)
- *
- * Safe to call multiple times — idempotent.
- */
 export async function configurePush() {
-  const N = getN();
-  if (!N) return;
-
-  // Android 8+ requires a channel or notifications silently drop
-  if (Platform.OS === 'android') {
-  try {
-    await N.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-      name: 'Trakbin',
-      importance: N.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#10b981',
-      // sound omitted → Android uses the system default sound
-    });
-  } catch (e) {
-    console.warn('[push] channel setup failed:', e);
+  if (!Device.isDevice) {
+    console.log('[push] not a physical device — push disabled');
+    return;
   }
-}
-
-  // Show banners even when app is foregrounded (otherwise pushes silently vanish)
-  N.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#10B981',
+    });
+  }
+  Notifications.setNotificationHandler({
+  handleNotification: async () =>
+    ({
+      shouldShowAlert: true,   // legacy (SDK < 52)
+      shouldShowBanner: true,  // new (SDK 52+)
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
-      priority: N.AndroidNotificationPriority.HIGH,
-    }),
-  });
-
-  // Handle taps — route the user based on notification data
-  N.addNotificationResponseReceivedListener((response: any) => {
-    const data = response?.notification?.request?.content?.data;
-    if (!data) return;
-    // Future: switch on data.type to deep-link into specific screens
-    // e.g. if (data.type === 'pickup_completed') router.push('/customer/notifications');
-    console.log('[push] tapped:', data);
-  });
+    } as any),
+});
+  
+  console.log('[push] configured');
 }
 
-/**
- * Request permission, fetch Expo push token, persist to `device_tokens`.
- * Safe to call after every successful auth — upsert is idempotent on `user_id`.
- */
 export async function registerPushToken(userId: string) {
-  const N = getN();
-  const D = getD();
-  if (!N || !D || !D.isDevice) return { ok: false, reason: 'unavailable' };
-
   try {
-    // 1. Permission (Android 13+ needs POST_NOTIFICATIONS runtime grant)
-    const { status: existing } = await N.getPermissionsAsync();
-    let status = existing;
-    if (status !== 'granted') {
-      const req = await N.requestPermissionsAsync();
-      status = req.status;
+    console.log('[push] register start, userId:', userId);
+
+    if (!Device.isDevice) {
+      console.log('[push] skipped — emulator/simulator');
+      return;
     }
-    if (status !== 'granted') return { ok: false, reason: 'denied' };
 
-    // 2. Token
-    const tokenData = await N.getExpoPushTokenAsync({
-      projectId: undefined, // uses app.json slug-based project id
-    });
-    const token = tokenData.data;
-    if (!token) return { ok: false, reason: 'no_token' };
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    console.log('[push] permission status:', finalStatus);
+    if (finalStatus !== 'granted') {
+      console.log('[push] permission NOT granted — abort');
+      return;
+    }
 
-    // 3. Persist — upsert on user_id so re-logins refresh the token
-    const { error } = await supabase.from('device_tokens').upsert(
-      {
-        user_id: userId,
-        token,
-        platform: Platform.OS === 'ios' ? 'ios' : 'android',
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
-    if (error) return { ok: false, reason: error.message };
+    const token = (
+      await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId,
+      })
+    ).data;
+    console.log('[push] got Expo token:', token);
 
-    return { ok: true, token };
+    const { data: existingRow } = await supabase
+      .from('device_tokens')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existingRow) {
+      await supabase
+        .from('device_tokens')
+        .update({ token, platform: Platform.OS, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+    } else {
+      await supabase
+        .from('device_tokens')
+        .insert({ user_id: userId, token, platform: Platform.OS, updated_at: new Date().toISOString() });
+    }
+    console.log('[push] token saved to device_tokens');
   } catch (e: any) {
-    return { ok: false, reason: e.message };
+    console.log('[push] FAILED:', e?.message || e);
   }
 }

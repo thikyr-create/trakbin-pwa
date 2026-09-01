@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'invalid_status' }, { status: 400 });
     }
 
-    // 1. Load the issue first (we need building_id to find the caretaker)
+    // 1. Load the issue first
     const { data: issue, error: loadErr } = await admin()
       .from('environmental_issues')
       .select('id, building_id, issue_number, issue_type, description, status')
@@ -55,27 +55,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 });
     }
 
-    // 3. Look up the caretaker user_id for this building
+    // 3. ARCHITECTURAL FIX: Query public.profiles directly!
+    // No need to touch the Auth API or Buildings table. 
+    // The profiles table securely maps user_id to building_id.
     let caretakerUserId: string | null = null;
     if (issue.building_id) {
-      const { data: building } = await admin()
-        .from('Buildings')
-        .select('caretaker_email')
-        .eq('custom_id', issue.building_id)
-        .maybeSingle();
-
-      if (building?.caretaker_email) {
-        const { data: user } = await admin()
-          .schema('auth')
-          .from('users')
-          .select('id')
-          .eq('email', building.caretaker_email)
-          .maybeSingle();
-        caretakerUserId = user?.id ?? null;
-      }
+      const { data: profile } = await admin()
+        .from('profiles')
+        .select('user_id')
+        .eq('building_id', issue.building_id)
+        .maybeSingle(); 
+        
+      caretakerUserId = profile?.user_id ?? null;
     }
 
-    // 4. Emit the notification (persist + push). Only if we found the user.
+    // 4. Emit the notification
     const meta = NOTIFY[nextStatus];
     if (caretakerUserId) {
       await notify({
@@ -97,7 +91,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       status: nextStatus,
-      notified: !!caretakerUserId,
+      notified: !!caretakerUserId, // Will now correctly be true!
     });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'advance_failed' }, { status: 400 });
