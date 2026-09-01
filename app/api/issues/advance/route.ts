@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     if (updErr) return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 });
 
     // Resolve caretaker UUID: Buildings.custom_id -> caretaker_email -> auth.users.id (secure RPC)
+        // Resolve caretaker UUID: building -> caretaker email (stored OR derived) -> auth.users.id
     let caretakerUserId: string | null = null;
     if (issue.building_id) {
       const { data: building } = await admin()
@@ -38,10 +39,13 @@ export async function POST(req: NextRequest) {
         .eq('custom_id', issue.building_id)
         .maybeSingle();
 
-      if (building?.caretaker_email) {
-        const { data: uid } = await admin().rpc('get_user_id_by_email', { em: building.caretaker_email });
-        caretakerUserId = (uid as string) ?? null;
-      }
+      // Caretaker accounts use synthetic emails: b-{CUSTOM_ID}@caretaker.trakbin.app
+      const email =
+        building?.caretaker_email ||
+        `b-${String(issue.building_id).toLowerCase()}@caretaker.trakbin.app`;
+
+      const { data: uid } = await admin().rpc('get_user_id_by_email', { em: email });
+      caretakerUserId = (uid as string) ?? null;
     }
 
     const meta = NOTIFY[nextStatus];
