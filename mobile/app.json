@@ -6,19 +6,16 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "trakbin",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F5F0E6"
-    },
+    "userInterfaceStyle": "light"
+    
+  },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.trakbin.app"
     },
     "android": {
       "package": "com.trakbin",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -107,4 +104,3 @@
     },
     "owner": "thikyr"
   }
-}

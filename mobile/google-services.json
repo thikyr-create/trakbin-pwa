@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "702234316534",
+    "project_id": "trakbin-final",
+    "storage_bucket": "trakbin-final.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:702234316534:android:2ffcde33d3e4eaed1526d7",
+        "android_client_info": {
+          "package_name": "com.trakbin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBExH2swSEU8zrS-YGflWcftuSbMH_NA2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
