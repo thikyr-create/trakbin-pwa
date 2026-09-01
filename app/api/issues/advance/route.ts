@@ -29,23 +29,26 @@ export async function POST(req: NextRequest) {
     const { error: updErr } = await admin().from('environmental_issues').update(patch).eq('id', issueId);
     if (updErr) return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 });
 
-    // Resolve caretaker UUID: Buildings.custom_id -> caretaker_email -> auth.users.id (secure RPC)
-        // Resolve caretaker UUID: building -> caretaker email (stored OR derived) -> auth.users.id
+       // 3. Resolve caretaker UUID: direct caretaker_id link, fallback to derivation
     let caretakerUserId: string | null = null;
     if (issue.building_id) {
       const { data: building } = await admin()
         .from('Buildings')
-        .select('caretaker_email')
+        .select('caretaker_id, caretaker_email')
         .eq('custom_id', issue.building_id)
         .maybeSingle();
 
-      // Caretaker accounts use synthetic emails: b-{CUSTOM_ID}@caretaker.trakbin.app
-      const email =
-        building?.caretaker_email ||
-        `b-${String(issue.building_id).toLowerCase()}@caretaker.trakbin.app`;
+      caretakerUserId = (building?.caretaker_id as string) ?? null;
 
-      const { data: uid } = await admin().rpc('get_user_id_by_email', { em: email });
-      caretakerUserId = (uid as string) ?? null;
+      if (!caretakerUserId) {
+        // Fallback to derivation if caretaker_id is missing
+        const email =
+          building?.caretaker_email ||
+          `b-${String(issue.building_id).toLowerCase()}@caretaker.trakbin.app`;
+
+        const { data: uid } = await admin().rpc('get_user_id_by_email', { em: email });
+        caretakerUserId = (uid as string) ?? null;
+      }
     }
 
     const meta = NOTIFY[nextStatus];

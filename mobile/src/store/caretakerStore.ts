@@ -96,8 +96,7 @@ export const useCaretakerStore = create<CaretakerState>((set, get) => ({
       let building: Building | null = null;
       if (metaId) building = await svc.fetchBuildingByCustomId(metaId);
       if (!building && parsedId) building = await svc.fetchBuildingByCustomId(parsedId);
-      if (!building) building = await svc.fetchBuildingByEmail(email);
-
+           if (!building && user?.id) building = await svc.fetchBuildingByUserId(user.id);
       if (!building || !building.custom_id) {
         if (notifChannel) { supabase.removeChannel(notifChannel); notifChannel = null; }
         set({ loading: false, loaded: true });

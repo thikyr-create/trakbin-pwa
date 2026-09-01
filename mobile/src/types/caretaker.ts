@@ -17,6 +17,7 @@ export interface Building {
   next_billing_date: string | null;
   company_id: number | null;
   caretaker_email: string | null;
+  caretaker_id: string | null;
   latitude: number | null;
   longitude: number | null;
   gps_location_address: string | null;

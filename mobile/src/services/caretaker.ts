@@ -36,8 +36,13 @@ export async function fetchBuildingByCustomId(customId: string): Promise<Buildin
   return data as Building | null;
 }
 
-export async function fetchBuildingByEmail(email: string): Promise<Building | null> {
-  const { data } = await supabase.from('Buildings').select('*').eq('caretaker_email', email).maybeSingle();
+// NEW: Look up building by caretaker UUID (no email parsing needed)
+export async function fetchBuildingByUserId(userId: string): Promise<Building | null> {
+  const { data } = await supabase
+    .from('Buildings')
+    .select('*')
+    .eq('caretaker_id', userId)
+    .maybeSingle();
   return data as Building | null;
 }
 
