@@ -7,6 +7,11 @@
     "icon": "./assets/icon.png",
     "scheme": "trakbin",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F0E6"
+    },
     "extra": {
       "eas": {
         "projectId": "88fb5762-cc96-49f2-99ea-e70dc6794bfe"
@@ -40,10 +45,10 @@
       "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
       "android.permission.READ_MEDIA_AUDIO"
     ],
-    "adaptiveIcon": {
-      "foregroundImage": "./assets/adaptive-icon.png",
-      "backgroundColor": "#064e3b"
-    },
+      "adaptiveIcon": {
+    "foregroundImage": "./assets/adaptive-icon.png",
+    "backgroundColor": "#F5F0E6"
+  },
     "config": {
       "googleMaps": {
         "apiKey": "PASTE_YOUR_ANDROID_GOOGLE_MAPS_KEY_HERE"
@@ -61,7 +66,7 @@
   "expo-splash-screen",
   {
     "image": "./assets/splash-icon.png",
-    "imageWidth": 240,
+    "imageWidth": 320,
     "resizeMode": "contain",
     "backgroundColor": "#F5F0E6"
   }
@@ -90,13 +95,13 @@
       }
     ],
     [
-      "expo-notifications",
-      {
-        "icon": "./assets/notification-icon.png",
-        "color": "#10b981",
-        "sounds": []
-      }
-    ],
+  "expo-notifications",
+  {
+    "icon": "./assets/splash-icon.png",
+    "color": "#10b981",
+    "sounds": []
+  }
+],
     "react-native-maps",
     "expo-status-bar"
   ],
