@@ -37,6 +37,9 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/caretaker"
+    "apps/caretaker",
+    "apps",
+    "packages",
+    "mobile"
   ]
 }
