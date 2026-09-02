@@ -1,0 +1,2 @@
+﻿// @trakbin/domain - placeholder
+export {};

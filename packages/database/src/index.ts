@@ -1,0 +1,2 @@
+﻿// @trakbin/database - placeholder
+export {};

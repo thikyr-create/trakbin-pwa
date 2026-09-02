@@ -1,0 +1,2 @@
+﻿// @trakbin/auth - placeholder
+export {};

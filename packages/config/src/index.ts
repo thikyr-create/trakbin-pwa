@@ -1,0 +1,2 @@
+﻿// @trakbin/config - placeholder
+export {};
