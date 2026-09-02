@@ -11,7 +11,12 @@ import { OnlineProvider } from '../services/connectivity';
 import { verifyTopUp } from '../services/wallet';
 import { configurePush } from '../services/push';
 
+// Freeze the native cream splash the instant native code runs
 SplashScreen.preventAutoHideAsync();
+
+// Minimum brand moment: hold the splash this long after fonts are ready.
+// Covers the session-check state so users never see a bare loading frame.
+const MIN_SPLASH_MS = 1500;
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,12 +25,14 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
+    if (!fontsLoaded) return;
+    const t = setTimeout(() => SplashScreen.hideAsync(), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
   }, [fontsLoaded]);
 
   useEffect(() => {
-  configurePush();
-}, []);
+    configurePush();
+  }, []);
 
   useEffect(() => {
     const sub = addEventListener('url', ({ url }) => {
