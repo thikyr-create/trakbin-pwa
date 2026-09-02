@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Trakbin Driver",
+    "slug": "trakbin-driver",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "trakbindriver",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.trakbin.driver",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F5F0E6"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 320,
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F0E6"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow Trakbin Driver to use your location for route tracking.",
+          "locationAlwaysAndWhenInUsePermission": "Allow Trakbin Driver to track your route in the background while on shift.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Trakbin Driver to take proof-of-collection photos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/splash-icon.png",
+          "color": "#10b981"
+        }
+      ],
+      "expo-status-bar"
+    ],
+    "extra": {
+      "router": {}
+    }
+  }
+}
