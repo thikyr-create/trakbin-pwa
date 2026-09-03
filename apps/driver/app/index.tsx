@@ -1,16 +1,20 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
+import { supabase } from '../src/services/supabase';
 
 export default function Index() {
-  return (
-    <View style={styles.wrap}>
-      <Text style={styles.title}>Trakbin Driver</Text>
-      <Text style={styles.sub}>Shell online — Phase 2 complete</Text>
-    </View>
-  );
-}
+  const router = useRouter();
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#F5F0E6', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: '#064e3b' },
-  sub: { marginTop: 8, color: '#10b981' },
-});
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace('/home');
+      } else {
+        router.replace('/login');
+      }
+    })();
+  }, []);
+
+  return null;
+}
