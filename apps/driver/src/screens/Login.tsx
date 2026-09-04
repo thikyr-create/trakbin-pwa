@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { driverLogin } from '../src/services/auth';
-import { useSessionStore } from '../src/store/session';
-import { colors, typography, spacing, elevation, radius } from '../src/theme/design';
+import { driverLogin } from '../services/auth';
+import { useSessionStore } from '../store/session';
+import { colors, typography, spacing, elevation, radius } from '../theme/design';
 
 export default function Login() {
-  const router = useRouter();
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -25,7 +23,7 @@ export default function Login() {
     setLoading(false);
     if (result.ok) {
       useSessionStore.getState().initializeSession();
-      router.replace('/home');
+      // Auth state change in index.tsx will trigger re-render with Console
     } else {
       setError(result.message || 'Login failed');
     }
