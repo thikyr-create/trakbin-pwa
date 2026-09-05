@@ -5,6 +5,7 @@ import { startGpsWatch, stopGpsWatch, calculateDistanceMeters, requestLocationPe
 import { recordActivity } from '../services/activity';
 import { breadcrumbRecorder } from '../services/breadcrumbs';
 import { deviationDetector } from '../services/deviation';
+import { gpsPipeline } from '../services/gpsPipeline';
 
 const SNAPSHOT_KEY = 'trakbin_snapshot_driver';
 
@@ -134,14 +135,17 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   },
 
   startGpsTracking: async () => {
-    const ok = await requestLocationPermission();
-    if (!ok) return;
-    await startGpsWatch((pos) => get().updateGps(pos));
-  },
+  const ok = await requestLocationPermission();
+  if (!ok) return;
+  await gpsPipeline.start({
+    getState: () => get(),
+    setState: (partial) => set(partial),
+  });
+},
 
-  stopGpsTracking: () => {
-    stopGpsWatch();
-  },
+stopGpsTracking: () => {
+  gpsPipeline.stop();
+},
 
   updateGps: (pos) => {
     set({ gpsLocation: pos, gpsAccuracy: pos.accuracy });

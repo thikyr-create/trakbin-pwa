@@ -40,6 +40,9 @@ export interface ConsoleState {
   endShiftOpen: boolean;
   setEndShiftOpen: (open: boolean) => void;
 
+  diagOpen: boolean;
+  setDiagOpen: (open: boolean) => void;
+
   evidenceOpen: boolean;
   evidenceActivityType: EvidenceActivityType;
   evidenceBuildingId: string | null;
@@ -82,6 +85,9 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
   endShiftOpen: false,
   setEndShiftOpen: (open) => set({ endShiftOpen: open }),
 
+  diagOpen: false,
+  setDiagOpen: (open) => set({ diagOpen: open }),
+
   evidenceOpen: false,
   evidenceActivityType: 'pickup',
   evidenceBuildingId: null,
@@ -111,6 +117,7 @@ export const useConsoleStore = create<ConsoleState>((set) => ({
       pauseModalOpen: false,
       reportOpen: false,
       endShiftOpen: false,
+      diagOpen: false,
       evidenceOpen: false,
       evidenceActivityType: 'pickup',
       evidenceBuildingId: null,

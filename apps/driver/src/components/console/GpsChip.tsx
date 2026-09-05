@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useSessionStore } from '../../store/session';
 import { useConsoleStore } from '../../store/ui';
 import { colors, typography, spacing, radius, elevation } from '../../theme/design';
@@ -7,6 +7,7 @@ export function GpsChip() {
   const gpsLocation = useSessionStore((s) => s.gpsLocation);
   const gpsAccuracy = useSessionStore((s) => s.gpsAccuracy);
   const sheetState = useConsoleStore((s) => s.sheetState);
+  const setDiagOpen = useConsoleStore((s) => s.setDiagOpen);
 
   const unusable = gpsAccuracy != null && gpsAccuracy > 1000;
   const quality =
@@ -18,7 +19,7 @@ export function GpsChip() {
   if (sheetState === 'expanded') return null;
 
   return (
-    <View style={styles.chip}>
+    <Pressable onLongPress={() => setDiagOpen(true)} delayLongPress={400} style={styles.chip}>
       <View style={[styles.dot, quality ? styles.dotActive : styles.dotAcquiring]} />
       <View style={styles.textWrap}>
         <Text style={styles.title}>GPS</Text>
@@ -37,7 +38,7 @@ export function GpsChip() {
           />
         ))}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
