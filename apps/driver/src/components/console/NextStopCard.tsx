@@ -49,21 +49,25 @@ export function NextStopCard({ stop, isArrived, distanceM, etaMin, onNavigate, o
       </View>
 
       <View style={styles.actions}>
-        <Pressable style={({ pressed }) => [styles.navBtn, pressed && styles.pressed]} onPress={onNavigate}>
-          <Ionicons name="navigate" size={16} color={colors.text.inverse} />
-          <Text style={styles.btnText}>NAVIGATE</Text>
+        <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]} onPress={onNavigate}>
+          <Ionicons name="navigate" size={14} color={colors.text.inverse} />
+          <Text style={styles.actionText}>NAVIGATE</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.skipBtn, pressed && styles.pressed]} onPress={onSkip}>
-          <Ionicons name="play-skip-forward" size={16} color={colors.text.inverse} />
-          <Text style={styles.btnText}>SKIP</Text>
+        <Pressable style={({ pressed }) => [styles.actionBtn, pressed && styles.pressed]} onPress={onSkip}>
+          <Ionicons name="play-skip-forward" size={14} color={colors.text.inverse} />
+          <Text style={styles.actionText}>SKIP</Text>
         </Pressable>
         <Pressable
-          style={({ pressed }) => [styles.confirmBtn, !isArrived && styles.confirmDisabled, pressed && isArrived && styles.pressed]}
+          style={({ pressed }) => [
+            styles.actionBtn,
+            !isArrived && styles.actionDisabled,
+            pressed && isArrived && styles.pressed,
+          ]}
           onPress={onConfirm}
           disabled={!isArrived}
         >
-          <Ionicons name="checkmark-circle" size={16} color={isArrived ? colors.text.inverse : colors.text.disabled} />
-          <Text style={[styles.btnText, !isArrived && styles.btnTextDisabled]}>CONFIRM</Text>
+          <Ionicons name="checkmark-circle" size={14} color={isArrived ? colors.text.inverse : colors.text.disabled} />
+          <Text style={[styles.actionText, !isArrived && styles.actionTextDisabled]}>CONFIRM</Text>
         </Pressable>
       </View>
 
@@ -99,25 +103,23 @@ const styles = StyleSheet.create({
   distance: { alignItems: 'flex-end' },
   distanceText: { ...typography.titleSmall, color: colors.primary[900] },
   etaText: { ...typography.labelSmall, color: colors.primary[700], marginTop: 2 },
-  actions: { flexDirection: 'row', gap: spacing.x6 },
-  navBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: '#2563eb', borderRadius: radius.medium, paddingVertical: spacing.x12,
+  actions: { flexDirection: 'row', gap: spacing.x8 },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.medium,
+    paddingVertical: spacing.x10,
     ...elevation[1],
   },
-  skipBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: colors.state.warning, borderRadius: radius.medium, paddingVertical: spacing.x12,
-    ...elevation[1],
+  actionDisabled: {
+    backgroundColor: colors.neutral[30],
   },
-  confirmBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: colors.primary[600], borderRadius: radius.medium, paddingVertical: spacing.x12,
-    ...elevation[1],
-  },
-  confirmDisabled: { backgroundColor: colors.neutral[30] },
-  pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
-  btnText: { ...typography.labelLarge, color: colors.text.inverse },
-  btnTextDisabled: { color: colors.text.disabled },
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
+  actionText: { ...typography.labelMedium, color: colors.text.inverse },
+  actionTextDisabled: { color: colors.text.disabled },
   hint: { ...typography.bodySmall, color: colors.text.tertiary, textAlign: 'center', marginTop: -4 },
 });

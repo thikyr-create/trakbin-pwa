@@ -9,9 +9,9 @@ import { NotificationsSheet } from '../components/console/NotificationsSheet';
 import { SearchScreen } from '../components/console/SearchScreen';
 import { MapScreen } from './MapScreen';
 import { StopsScreen } from './StopsScreen';
-import { ProgressScreen } from './ProgressScreen';
+
 import { ActivityScreen } from './ActivityScreen';
-import { MoreScreen } from './MoreScreen';
+
 import { colors } from '../theme/design';
 import { SkipReasonModal } from '../components/modals/SkipReasonModal';
 import { EndShiftModal } from '../components/modals/EndShiftModal';
@@ -35,9 +35,9 @@ export default function Console() {
     <View style={styles.root}>
       {activeTab === 'map' && <MapScreen />}
       {activeTab === 'stops' && <StopsScreen />}
-      {activeTab === 'progress' && <ProgressScreen />}
+      
       {activeTab === 'activity' && <ActivityScreen />}
-      {activeTab === 'more' && <MoreScreen />}
+      
 
       {activeTab === 'map' && <BottomSheet />}
 

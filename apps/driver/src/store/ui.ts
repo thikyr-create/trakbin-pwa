@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ConsoleTab = 'map' | 'stops' | 'progress' | 'activity' | 'more';
+export type ConsoleTab = 'map' | 'stops' | 'activity';
 
 export type SheetState = 'collapsed' | 'expanded';
 

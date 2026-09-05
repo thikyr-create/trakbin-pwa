@@ -5,7 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSessionStore } from '../../store/session';
 import { useConsoleStore } from '../../store/ui';
 import { calculateDistanceInMeters } from '../../utils/geo';
-import { colors, typography, spacing, radius, elevation } from '../../theme/design';
+import { useLayout } from '../../theme/layout';
+import { colors, typography, spacing, radius } from '../../theme/design';
+
 interface GeocodeResult {
   id: string;
   place_name: string;
@@ -17,13 +19,14 @@ const MAX_RECENTS = 8;
 const keyFor = (driverId: string | null) => `trakbin_driver_recent_searches_${driverId ?? 'anon'}`;
 
 export function SearchScreen() {
-  const searchOpen = useConsoleStore((s) => s.searchOpen);
-  const setSearchOpen = useConsoleStore((s) => s.setSearchOpen);
-  const setSearchDestination = useConsoleStore((s) => s.setSearchDestination);
-  const setActiveTab = useConsoleStore((s) => s.setActiveTab);
-  const driver = useSessionStore((s) => s.driver);
-  const gpsLocation = useSessionStore((s) => s.gpsLocation);
-  const routeStops = useSessionStore((s) => s.routeStops);
+  const L = useLayout();
+  const searchOpen = useConsoleStore((s: any) => s.searchOpen);
+  const setSearchOpen = useConsoleStore((s: any) => s.setSearchOpen);
+  const setSearchDestination = useConsoleStore((s: any) => s.setSearchDestination);
+  const setActiveTab = useConsoleStore((s: any) => s.setActiveTab);
+  const driver = useSessionStore((s: any) => s.driver);
+  const gpsLocation = useSessionStore((s: any) => s.gpsLocation);
+  const routeStops = useSessionStore((s: any) => s.routeStops);
 
   const [query, setQuery] = useState('');
   const [recents, setRecents] = useState<GeocodeResult[]>([]);
@@ -51,18 +54,15 @@ export function SearchScreen() {
       setResults([]);
       return;
     }
-    // Simple search: filter routeStops by address or building_id
+    const q = query.toLowerCase();
     const filtered = routeStops
-      .filter((s: any) => {
-        const q = query.toLowerCase();
-        return (
-          (s.building_id || '').toLowerCase().includes(q) ||
-          (s.address || '').toLowerCase().includes(q)
-        );
-      })
+      .filter((s: any) =>
+        (s.building_id || '').toLowerCase().includes(q) ||
+        (s.address || '').toLowerCase().includes(q)
+      )
       .slice(0, 10)
       .map((s: any) => ({
-        id: s.id,
+        id: String(s.id),
         place_name: s.address || s.building_id,
         center: [s.longitude, s.latitude] as [number, number],
         type: 'building' as const,
@@ -108,7 +108,7 @@ export function SearchScreen() {
   return (
     <Modal visible={searchOpen} animationType="slide">
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: L.insets.top + 12 }]}>
           <Pressable onPress={close} style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}>
             <Ionicons name="close" size={22} color={colors.text.primary} />
           </Pressable>
@@ -194,7 +194,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.x16,
-    paddingTop: spacing.x48,
     paddingBottom: spacing.x12,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral[20],

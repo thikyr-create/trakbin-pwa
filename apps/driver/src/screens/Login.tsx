@@ -4,9 +4,11 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { driverLogin } from '../services/auth';
 import { useSessionStore } from '../store/session';
+import { useLayout } from '../theme/layout';
 import { colors, typography, spacing, elevation, radius } from '../theme/design';
 
 export default function Login() {
+  const L = useLayout();
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,7 +25,6 @@ export default function Login() {
     setLoading(false);
     if (result.ok) {
       useSessionStore.getState().initializeSession();
-      // Auth state change in index.tsx will trigger re-render with Console
     } else {
       setError(result.message || 'Login failed');
     }
@@ -31,16 +32,16 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { paddingTop: L.insets.top, paddingBottom: L.insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.background} />
-      
+
       <BlurView intensity={80} tint="light" style={styles.card}>
         <View style={styles.iconContainer}>
           <Ionicons name="leaf" size={48} color={colors.primary[600]} />
         </View>
-        
+
         <Text style={styles.title}>Trakbin Driver</Text>
         <Text style={styles.subtitle}>Sign in to start your shift</Text>
 
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   },
   background: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: `linear-gradient(135deg, ${colors.primary[100]} 0%, ${colors.primary[50]} 100%)`,
+    backgroundColor: colors.primary[100],
   },
   card: {
     borderRadius: radius.large,

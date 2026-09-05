@@ -1,16 +1,19 @@
-import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSessionStore } from '../../store/session';
 import { useConsoleStore } from '../../store/ui';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
 import { signOut } from '../../services/auth';
+import { useLayout } from '../../theme/layout';
 import { colors, typography, spacing, radius, elevation } from '../../theme/design';
 
 export function TopBar() {
+  const L = useLayout();
   const route = useSessionStore((s) => s.route);
   const isRoutePaused = useSessionStore((s) => s.isRoutePaused);
   const resetSession = useSessionStore((s) => s.resetSession);
-  const { setSearchOpen, setNotifOpen } = useConsoleStore();
+  const setSearchOpen = useConsoleStore((s) => s.setSearchOpen);
+  const setNotifOpen = useConsoleStore((s) => s.setNotifOpen);
   const { unread } = useDriverNotifications();
 
   const onShift = !!route && route.status !== 'completed';
@@ -28,7 +31,7 @@ export function TopBar() {
     : 'OFF SHIFT';
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingTop: L.topBarPadTop }]}>
       <View style={styles.left}>
         <Pressable onPress={() => setSearchOpen(true)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
           <Ionicons name="search-outline" size={22} color={colors.text.primary} />
@@ -62,9 +65,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 72,
-    paddingTop: spacing.x32,
-    paddingBottom: spacing.x12,
+    paddingBottom: spacing.x8,
     paddingHorizontal: spacing.x16,
     flexDirection: 'row',
     alignItems: 'center',

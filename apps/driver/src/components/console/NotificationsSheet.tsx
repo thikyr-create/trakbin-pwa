@@ -4,12 +4,13 @@ import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useConsoleStore } from '../../store/ui';
 import { useDriverNotifications } from '../../hooks/useDriverNotifications';
+import { useLayout } from '../../theme/layout';
 import { colors, typography, spacing, radius, elevation } from '../../theme/design';
 
 export function NotificationsSheet() {
+  const L = useLayout();
   const notifOpen = useConsoleStore((s) => s.notifOpen);
   const setNotifOpen = useConsoleStore((s) => s.setNotifOpen);
-  const setActiveTab = useConsoleStore((s) => s.setActiveTab);
   const { items, markSeen } = useDriverNotifications();
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export function NotificationsSheet() {
   return (
     <Modal visible={notifOpen} transparent animationType="slide">
       <View style={styles.backdrop}>
-        <BlurView intensity={90} tint="light" style={styles.sheet}>
+        <BlurView intensity={90} tint="light" style={[styles.sheet, { paddingBottom: L.insets.bottom }]}>
           <View style={styles.header}>
             <Text style={styles.title}>Notifications</Text>
             <Pressable onPress={() => setNotifOpen(false)} style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}>
@@ -59,13 +60,6 @@ export function NotificationsSheet() {
               ))}
             </ScrollView>
           )}
-
-          <Pressable
-            onPress={() => { setActiveTab('activity'); setNotifOpen(false); }}
-            style={({ pressed }) => [styles.viewAllBtn, pressed && styles.pressed]}
-          >
-            <Text style={styles.viewAllText}>VIEW FULL ACTIVITY</Text>
-          </Pressable>
         </BlurView>
       </View>
     </Modal>
@@ -174,16 +168,5 @@ const styles = StyleSheet.create({
     ...typography.labelSmall,
     color: colors.text.tertiary,
     fontSize: 10,
-  },
-  viewAllBtn: {
-    margin: spacing.x16,
-    backgroundColor: colors.neutral[10],
-    borderRadius: radius.medium,
-    paddingVertical: spacing.x12,
-    alignItems: 'center',
-  },
-  viewAllText: {
-    ...typography.labelLarge,
-    color: colors.text.secondary,
   },
 });

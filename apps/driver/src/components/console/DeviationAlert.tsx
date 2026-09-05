@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { deviationEvents } from '../../services/events';
+import { useLayout } from '../../theme/layout';
 import { colors, typography, spacing, radius, elevation } from '../../theme/design';
 
 export function DeviationAlert() {
+  const L = useLayout();
   const [distance, setDistance] = useState<number | null>(null);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export function DeviationAlert() {
   if (distance == null) return null;
 
   return (
-    <View style={styles.alert}>
+    <View style={[styles.alert, { top: L.alertTop }]}>
       <Ionicons name="alert-circle" size={20} color={colors.text.inverse} />
       <Text style={styles.text}>Off route by {distance} m — return to planned route</Text>
     </View>
@@ -28,7 +30,6 @@ export function DeviationAlert() {
 const styles = StyleSheet.create({
   alert: {
     position: 'absolute',
-    top: 96,
     left: spacing.x16,
     right: spacing.x16,
     flexDirection: 'row',

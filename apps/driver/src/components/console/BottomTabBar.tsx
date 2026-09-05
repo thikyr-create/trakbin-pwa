@@ -2,14 +2,16 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useConsoleStore } from '../../store/ui';
 import { CONSOLE_TABS } from '../../constants/console';
+import { useLayout } from '../../theme/layout';
 import { colors, typography, spacing, radius } from '../../theme/design';
 
 export function BottomTabBar() {
+  const L = useLayout();
   const activeTab = useConsoleStore((s) => s.activeTab);
   const setActiveTab = useConsoleStore((s) => s.setActiveTab);
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { paddingBottom: L.tabBarPadBottom }]}>
       {CONSOLE_TABS.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -27,7 +29,9 @@ export function BottomTabBar() {
               size={20}
               color={isActive ? colors.primary[600] : colors.text.tertiary}
             />
-            <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
+            <Text style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
+              {tab.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -41,12 +45,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 72,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: spacing.x8,
-    paddingVertical: spacing.x8,
+    paddingTop: spacing.x8,
     backgroundColor: colors.surface.containerHighest,
     borderTopWidth: 1,
     borderTopColor: colors.neutral[20],
@@ -57,7 +60,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.x4,
-    paddingHorizontal: spacing.x16,
+    paddingHorizontal: spacing.x4,
     paddingVertical: spacing.x8,
     borderRadius: radius.medium,
   },
@@ -69,6 +72,7 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.labelSmall,
+    fontSize: 9,
     color: colors.text.tertiary,
   },
   labelActive: {

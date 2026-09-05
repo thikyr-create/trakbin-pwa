@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -9,18 +9,18 @@ import { GpsChip } from '../components/console/GpsChip';
 import { MapControls } from '../components/console/MapControls';
 import { DeviationAlert } from '../components/console/DeviationAlert';
 import { MAP_CONFIG } from '../constants/config';
-import { calculateDistanceInMeters } from '../utils/geo';
+import { useLayout } from '../theme/layout';
 import { colors, typography, spacing, radius, elevation } from '../theme/design';
 import type { RouteBuilding } from '../types/routes';
 
 const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? null;
 
 export function MapScreen() {
+  const L = useLayout();
   const mapRef = useRef<MapView>(null);
   const route = useSessionStore((s) => s.route);
   const routeStops = useSessionStore((s) => s.routeStops);
   const currentStop = useSessionStore((s) => s.currentStop);
-  const gpsLocation = useSessionStore((s) => s.gpsLocation);
   const searchDestination = useConsoleStore((s) => s.searchDestination);
   const [satellite, setSatellite] = useState(true);
 
@@ -77,14 +77,14 @@ export function MapScreen() {
           )}
         </MapView>
       ) : (
-        <PlaceholderCanvas stops={stopsWithCoords} currentStopId={currentStop?.id ?? null} gps={gpsLocation} />
+        <PlaceholderCanvas screenTop={L.screenTop} />
       )}
 
       <MapControls mapRef={mapRef} satellite={satellite} onToggleStyle={() => setSatellite((v) => !v)} />
-      
+
       <DeviationAlert />
 
-      <View style={styles.gpsWrap}>
+      <View style={[styles.gpsWrap, { bottom: L.chipBottom }]}>
         <GpsChip />
       </View>
     </View>
@@ -104,71 +104,47 @@ function StopBadge({ stop, isCurrent }: { stop: RouteBuilding; isCurrent: boolea
   );
 }
 
-function PlaceholderCanvas({ stops, currentStopId, gps }: {
-  stops: RouteBuilding[];
-  currentStopId: string | null;
-  gps: { latitude: number; longitude: number } | null;
-}) {
+function PlaceholderCanvas({ screenTop }: { screenTop: number }) {
   return (
-    <View style={styles.placeholder}>
+    <View style={[styles.placeholder, { paddingTop: screenTop }]}>
       <BlurView intensity={70} tint="light" style={styles.card}>
         <Ionicons name="map-outline" size={44} color={colors.primary[400]} />
         <Text style={styles.cardTitle}>Live map awaiting provider key</Text>
         <Text style={styles.cardBody}>
-          Add EXPO_PUBLIC_GOOGLE_MAPS_KEY to activate the render layer.{'\n'}Route telemetry below is live.
+          Add EXPO_PUBLIC_GOOGLE_MAPS_KEY to activate the render layer.
         </Text>
       </BlurView>
-
-      <ScrollView style={styles.strip} contentContainerStyle={styles.stripContent}>
-        {stops.length === 0 && <Text style={styles.cardBody}>No geocoded stops on this route.</Text>}
-        {stops.map((s: RouteBuilding) => {
-          const dist = gps ? calculateDistanceInMeters(gps.latitude, gps.longitude, s.latitude!, s.longitude!) : null;
-          return (
-            <View key={s.id} style={[styles.stripRow, s.id === currentStopId && styles.stripRowCurrent]}>
-              <StopBadge stop={s} isCurrent={s.id === currentStopId} />
-              <View style={styles.stripInfo}>
-                <Text style={styles.stripAddress} numberOfLines={1}>{s.address || s.building_id}</Text>
-                <Text style={styles.stripSub}>
-                  {s.status}{dist != null ? ` · ${(dist / 1000).toFixed(1)} km away` : ''}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFill, backgroundColor: colors.primary[100] },
-  placeholder: { flex: 1, paddingTop: 110, paddingHorizontal: spacing.x16 },
+  placeholder: { flex: 1, paddingHorizontal: spacing.x16 },
   card: {
-    borderRadius: radius.large, padding: spacing.x20, alignItems: 'center',
-    backgroundColor: colors.surface.container, ...elevation[2], overflow: 'hidden',
-    marginBottom: spacing.x12,
+    borderRadius: radius.large,
+    padding: spacing.x20,
+    alignItems: 'center',
+    backgroundColor: colors.surface.container,
+    ...elevation[2],
+    overflow: 'hidden',
   },
   cardTitle: { ...typography.titleSmall, color: colors.primary[900], marginTop: spacing.x8, textAlign: 'center' },
   cardBody: { ...typography.bodySmall, color: colors.text.secondary, textAlign: 'center', marginTop: spacing.x4 },
-  strip: { flex: 1 },
-  stripContent: { paddingBottom: 220 },
-  stripRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: colors.surface.container, borderRadius: radius.large,
-    padding: spacing.x12, marginBottom: spacing.x8, ...elevation[1],
-  },
-  stripRowCurrent: { borderWidth: 1.5, borderColor: colors.primary[500] },
-  stripInfo: { flex: 1, marginLeft: spacing.x12 },
-  stripAddress: { ...typography.titleSmall, color: colors.text.primary },
-  stripSub: { ...typography.bodySmall, color: colors.text.tertiary, marginTop: 2 },
   marker: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: colors.primary[600], borderWidth: 2, borderColor: colors.surface.containerHighest,
-    alignItems: 'center', justifyContent: 'center', ...elevation[2],
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary[600],
+    borderWidth: 2,
+    borderColor: colors.surface.containerHighest,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...elevation[2],
   },
   markerCompleted: { backgroundColor: colors.state.success },
   markerSkipped: { backgroundColor: colors.state.warning },
   markerCurrent: { backgroundColor: colors.primary[700], transform: [{ scale: 1.15 }] },
   markerText: { ...typography.labelLarge, color: colors.text.inverse },
-  gpsWrap: { position: 'absolute', left: spacing.x16, bottom: 180 },
+  gpsWrap: { position: 'absolute', left: spacing.x16 },
 });

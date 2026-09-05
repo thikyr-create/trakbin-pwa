@@ -5,29 +5,26 @@ import { useSessionStore } from '../store/session';
 import { useConsoleStore } from '../store/ui';
 import { StopListItem } from '../components/stops/StopListItem';
 import { calculateDistanceInMeters } from '../utils/geo';
+import { useLayout } from '../theme/layout';
 import { colors, typography, spacing, radius } from '../theme/design';
 
 export function StopsScreen() {
+  const L = useLayout();
   const route = useSessionStore((s) => s.route);
   const routeStops = useSessionStore((s) => s.routeStops);
-  const currentStop = useSessionStore((s) => s.currentStop);
   const gpsLocation = useSessionStore((s) => s.gpsLocation);
-  const { setActiveTab, selectedStopId, setSelectedStopId } = useConsoleStore();
+  const setActiveTab = useConsoleStore((s) => s.setActiveTab);
+  const selectedStopId = useConsoleStore((s) => s.selectedStopId);
+  const setSelectedStopId = useConsoleStore((s) => s.setSelectedStopId);
 
   const sorted = useMemo(() => [...routeStops].sort((a, b) => a.sequence - b.sequence), [routeStops]);
   const completed = sorted.filter((s) => s.status === 'completed').length;
   const skipped = sorted.filter((s) => s.status === 'skipped').length;
   const nextId = sorted.find((s: any) => s.status === 'pending')?.id;
 
-  const handleNavigate = (stop: any) => {
-    // Fly to location on map tab
-    setActiveTab('map');
-    // The MapScreen will handle the actual camera animation when selectedStopId is set
-  };
-
   if (!route) {
     return (
-      <View style={styles.emptyContainer}>
+      <View style={[styles.emptyContainer, { paddingTop: L.screenTop }]}>
         <View style={styles.emptyIcon}>
           <Ionicons name="cube-outline" size={26} color={colors.text.tertiary} />
         </View>
@@ -41,9 +38,9 @@ export function StopsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: L.screenTop }]}>
         <View>
-          <Text style={styles.title}>Stops</Text>
+          <Text style={styles.title}>Routes</Text>
           <Text style={styles.subtitle}>In route order</Text>
         </View>
         <View style={styles.stats}>
@@ -81,11 +78,11 @@ export function StopsScreen() {
               legDistanceM={legDistanceM}
               selected={selectedStopId === stop.id}
               onSelect={() => setSelectedStopId(selectedStopId === stop.id ? null : String(stop.id))}
-              onNavigate={() => handleNavigate(stop)}
+              onNavigate={() => setActiveTab('map')}
             />
           );
         }}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, { paddingBottom: L.listBottom }]}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -128,7 +125,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.x16,
-    paddingTop: 110,
     paddingBottom: spacing.x12,
   },
   title: {
@@ -172,6 +168,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingHorizontal: spacing.x16,
-    paddingBottom: 100,
+    gap: spacing.x8,
   },
 });

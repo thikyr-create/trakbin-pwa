@@ -9,6 +9,7 @@ import { useConsoleStore } from '../../store/ui';
 import { NextStopCard } from './NextStopCard';
 import { calculateDistanceInMeters } from '../../utils/geo';
 import { captureProof } from '../../services/proof';
+import { useLayout } from '../../theme/layout';
 import { colors, typography, spacing, radius, elevation } from '../../theme/design';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -17,6 +18,7 @@ const SNAP_VELOCITY = 500;
 const SNAP_OFFSET = 60;
 
 export function BottomSheet() {
+  const L = useLayout();
   const currentStop = useSessionStore((s) => s.currentStop);
   const isArrived = useSessionStore((s) => s.isArrived);
   const isRoutePaused = useSessionStore((s) => s.isRoutePaused);
@@ -120,7 +122,7 @@ export function BottomSheet() {
   return (
     <>
       <Animated.View
-        style={[styles.sheet, animatedStyle]}
+        style={[styles.sheet, animatedStyle, { bottom: L.sheetBottom }]}
         onLayout={(e) => setSheetHeight(e.nativeEvent.layout.height)}
       >
         <GestureDetector gesture={handleGesture}>
@@ -155,7 +157,7 @@ export function BottomSheet() {
                 </View>
               </View>
               <Pressable style={({ pressed }) => [styles.resumeBtn, pressed && styles.pressed]} onPress={() => toggleRoutePause()}>
-                <Ionicons name="play" size={16} color={colors.text.inverse} />
+                <Ionicons name="play" size={14} color={colors.text.inverse} />
                 <Text style={styles.resumeText}>RESUME ROUTE</Text>
               </Pressable>
             </>
@@ -172,31 +174,24 @@ export function BottomSheet() {
                 onConfirm={handleConfirm}
                 onSkip={() => setSkipOpen(true)}
               />
-              <Pressable style={({ pressed }) => [styles.pauseBtn, pressed && styles.pressed]} onPress={() => setPauseModalOpen(true)}>
-                <Ionicons name="pause-outline" size={16} color={colors.state.warning} />
-                <Text style={styles.pauseText}>PAUSE ROUTE</Text>
-              </Pressable>
+
+              {sheetState === 'expanded' && (
+                <View style={styles.toolRow}>
+                  <Pressable style={({ pressed }) => [styles.toolBtn, pressed && styles.pressed]} onPress={handleConfirm}>
+                    <Ionicons name="camera" size={14} color={colors.text.inverse} />
+                    <Text style={styles.toolBtnText}>EVIDENCE</Text>
+                  </Pressable>
+                  <Pressable style={({ pressed }) => [styles.toolBtn, pressed && styles.pressed]} onPress={() => setReportOpen(true)}>
+                    <Ionicons name="flag" size={14} color={colors.text.inverse} />
+                    <Text style={styles.toolBtnText}>REPORT</Text>
+                  </Pressable>
+                  <Pressable style={({ pressed }) => [styles.toolBtn, pressed && styles.pressed]} onPress={() => setPauseModalOpen(true)}>
+                    <Ionicons name="pause" size={14} color={colors.text.inverse} />
+                    <Text style={styles.toolBtnText}>PAUSE</Text>
+                  </Pressable>
+                </View>
+              )}
             </>
-          )}
-
-          {sheetState === 'expanded' && mode === 'active' && (
-            <View style={styles.expandedSection}>
-              <View style={styles.actionGrid}>
-                <Pressable style={({ pressed }) => [styles.evidenceBtn, pressed && styles.pressed]} onPress={handleConfirm}>
-                  <Ionicons name="camera-outline" size={16} color={colors.primary[700]} />
-                  <Text style={styles.evidenceText}>EVIDENCE</Text>
-                </Pressable>
-                <Pressable style={({ pressed }) => [styles.reportBtn, pressed && styles.pressed]} onPress={() => setReportOpen(true)}>
-                  <Ionicons name="flag-outline" size={16} color={colors.state.danger} />
-                  <Text style={styles.reportText}>REPORT</Text>
-                </Pressable>
-              </View>
-
-              <Pressable style={({ pressed }) => [styles.collapseBtn, pressed && styles.pressed]} onPress={() => setSheetState('collapsed')}>
-                <Ionicons name="chevron-down" size={18} color={colors.text.tertiary} />
-                <Text style={styles.collapseText}>COLLAPSE</Text>
-              </Pressable>
-            </View>
           )}
 
           {sheetState === 'expanded' && (
@@ -206,6 +201,16 @@ export function BottomSheet() {
             >
               <Ionicons name="power-outline" size={16} color={colors.text.inverse} />
               <Text style={styles.endShiftText}>END SHIFT</Text>
+            </Pressable>
+          )}
+
+          {sheetState === 'expanded' && (
+            <Pressable
+              style={({ pressed }) => [styles.collapseBtn, pressed && styles.pressed]}
+              onPress={() => setSheetState('collapsed')}
+            >
+              <Ionicons name="chevron-down" size={16} color={colors.text.secondary} />
+              <Text style={styles.collapseText}>COLLAPSE</Text>
             </Pressable>
           )}
         </ScrollView>
@@ -246,7 +251,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 72,
     borderTopLeftRadius: radius.extraLarge,
     borderTopRightRadius: radius.extraLarge,
     backgroundColor: colors.surface.containerHigh,
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
   handleWrap: { alignItems: 'center', paddingVertical: spacing.x12 },
   handle: { width: 44, height: 5, borderRadius: 3, backgroundColor: colors.neutral[40] },
   content: { flex: 1 },
-  contentContainer: { paddingHorizontal: spacing.x16, paddingBottom: spacing.x16 },
+  contentContainer: { paddingHorizontal: spacing.x16, paddingBottom: spacing.x16, gap: spacing.x12 },
   idleCard: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.x12,
     backgroundColor: colors.neutral[10], borderRadius: radius.medium,
@@ -275,43 +279,35 @@ const styles = StyleSheet.create({
   resumeBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x6,
     backgroundColor: colors.primary[600], borderRadius: radius.medium,
-    paddingVertical: spacing.x14, marginTop: spacing.x12, ...elevation[1],
+    paddingVertical: spacing.x10, ...elevation[1],
   },
-  resumeText: { ...typography.labelLarge, color: colors.text.inverse },
-  pauseBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x6,
-    backgroundColor: `${colors.state.warning}15`, borderRadius: radius.medium,
-    paddingVertical: spacing.x12, marginTop: spacing.x12,
-    borderWidth: 1, borderColor: `${colors.state.warning}40`,
+  resumeText: { ...typography.labelMedium, color: colors.text.inverse },
+  toolRow: { flexDirection: 'row', gap: spacing.x8 },
+  toolBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: colors.primary[600],
+    borderRadius: radius.medium,
+    paddingVertical: spacing.x10,
+    ...elevation[1],
   },
-  pauseText: { ...typography.labelLarge, color: colors.state.warning },
-  expandedSection: { marginTop: spacing.x16, paddingTop: spacing.x16, borderTopWidth: 1, borderTopColor: colors.neutral[20] },
-  actionGrid: { flexDirection: 'row', gap: spacing.x6 },
-  evidenceBtn: {
-    flex: 1, flexDirection: 'column', alignItems: 'center', gap: 4,
-    backgroundColor: colors.primary[50], borderRadius: radius.medium,
-    paddingVertical: spacing.x12, borderWidth: 1, borderColor: `${colors.primary[600]}40`,
-  },
-  evidenceText: { ...typography.labelSmall, color: colors.primary[700] },
-  reportBtn: {
-    flex: 1, flexDirection: 'column', alignItems: 'center', gap: 4,
-    backgroundColor: `${colors.state.danger}10`, borderRadius: radius.medium,
-    paddingVertical: spacing.x12, borderWidth: 1, borderColor: `${colors.state.danger}40`,
-  },
-  reportText: { ...typography.labelSmall, color: colors.state.danger },
-  collapseBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x8,
-    backgroundColor: colors.neutral[10], borderRadius: radius.medium,
-    paddingVertical: spacing.x12, marginTop: spacing.x12,
-  },
-  collapseText: { ...typography.labelLarge, color: colors.text.tertiary },
+  toolBtnText: { ...typography.labelSmall, color: colors.text.inverse },
   endShiftBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x8,
     backgroundColor: colors.state.danger, borderRadius: radius.medium,
-    paddingVertical: spacing.x12, marginTop: spacing.x12, ...elevation[1],
+    paddingVertical: spacing.x12, ...elevation[1],
   },
   endShiftText: { ...typography.labelLarge, color: colors.text.inverse },
-  pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
+  collapseBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.x6,
+    backgroundColor: colors.neutral[20], borderRadius: radius.medium,
+    paddingVertical: spacing.x10,
+  },
+  collapseText: { ...typography.labelMedium, color: colors.text.secondary },
+  pressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
   modalBackdrop: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', padding: spacing.x20,
